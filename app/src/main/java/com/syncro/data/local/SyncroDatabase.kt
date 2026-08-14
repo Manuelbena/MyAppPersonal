@@ -2,10 +2,21 @@ package com.syncro.data.local
 
 import androidx.room.Database
 import androidx.room.RoomDatabase
+import com.syncro.data.local.dao.EventDao
 import com.syncro.data.local.dao.TaskDao
+import com.syncro.data.local.dao.UserDao
+import com.syncro.data.local.entity.EventEntity
+import com.syncro.data.local.entity.SubtaskEntity
 import com.syncro.data.local.entity.TaskEntity
+import com.syncro.data.local.entity.UserEntity
 
-@Database(entities = [TaskEntity::class], version = 1, exportSchema = false)
+@Database(
+    entities = [TaskEntity::class, UserEntity::class, EventEntity::class, SubtaskEntity::class], 
+    version = 3, 
+    exportSchema = false
+)
 abstract class SyncroDatabase : RoomDatabase() {
     abstract val taskDao: TaskDao
+    abstract val userDao: UserDao
+    abstract val eventDao: EventDao
 }

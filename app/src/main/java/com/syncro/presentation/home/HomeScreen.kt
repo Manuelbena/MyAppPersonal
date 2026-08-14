@@ -1,5 +1,8 @@
 package com.syncro.presentation.home
 
+import android.app.Activity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -18,6 +21,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.syncro.presentation.home.components.*
 import com.syncro.domain.model.SyncroItem
 import com.syncro.presentation.navigation.AppScreen
+import kotlinx.coroutines.flow.collectLatest
 import java.time.LocalDate
 import java.time.format.TextStyle
 import java.util.*
@@ -34,6 +38,25 @@ fun HomeScreen(
     var showAddItemSheet by remember { mutableStateOf(false) }
     var showQuickTaskSheet by remember { mutableStateOf(false) }
     var selectedTaskForDetail by remember { mutableStateOf<SyncroItem.Task?>(null) }
+
+    val authLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            // Reintentar sincronización si el usuario autorizó
+            viewModel.syncFromGoogle()
+        }
+    }
+
+    LaunchedEffect(viewModel.effect) {
+        viewModel.effect.collect { effect ->
+            when (effect) {
+                is HomeEffect.LaunchAuthRecovery -> {
+                    authLauncher.launch(effect.intent)
+                }
+            }
+        }
+    }
     
     // Formatear la fecha actual para el header
     val formattedDate = uiState.selectedDate.dayOfWeek.getDisplayName(TextStyle.FULL, Locale("es", "ES"))
@@ -84,40 +107,66 @@ fun HomeScreen(
 
             // CONTENEDOR CON DEGRADADOS (Arriba y Abajo)
             Box(modifier = Modifier.fillMaxSize()) {
-                // PARTE SCROLLABLE: Asistente y Timeline
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .verticalScroll(scrollState)
-                ) {
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    AssistantCard(
-                        quote = uiState.quote,
-                        author = uiState.quoteAuthor
-                    )
-                    
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // Timeline de items (Eventos y Tareas)
+                if (uiState.isLoading && uiState.timelineItems.isEmpty()) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                } else {
+                    // PARTE SCROLLABLE: Asistente y Timeline
                     Column(
                         modifier = Modifier
-                            .padding(horizontal = 16.dp)
-                            .padding(bottom = 160.dp) // Espacio extra para el degradado y menú
+                            .fillMaxSize()
+                            .verticalScroll(scrollState)
                     ) {
-                        uiState.timelineItems.forEach { item ->
-                            when (item) {
-                                is SyncroItem.Event -> EventCard(
-                                    event = item,
-                                    onSubtaskToggle = { subtaskTitle ->
-                                        viewModel.toggleSubtaskCompletion(item.id, subtaskTitle)
-                                    }
-                                )
-                                is SyncroItem.Task -> TaskRow(
-                                    task = item,
-                                    onToggle = { viewModel.toggleTaskCompletion(item.id) },
-                                    onClick = { selectedTaskForDetail = item }
-                                )
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        AssistantCard(
+                            quote = uiState.quote,
+                            author = uiState.quoteAuthor
+                        )
+                        
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        // Timeline de items (Eventos y Tareas)
+                        Column(
+                            modifier = Modifier
+                                .padding(horizontal = 16.dp)
+                                .padding(bottom = 160.dp) // Espacio extra para el degradado y menú
+                        ) {
+                            if (uiState.timelineItems.isEmpty()) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(top = 40.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = "No hay eventos para hoy",
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
+                                    )
+                                }
+                            }
+
+                            uiState.timelineItems.forEach { item ->
+                                when (item) {
+                                    is SyncroItem.Event -> EventCard(
+                                        event = item,
+                                        onSubtaskToggle = { subtaskTitle ->
+                                            viewModel.toggleSubtaskCompletion(item.id, subtaskTitle)
+                                        }
+                                    )
+                                    is SyncroItem.Task -> TaskRow(
+                                        task = item,
+                                        onToggle = { viewModel.toggleTaskCompletion(item.id) },
+                                        onClick = { selectedTaskForDetail = item }
+                                    )
+                                }
                             }
                         }
                     }

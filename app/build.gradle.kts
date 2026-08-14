@@ -32,6 +32,20 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
+    packaging {
+        resources {
+            excludes += "/META-INF/{AL2.0,LGPL2.1}"
+            excludes += "META-INF/DEPENDENCIES"
+            excludes += "META-INF/INDEX.LIST"
+            excludes += "META-INF/LICENSE"
+            excludes += "META-INF/LICENSE.txt"
+            excludes += "META-INF/license.txt"
+            excludes += "META-INF/NOTICE"
+            excludes += "META-INF/NOTICE.txt"
+            excludes += "META-INF/notice.txt"
+            excludes += "META-INF/ASL2.0"
+        }
+    }
 }
 
 dependencies {
@@ -63,4 +77,17 @@ dependencies {
 
     // La librería de iconos extendidos (vital para usar iconos como el de "Ahorros")
     implementation("androidx.compose.material:material-icons-extended:1.6.0")
+
+    // Autenticación de Google (Credential Manager es lo más moderno)
+    implementation("androidx.credentials:credentials:1.2.1")
+    implementation("androidx.credentials:credentials-play-services-auth:1.2.1")
+    implementation("com.google.android.libraries.identity.googleid:googleid:1.1.0")
+
+    // APIs de Google (Calendar y Tasks)
+    implementation("com.google.api-client:google-api-client-android:1.35.0")
+    implementation("com.google.apis:google-api-services-calendar:v3-rev20211229-1.32.1")
+    implementation("com.google.apis:google-api-services-tasks:v1-rev20210709-1.32.1")
+
+    // Autenticación con OAuth2 para las APIs
+    implementation("com.google.auth:google-auth-library-oauth2-http:1.23.0")
 }

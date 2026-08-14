@@ -12,24 +12,28 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.syncro.presentation.AuthViewModel
 import com.syncro.presentation.assistant.AssistantScreen
 import com.syncro.presentation.calendar.CalendarScreen
 import com.syncro.presentation.event.AddEventScreen
 import com.syncro.presentation.home.HomeScreen
+import com.syncro.presentation.login.LoginScreen
 import com.syncro.presentation.theme.SyncroTheme
 import com.syncro.presentation.theme.ThemeViewModel
 
 @Composable
 fun MainScaffold(
-    themeViewModel: ThemeViewModel = hiltViewModel()
+    themeViewModel: ThemeViewModel = hiltViewModel(),
+    authViewModel: AuthViewModel = hiltViewModel()
 ) {
     val isDarkTheme by themeViewModel.isDarkTheme.collectAsState()
+    val currentUser by authViewModel.currentUser.collectAsState()
     val navController = rememberNavController()
 
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
     
-    val showBottomBar = currentRoute != AppScreen.AddEvent.route
+    val showBottomBar = currentRoute != AppScreen.AddEvent.route && currentRoute != AppScreen.Login.route
 
     SyncroTheme(darkTheme = isDarkTheme) {
         Scaffold(
@@ -56,9 +60,18 @@ fun MainScaffold(
             // Ingnoramos paddingValues para que el contenido sea inmersivo
             NavHost(
                 navController = navController,
-                startDestination = AppScreen.Home.route,
+                startDestination = if (currentUser == null) AppScreen.Login.route else AppScreen.Home.route,
                 modifier = Modifier.fillMaxSize()
             ) {
+                composable(AppScreen.Login.route) {
+                    LoginScreen(
+                        onLoginSuccess = {
+                            navController.navigate(AppScreen.Home.route) {
+                                popUpTo(AppScreen.Login.route) { inclusive = true }
+                            }
+                        }
+                    )
+                }
                 composable(AppScreen.Home.route) {
                      HomeScreen(
                          isDarkTheme = isDarkTheme,

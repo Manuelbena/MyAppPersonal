@@ -6,6 +6,7 @@ import androidx.room.PrimaryKey
 @Entity(tableName = "tasks")
 data class TaskEntity(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val remoteId: String? = null, // ID de Google Tasks
     val title: String,
     val description: String,
     val date: Long, // Epoch millis

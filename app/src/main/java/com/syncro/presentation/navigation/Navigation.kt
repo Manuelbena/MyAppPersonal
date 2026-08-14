@@ -5,6 +5,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.DateRange
 import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Savings
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -16,6 +17,7 @@ sealed class AppScreen(val route: String, val title: String, val icon: ImageVect
     object Savings : AppScreen("savings", "Ahorros", Icons.Outlined.Savings)
     object Assistant : AppScreen("assistant", "Asistente", Icons.Outlined.AutoAwesome)
     object AddEvent : AppScreen("add_event", "Nuevo Evento", Icons.Rounded.Add)
+    object Login : AppScreen("login", "Login", Icons.Outlined.Person)
 }
 
 // Lista que usaremos para pintar el menú
