@@ -13,6 +13,7 @@ import com.syncro.data.local.dao.EventDao
 import com.syncro.data.local.dao.TaskDao
 import com.syncro.data.local.dao.UserDao
 import com.syncro.data.local.entity.EventEntity
+import com.syncro.data.local.entity.SubtaskEntity
 import com.syncro.data.local.entity.TaskEntity
 import com.syncro.domain.repository.GoogleSyncRepository
 import kotlinx.coroutines.Dispatchers
@@ -35,14 +36,11 @@ class GoogleSyncRepositoryImpl @Inject constructor(
     private val jsonFactory = GsonFactory.getDefaultInstance()
     private val transport = NetHttpTransport()
 
-    override suspend fun syncTasks(): Result<Unit> = withContext(Dispatchers.IO) {
-        val tag = "GoogleSync"
+    override suspend fun syncTasks(date: LocalDate): Result<Unit> = withContext(Dispatchers.IO) {
         try {
             val user = userDao.getUser().first() ?: return@withContext Result.failure(Exception("No user logged in"))
-            Log.d(tag, "Syncing tasks for user email: '${user.email}'")
             
             if (user.email.isBlank() || !user.email.contains("@") || user.email.lowercase() == "null") {
-                Log.e(tag, "Invalid user email for sync: '${user.email}'")
                 return@withContext Result.failure(Exception("Invalid user email: ${user.email}"))
             }
 
@@ -64,12 +62,17 @@ class GoogleSyncRepositoryImpl @Inject constructor(
                     val googleTasks = tasksResponse.items
                     if (googleTasks != null) {
                         for (googleTask in googleTasks) {
+                            val taskDateEpoch = parseGoogleDateToEpoch(googleTask.due)
+                            val title = googleTask.title ?: ""
+                            val time = parseGoogleTime(googleTask.due)
+                            
                             val taskEntity = TaskEntity(
+                                id = "${taskDateEpoch}_${title}_${time}",
                                 remoteId = googleTask.id,
-                                title = googleTask.title ?: "",
+                                title = title,
                                 description = googleTask.notes ?: "",
-                                date = parseGoogleDateToEpoch(googleTask.due),
-                                time = parseGoogleTime(googleTask.due),
+                                date = taskDateEpoch,
+                                time = time,
                                 isCompleted = googleTask.status == "completed"
                             )
                             taskDao.insertTask(taskEntity)
@@ -77,25 +80,19 @@ class GoogleSyncRepositoryImpl @Inject constructor(
                     }
                 }
             }
-            Log.d(tag, "Tasks sync completed")
             Result.success(Unit)
         } catch (e: UserRecoverableAuthIOException) {
-            Log.w(tag, "User recoverable auth error during tasks sync", e)
             Result.failure(e)
         } catch (e: Exception) {
-            Log.e(tag, "Error syncing tasks", e)
             Result.failure(e)
         }
     }
 
-    override suspend fun syncCalendar(): Result<Unit> = withContext(Dispatchers.IO) {
-        val tag = "GoogleSync"
+    override suspend fun syncCalendar(date: LocalDate): Result<Unit> = withContext(Dispatchers.IO) {
         try {
             val user = userDao.getUser().first() ?: return@withContext Result.failure(Exception("No user logged in"))
-            Log.d(tag, "Syncing calendar for user email: '${user.email}'")
 
             if (user.email.isBlank() || !user.email.contains("@") || user.email.lowercase() == "null") {
-                Log.e(tag, "Invalid user email for sync: '${user.email}'")
                 return@withContext Result.failure(Exception("Invalid user email: ${user.email}"))
             }
 
@@ -108,52 +105,129 @@ class GoogleSyncRepositoryImpl @Inject constructor(
                 .setApplicationName("Syncro")
                 .build()
 
-            // Sincronizar desde el inicio del día actual para no perder eventos que ya pasaron hoy
-            val startOfDay = LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
-            val timeMin = com.google.api.client.util.DateTime(startOfDay)
+            val startOfDay = date.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+            val endOfDay = date.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
             
-            Log.d(tag, "Fetching events from: ${timeMin.toStringRfc3339()}")
+            val timeMin = com.google.api.client.util.DateTime(startOfDay)
+            val timeMax = com.google.api.client.util.DateTime(endOfDay)
 
             val eventsResponse = calendarService.events().list("primary")
                 .setTimeMin(timeMin)
+                .setTimeMax(timeMax)
                 .setOrderBy("startTime")
                 .setSingleEvents(true)
                 .execute()
             
             val events = eventsResponse.items
-            Log.d(tag, "Found ${events?.size ?: 0} events in Google Calendar")
-
             if (events != null) {
                 for (googleEvent in events) {
                     val startDateTime = googleEvent.start.dateTime ?: googleEvent.start.date
                     val localDate = parseGoogleDateToLocalDate(startDateTime)
+                    val dateEpoch = localDate.toEpochDay()
+                    val title = googleEvent.summary ?: ""
+                    val startTime = formatGoogleDateTime(googleEvent.start.dateTime)
+                    val rawDescription = googleEvent.description ?: ""
+
+                    val eventId = "${dateEpoch}_${title}_${startTime}"
                     
-                    Log.d(tag, "Event: ${googleEvent.summary} - Date: $localDate")
+                    // Extraer subtareas y limpiar descripción
+                    var cleanDescription = rawDescription
+                    val subtasks = mutableListOf<SubtaskEntity>()
+                    
+                    if (rawDescription.contains("subtareas:", ignoreCase = true)) {
+                        val parts = rawDescription.split(Regex("subtareas:", RegexOption.IGNORE_CASE))
+                        cleanDescription = parts[0].trim()
+                        
+                        if (parts.size > 1) {
+                            val subtasksPart = parts[1]
+                            val lines = subtasksPart.lines()
+                            for (line in lines) {
+                                val trimmedLine = line.trim()
+                                if (trimmedLine.isEmpty() || trimmedLine.contains("vacio", ignoreCase = true)) continue
+
+                                if (trimmedLine.contains("[x]", ignoreCase = true) || trimmedLine.startsWith("x ", ignoreCase = true)) {
+                                    val subtaskTitle = trimmedLine.replace("[x]", "", ignoreCase = true).removePrefix("x ").removePrefix("X ").trim()
+                                    if (subtaskTitle.isNotEmpty()) {
+                                        subtasks.add(SubtaskEntity(eventId = eventId, title = subtaskTitle, isCompleted = true))
+                                    }
+                                } else {
+                                    // Cualquier otra línea la tratamos como subtarea pendiente
+                                    val subtaskTitle = trimmedLine.replace("[ ]", "", ignoreCase = true).removePrefix("- ").removePrefix("• ").trim()
+                                    if (subtaskTitle.isNotEmpty()) {
+                                        subtasks.add(SubtaskEntity(eventId = eventId, title = subtaskTitle, isCompleted = false))
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Lógica para saber si el evento principal está completado
+                    val isEventCompleted = title.contains("[x]", ignoreCase = true) || 
+                                         title.startsWith("Cancelado", ignoreCase = true) ||
+                                         title.startsWith("Done", ignoreCase = true) ||
+                                         title.contains("✅")
+                    
+                    val cleanTitle = title
+                        .replace("[x]", "", ignoreCase = true)
+                        .replace("[ ]", "", ignoreCase = true)
+                        .replace("✅", "")
+                        .trim()
+
+                    val colorId = googleEvent.colorId
+                    val categoryColor = mapGoogleColorToHex(colorId)
+                    
+                    // Lógica de categoría dinámica basada en el color o título
+                    val (categoryName, finalColor) = when {
+                        title.contains("Trabajo", ignoreCase = true) || colorId == "6" -> "Trabajo" to 0xFFE67C73.toInt() // Mandarina/Rojizo para Trabajo
+                        title.contains("Cita", ignoreCase = true) || title.contains("Médico", ignoreCase = true) || colorId == "11" -> "Personal" to 0xFF7AE7BF.toInt() // Esmeralda para Personal
+                        else -> "General" to categoryColor
+                    }
 
                     val eventEntity = EventEntity(
+                        id = eventId,
                         remoteId = googleEvent.id,
-                        title = googleEvent.summary ?: "",
-                        description = googleEvent.description,
-                        date = localDate.toEpochDay(), 
-                        startTime = formatGoogleDateTime(googleEvent.start.dateTime),
+                        title = cleanTitle,
+                        description = cleanDescription,
+                        date = dateEpoch, 
+                        startTime = startTime,
                         endTime = formatGoogleDateTime(googleEvent.end.dateTime),
-                        categoryText = "Google Calendar",
-                        categoryColor = 0xFF4285F4.toInt(),
+                        categoryText = categoryName,
+                        categoryColor = finalColor,
                         priority = "MEDIUM",
                         isAllDay = googleEvent.start.dateTime == null,
-                        location = googleEvent.location
+                        location = googleEvent.location,
+                        isCompleted = isEventCompleted
                     )
-                    eventDao.insertEvent(eventEntity)
+                    
+                    if (subtasks.isEmpty()) {
+                        eventDao.insertEvent(eventEntity)
+                    } else {
+                        eventDao.insertEventWithSubtasks(eventEntity, subtasks)
+                    }
                 }
             }
-            Log.d(tag, "Calendar sync completed")
             Result.success(Unit)
         } catch (e: UserRecoverableAuthIOException) {
-            Log.w(tag, "User recoverable auth error during calendar sync", e)
             Result.failure(e)
         } catch (e: Exception) {
-            Log.e(tag, "Error syncing calendar", e)
             Result.failure(e)
+        }
+    }
+
+    private fun mapGoogleColorToHex(colorId: String?): Int {
+        return when (colorId) {
+            "1" -> 0xFFA4BDFC.toInt()
+            "2" -> 0xFF7AE7BF.toInt()
+            "3" -> 0xFFBDADFF.toInt()
+            "4" -> 0xFFFF887C.toInt()
+            "5" -> 0xFFFBD75B.toInt()
+            "6" -> 0xFFFFB878.toInt()
+            "7" -> 0xFF46D6DB.toInt()
+            "8" -> 0xFFE1E1E1.toInt()
+            "9" -> 0xFF5484ED.toInt()
+            "10" -> 0xFF51B749.toInt()
+            "11" -> 0xFFDC2127.toInt()
+            else -> 0xFF4285F4.toInt()
         }
     }
 
@@ -170,7 +244,6 @@ class GoogleSyncRepositoryImpl @Inject constructor(
     private fun parseGoogleDateToLocalDate(googleDateTime: com.google.api.client.util.DateTime): LocalDate {
         return try {
             val instant = Instant.ofEpochMilli(googleDateTime.value)
-            // Usamos el sistema de zona horaria por defecto para la conversión
             instant.atZone(ZoneId.systemDefault()).toLocalDate()
         } catch (_: Exception) {
             LocalDate.now()

@@ -5,7 +5,7 @@ import androidx.room.PrimaryKey
 
 @Entity(tableName = "events")
 data class EventEntity(
-    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    @PrimaryKey val id: String, // Generado como: date_title_startTime
     val remoteId: String? = null, // ID de Google Calendar
     val title: String,
     val description: String?,
@@ -17,5 +17,6 @@ data class EventEntity(
     val priority: String?, // LOW, MEDIUM, HIGH
     val isAllDay: Boolean = false,
     val location: String? = null,
-    val notificationEnabled: Boolean = true
+    val notificationEnabled: Boolean = true,
+    val isCompleted: Boolean = false
 )

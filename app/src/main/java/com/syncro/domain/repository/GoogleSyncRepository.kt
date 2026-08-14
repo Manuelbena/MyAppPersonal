@@ -1,8 +1,8 @@
 package com.syncro.domain.repository
 
-import com.syncro.domain.model.SyncroItem
+import java.time.LocalDate
 
 interface GoogleSyncRepository {
-    suspend fun syncTasks(): Result<Unit>
-    suspend fun syncCalendar(): Result<Unit>
+    suspend fun syncTasks(date: LocalDate): Result<Unit>
+    suspend fun syncCalendar(date: LocalDate): Result<Unit>
 }

@@ -10,9 +10,13 @@ import com.syncro.domain.usecase.GetTimelineUseCase
 import com.syncro.domain.usecase.SaveTaskUseCase
 import com.syncro.domain.usecase.SyncGoogleCalendarUseCase
 import com.syncro.domain.usecase.SyncGoogleTasksUseCase
+import com.syncro.domain.usecase.ToggleEventCompletionUseCase
+import com.syncro.domain.usecase.ToggleSubtaskCompletionUseCase
 import com.syncro.domain.usecase.ToggleTaskCompletionUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -40,6 +44,8 @@ class HomeViewModel @Inject constructor(
     private val getTimelineUseCase: GetTimelineUseCase,
     private val saveTaskUseCase: SaveTaskUseCase,
     private val toggleTaskCompletionUseCase: ToggleTaskCompletionUseCase,
+    private val toggleSubtaskCompletionUseCase: ToggleSubtaskCompletionUseCase,
+    private val toggleEventCompletionUseCase: ToggleEventCompletionUseCase,
     private val syncGoogleTasksUseCase: SyncGoogleTasksUseCase,
     private val syncGoogleCalendarUseCase: SyncGoogleCalendarUseCase
 ) : ViewModel() {
@@ -50,36 +56,43 @@ class HomeViewModel @Inject constructor(
     private val _effect = Channel<HomeEffect>(Channel.BUFFERED)
     val effect = _effect.receiveAsFlow()
 
+    private var syncJob: Job? = null
+
     init {
-        // Observar tareas y eventos del día seleccionado
+        // Observar cambios en la fecha seleccionada
         _uiState
             .map { it.selectedDate }
             .distinctUntilChanged()
+            .onEach { date ->
+                // Cada vez que cambia el día, lanzamos la sincronización
+                syncFromGoogle(date)
+            }
             .flatMapLatest { date ->
+                // Observamos la base de datos para ese día
                 getTimelineUseCase(date)
             }
             .onEach { items ->
-                Log.d("HomeViewModel", "Timeline updated: ${items.size} items for date ${_uiState.value.selectedDate}")
-                items.forEach { Log.d("HomeViewModel", "Item: ${it.javaClass.simpleName} - Title: ${if (it is SyncroItem.Event) it.title else (it as SyncroItem.Task).title}") }
                 _uiState.update { it.copy(timelineItems = items) }
             }
             .launchIn(viewModelScope)
-            
-        // Sincronización inicial
-        syncFromGoogle()
     }
 
-    fun syncFromGoogle() {
+    fun syncFromGoogle(date: LocalDate = _uiState.value.selectedDate) {
+        syncJob?.cancel()
         isAuthRecoveryInProgress = false
-        viewModelScope.launch {
+        syncJob = viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
             try {
-                val tasksResult = syncGoogleTasksUseCase()
-                val calendarResult = syncGoogleCalendarUseCase()
+                // Sincronizamos Calendar y Tasks en paralelo
+                val tasksDeferred = async { syncGoogleTasksUseCase(date) }
+                val calendarDeferred = async { syncGoogleCalendarUseCase(date) }
 
-                tasksResult.onFailure { handleSyncError(it) }
-                calendarResult.onFailure { handleSyncError(it) }
+                tasksDeferred.await().onFailure { handleSyncError(it) }
+                calendarDeferred.await().onFailure { handleSyncError(it) }
+            } catch (e: Exception) {
+                Log.e("HomeViewModel", "Error en la sincronización", e)
             } finally {
+                // Solo quitamos el cargando cuando ambas peticiones han terminado y guardado en BBDD
                 _uiState.update { it.copy(isLoading = false) }
             }
         }
@@ -88,19 +101,15 @@ class HomeViewModel @Inject constructor(
     private var isAuthRecoveryInProgress = false
 
     private fun handleSyncError(throwable: Throwable) {
-        Log.d("HomeViewModel", "Handling sync error: ${throwable.javaClass.simpleName}")
         if (throwable is UserRecoverableAuthIOException) {
             if (!isAuthRecoveryInProgress) {
                 isAuthRecoveryInProgress = true
-                Log.d("HomeViewModel", "UserRecoverableAuthIOException detected, sending effect")
                 viewModelScope.launch {
                     _effect.send(HomeEffect.LaunchAuthRecovery(throwable.intent))
                 }
-            } else {
-                Log.d("HomeViewModel", "Auth recovery already in progress, skipping duplicate effect")
             }
         } else {
-            Log.e("HomeViewModel", "Non-recoverable sync error", throwable)
+            Log.e("HomeViewModel", "Error de sincronización", throwable)
         }
     }
 
@@ -121,7 +130,15 @@ class HomeViewModel @Inject constructor(
         }
     }
 
+    fun toggleEventCompletion(eventId: String) {
+        viewModelScope.launch {
+            toggleEventCompletionUseCase(eventId)
+        }
+    }
+
     fun toggleSubtaskCompletion(eventId: String, subtaskTitle: String) {
-        // TODO: Implementar cuando los eventos estén en Room
+        viewModelScope.launch {
+            toggleSubtaskCompletionUseCase(eventId, subtaskTitle)
+        }
     }
 }

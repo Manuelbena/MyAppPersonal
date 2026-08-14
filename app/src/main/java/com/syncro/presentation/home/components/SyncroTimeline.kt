@@ -8,6 +8,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.*
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -31,7 +32,8 @@ import com.syncro.presentation.theme.Slate800
 @Composable
 fun EventCard(
     event: SyncroItem.Event,
-    onSubtaskToggle: (String) -> Unit
+    onSubtaskToggle: (String) -> Unit,
+    onToggleEvent: () -> Unit = {}
 ) {
     var isSubtasksExpanded by remember { mutableStateOf(true) }
 
@@ -47,17 +49,32 @@ fun EventCard(
                 .padding(top = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text(
-                text = event.startTime, 
-                fontWeight = FontWeight.Bold, 
-                fontSize = 14.sp, 
-                color = MaterialTheme.colorScheme.onBackground
-            )
-            Text(
-                text = event.endTime, 
-                color = MaterialTheme.colorScheme.onSurfaceVariant, 
-                fontSize = 12.sp
-            )
+            if (event.startTime == "00:00" && event.endTime == "00:00") {
+                Text(
+                    text = "Todo el",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+                Text(
+                    text = "día",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+            } else {
+                Text(
+                    text = event.startTime,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+                Text(
+                    text = event.endTime,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 12.sp
+                )
+            }
         }
 
         // Tarjeta
@@ -74,7 +91,7 @@ fun EventCard(
                     modifier = Modifier
                         .width(6.dp)
                         .fillMaxHeight()
-                        .background(event.categoryColor)
+                        .background(if (event.isCompleted) Emerald500 else event.categoryColor)
                 )
 
                 Column(
@@ -82,12 +99,35 @@ fun EventCard(
                         .padding(16.dp)
                         .fillMaxWidth()
                 ) {
-                    Text(
-                        text = event.title,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Checkbox para el evento principal
+                        Icon(
+                            imageVector = if (event.isCompleted) Icons.Rounded.CheckCircle else Icons.Rounded.RadioButtonUnchecked,
+                            contentDescription = "Completar evento",
+                            tint = if (event.isCompleted) Emerald500 else event.categoryColor.copy(alpha = 0.5f),
+                            modifier = Modifier
+                                .size(22.dp)
+                                .clickable(
+                                    interactionSource = remember { MutableInteractionSource() },
+                                    indication = null,
+                                    onClick = onToggleEvent
+                                )
+                        )
+                        
+                        Spacer(modifier = Modifier.width(12.dp))
+
+                        Text(
+                            text = event.title,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 16.sp,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            textDecoration = if (event.isCompleted) TextDecoration.LineThrough else TextDecoration.None,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
                     
                     if (!event.description.isNullOrEmpty()) {
                         Spacer(modifier = Modifier.height(4.dp))
@@ -183,9 +223,9 @@ fun SubtaskRow(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
-            imageVector = if (subtask.isCompleted) Icons.Rounded.CheckCircleOutline else Icons.Rounded.RadioButtonUnchecked,
+            imageVector = if (subtask.isCompleted) Icons.Rounded.CheckCircle else Icons.Rounded.RadioButtonUnchecked,
             contentDescription = null,
-            tint = if (subtask.isCompleted) color else MaterialTheme.colorScheme.outline,
+            tint = if (subtask.isCompleted) Emerald500 else color.copy(alpha = 0.5f),
             modifier = Modifier.size(20.dp)
         )
         Spacer(modifier = Modifier.width(12.dp))
@@ -384,6 +424,13 @@ fun TaskDetailDialog(
 
 @Composable
 fun TagChip(text: String, color: Color) {
+    val icon = when (text.lowercase()) {
+        "trabajo" -> Icons.Rounded.Work
+        "personal" -> Icons.Rounded.Person
+        "google calendar" -> Icons.Rounded.CalendarMonth
+        else -> Icons.AutoMirrored.Rounded.Label
+    }
+
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(8.dp))
@@ -391,12 +438,23 @@ fun TagChip(text: String, color: Color) {
             .border(BorderStroke(1.dp, color.copy(alpha = 0.2f)), RoundedCornerShape(8.dp))
             .padding(horizontal = 10.dp, vertical = 4.dp)
     ) {
-        Text(
-            text = text.uppercase(),
-            color = color,
-            fontSize = 10.sp,
-            fontWeight = FontWeight.Bold,
-            letterSpacing = 0.5.sp
-        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = color,
+                modifier = Modifier.size(12.dp)
+            )
+            Text(
+                text = text.uppercase(),
+                color = color,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 0.5.sp
+            )
+        }
     }
 }

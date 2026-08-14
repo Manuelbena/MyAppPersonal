@@ -18,15 +18,21 @@ interface EventDao {
 
     @Transaction
     @Query("SELECT * FROM subtasks WHERE eventId = :eventId")
-    suspend fun getSubtasksForEvent(eventId: Int): List<SubtaskEntity>
+    suspend fun getSubtasksForEvent(eventId: String): List<SubtaskEntity>
 
     @Transaction
     suspend fun insertEventWithSubtasks(event: EventEntity, subtasks: List<SubtaskEntity>) {
-        val eventId = insertEvent(event).toInt()
-        val subtasksWithId = subtasks.map { it.copy(eventId = eventId) }
+        insertEvent(event)
+        val subtasksWithId = subtasks.map { it.copy(eventId = event.id) }
         insertSubtasks(subtasksWithId)
     }
 
     @Query("DELETE FROM events WHERE remoteId = :remoteId")
     suspend fun deleteEventByRemoteId(remoteId: String)
+
+    @Query("UPDATE subtasks SET isCompleted = NOT isCompleted WHERE eventId = :eventId AND title = :subtaskTitle")
+    suspend fun toggleSubtaskCompletion(eventId: String, subtaskTitle: String)
+
+    @Query("UPDATE events SET isCompleted = NOT isCompleted WHERE id = :eventId")
+    suspend fun toggleEventCompletion(eventId: String)
 }

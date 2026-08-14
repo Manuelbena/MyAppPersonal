@@ -23,7 +23,8 @@ sealed class SyncroItem {
         val categoryText: String,
         val categoryColor: Color,
         val priority: Priority? = null,
-        val subtasks: List<Subtask> = emptyList()
+        val subtasks: List<Subtask> = emptyList(),
+        val isCompleted: Boolean = false
     ) : SyncroItem()
 
     data class Task(

@@ -107,31 +107,31 @@ fun HomeScreen(
 
             // CONTENEDOR CON DEGRADADOS (Arriba y Abajo)
             Box(modifier = Modifier.fillMaxSize()) {
-                if (uiState.isLoading && uiState.timelineItems.isEmpty()) {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        CircularProgressIndicator(
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                } else {
-                    // PARTE SCROLLABLE: Asistente y Timeline
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .verticalScroll(scrollState)
-                    ) {
-                        Spacer(modifier = Modifier.height(16.dp))
+                // El contenido principal siempre es scrollable para que el Assistant pueda subir
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(scrollState)
+                ) {
+                    Spacer(modifier = Modifier.height(16.dp))
 
-                        AssistantCard(
-                            quote = uiState.quote,
-                            author = uiState.quoteAuthor
-                        )
-                        
-                        Spacer(modifier = Modifier.height(16.dp))
+                    AssistantCard(
+                        quote = uiState.quote,
+                        author = uiState.quoteAuthor
+                    )
 
+                    if (uiState.isLoading) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(200.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator(
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    } else {
                         // Timeline de items (Eventos y Tareas)
                         Column(
                             modifier = Modifier
@@ -159,6 +159,9 @@ fun HomeScreen(
                                         event = item,
                                         onSubtaskToggle = { subtaskTitle ->
                                             viewModel.toggleSubtaskCompletion(item.id, subtaskTitle)
+                                        },
+                                        onToggleEvent = {
+                                            viewModel.toggleEventCompletion(item.id)
                                         }
                                     )
                                     is SyncroItem.Task -> TaskRow(

@@ -7,7 +7,6 @@ import com.syncro.domain.repository.TaskRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import java.time.LocalDate
-import java.time.ZoneOffset
 import javax.inject.Inject
 
 class TaskRepositoryImpl @Inject constructor(
@@ -22,11 +21,13 @@ class TaskRepositoryImpl @Inject constructor(
     }
 
     override suspend fun insertTask(task: SyncroItem.Task, description: String, date: LocalDate) {
+        val dateEpoch = date.toEpochDay()
         dao.insertTask(
             TaskEntity(
+                id = "${dateEpoch}_${task.title}_${task.time}",
                 title = task.title,
                 description = description,
-                date = date.toEpochDay(),
+                date = dateEpoch,
                 time = task.time,
                 isCompleted = task.isCompleted
             )
@@ -34,15 +35,14 @@ class TaskRepositoryImpl @Inject constructor(
     }
 
     override suspend fun toggleTaskCompletion(taskId: String) {
-        val id = taskId.toIntOrNull() ?: return
-        dao.getTaskById(id)?.let { entity ->
+        dao.getTaskById(taskId)?.let { entity ->
             dao.updateTask(entity.copy(isCompleted = !entity.isCompleted))
         }
     }
 
     private fun TaskEntity.toDomain(): SyncroItem.Task {
         return SyncroItem.Task(
-            id = id.toString(),
+            id = id,
             title = title,
             description = description,
             time = time,

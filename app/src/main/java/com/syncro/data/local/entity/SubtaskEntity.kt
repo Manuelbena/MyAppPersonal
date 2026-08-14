@@ -19,7 +19,7 @@ import androidx.room.PrimaryKey
 )
 data class SubtaskEntity(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
-    val eventId: Int,
+    val eventId: String,
     val title: String,
     val isCompleted: Boolean
 )

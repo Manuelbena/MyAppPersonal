@@ -1,18 +1,30 @@
 package com.syncro.presentation.theme
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.syncro.data.preferences.ThemePreferences
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
-class ThemeViewModel @Inject constructor() : ViewModel() {
-    private val _isDarkTheme = MutableStateFlow(false)
-    val isDarkTheme = _isDarkTheme.asStateFlow()
+class ThemeViewModel @Inject constructor(
+    private val themePreferences: ThemePreferences
+) : ViewModel() {
+
+    val isDarkTheme: StateFlow<Boolean> = themePreferences.isDarkTheme
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = false
+        )
 
     fun toggleTheme() {
-        _isDarkTheme.update { !it }
+        viewModelScope.launch {
+            themePreferences.saveThemePreference(!isDarkTheme.value)
+        }
     }
 }
