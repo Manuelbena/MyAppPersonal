@@ -40,11 +40,18 @@ fun QuickTaskSheet(
     onDismiss: () -> Unit,
     onSave: (String, String, LocalDate, LocalTime, String?, Color?) -> Unit
 ) {
+    val categories = listOf(
+        CategoryItem("Personal", Icons.Rounded.Person, Emerald500),
+        CategoryItem("Trabajo", Icons.Rounded.Work, Indigo500),
+        CategoryItem("Salud", Icons.Rounded.Favorite, Color(0xFFFF5252)),
+        CategoryItem("Ocio", Icons.Rounded.SportsEsports, Amber500)
+    )
+
     var title by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
     var selectedDate by remember { mutableStateOf(LocalDate.now()) }
     var selectedTime by remember { mutableStateOf(LocalTime.now()) }
-    var selectedCategory by remember { mutableStateOf<CategoryItem?>(null) }
+    var selectedCategory by remember { mutableStateOf<CategoryItem?>(categories[0]) } // Default a Personal
     
     var showDatePicker by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
@@ -52,13 +59,6 @@ fun QuickTaskSheet(
 
     val dateFormatter = DateTimeFormatter.ofPattern("d 'de' MMMM", Locale("es", "ES"))
     val timeFormatter = DateTimeFormatter.ofPattern("HH:mm")
-
-    val categories = listOf(
-        CategoryItem("Personal", Icons.Rounded.Person, Emerald500),
-        CategoryItem("Trabajo", Icons.Rounded.Work, Indigo500),
-        CategoryItem("Salud", Icons.Rounded.Favorite, Color(0xFFFF5252)),
-        CategoryItem("Ocio", Icons.Rounded.SportsEsports, Amber500)
-    )
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,

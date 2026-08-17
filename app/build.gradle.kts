@@ -65,7 +65,7 @@ dependencies {
     ksp(libs.androidx.room.compiler)
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.datastore.preferences)
-    implementation("com.kizitonwose.calendar:compose:2.5.0")
+    implementation(libs.com.kizitonwose.calendar.compose)
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
@@ -77,7 +77,7 @@ dependencies {
     implementation("androidx.compose.material3:material3:1.4.0")
 
     // La librería de iconos extendidos (vital para usar iconos como el de "Ahorros")
-    implementation("androidx.compose.material:material-icons-extended:1.6.0")
+    implementation(libs.androidx.compose.material.icons.extended)
 
     // Autenticación de Google (Credential Manager es lo más moderno)
     implementation("androidx.credentials:credentials:1.2.1")

@@ -11,6 +11,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -116,39 +118,32 @@ fun HomeScreen(
             )
 
             // CONTENEDOR CON DEGRADADOS (Arriba y Abajo)
-            Box(modifier = Modifier.fillMaxSize()) {
-                // El contenido principal siempre es scrollable para que el Assistant pueda subir
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .verticalScroll(scrollState)
-                ) {
-                    Spacer(modifier = Modifier.height(16.dp))
+            PullToRefreshBox(
+                isRefreshing = uiState.isLoading,
+                onRefresh = { viewModel.syncFromGoogle() },
+                modifier = Modifier.fillMaxSize()
+            ) {
+                Box(modifier = Modifier.fillMaxSize()) {
+                    // El contenido principal siempre es scrollable para que el Assistant pueda subir
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .verticalScroll(scrollState)
+                    ) {
+                        Spacer(modifier = Modifier.height(16.dp))
 
-                    AssistantCard(
-                        quote = uiState.quote,
-                        author = uiState.quoteAuthor
-                    )
+                        AssistantCard(
+                            quote = uiState.quote,
+                            author = uiState.quoteAuthor
+                        )
 
-                    if (uiState.isLoading) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(200.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            CircularProgressIndicator(
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                    } else {
                         // Timeline de items (Eventos y Tareas)
                         Column(
                             modifier = Modifier
                                 .padding(horizontal = 16.dp)
                                 .padding(bottom = 160.dp) // Espacio extra para el degradado y menú
                         ) {
-                            if (uiState.timelineItems.isEmpty()) {
+                            if (!uiState.isLoading && uiState.timelineItems.isEmpty()) {
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -183,41 +178,41 @@ fun HomeScreen(
                             }
                         }
                     }
+
+                    // Degradado SUPERIOR (Para que las tareas se desvanezcan al subir)
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(24.dp)
+                            .align(Alignment.TopCenter)
+                            .background(
+                                brush = Brush.verticalGradient(
+                                    colors = listOf(
+                                        MaterialTheme.colorScheme.background,
+                                        Color.Transparent
+                                    )
+                                )
+                            )
+                    )
+
+                    // Degradado INFERIOR (Para que se vea por detrás del menú)
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(140.dp)
+                            .align(Alignment.BottomCenter)
+                            .background(
+                                brush = Brush.verticalGradient(
+                                    colors = listOf(
+                                        Color.Transparent,
+                                        MaterialTheme.colorScheme.background.copy(alpha = 0.7f),
+                                        MaterialTheme.colorScheme.background.copy(alpha = 0.95f),
+                                        MaterialTheme.colorScheme.background
+                                    )
+                                )
+                            )
+                    )
                 }
-
-                // Degradado SUPERIOR (Para que las tareas se desvanezcan al subir)
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(24.dp)
-                        .align(Alignment.TopCenter)
-                        .background(
-                            brush = Brush.verticalGradient(
-                                colors = listOf(
-                                    MaterialTheme.colorScheme.background,
-                                    Color.Transparent
-                                )
-                            )
-                        )
-                )
-
-                // Degradado INFERIOR (Para que se vea por detrás del menú)
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(140.dp)
-                        .align(Alignment.BottomCenter)
-                        .background(
-                            brush = Brush.verticalGradient(
-                                colors = listOf(
-                                    Color.Transparent,
-                                    MaterialTheme.colorScheme.background.copy(alpha = 0.7f),
-                                    MaterialTheme.colorScheme.background.copy(alpha = 0.95f),
-                                    MaterialTheme.colorScheme.background
-                                )
-                            )
-                        )
-                )
             }
         }
     }

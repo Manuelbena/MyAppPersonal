@@ -1,6 +1,7 @@
 package com.syncro.data.repository
 
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import com.syncro.data.local.dao.EventDao
 import com.syncro.data.local.entity.EventEntity
 import com.syncro.data.local.entity.SubtaskEntity
@@ -29,6 +30,32 @@ class EventRepositoryImpl @Inject constructor(
                     id = entity.id,
                     title = entity.title,
                     description = entity.description,
+                    date = LocalDate.ofEpochDay(entity.date),
+                    startTime = entity.startTime,
+                    endTime = entity.endTime,
+                    categoryText = entity.categoryText,
+                    categoryColor = Color(entity.categoryColor),
+                    priority = entity.priority?.let { Priority.valueOf(it) },
+                    subtasks = subtasks,
+                    isCompleted = entity.isCompleted
+                )
+            }
+        }
+    }
+
+    override fun getEventsInRange(startDate: LocalDate, endDate: LocalDate): Flow<List<SyncroItem.Event>> {
+        return dao.getEventsInRange(startDate.toEpochDay(), endDate.toEpochDay()).map { relations ->
+            relations.map { relation ->
+                val entity = relation.event
+                val subtasks = relation.subtasks.map {
+                    Subtask(title = it.title, isCompleted = it.isCompleted)
+                }
+
+                SyncroItem.Event(
+                    id = entity.id,
+                    title = entity.title,
+                    description = entity.description,
+                    date = LocalDate.ofEpochDay(entity.date),
                     startTime = entity.startTime,
                     endTime = entity.endTime,
                     categoryText = entity.categoryText,
@@ -52,7 +79,7 @@ class EventRepositoryImpl @Inject constructor(
             startTime = event.startTime,
             endTime = event.endTime,
             categoryText = event.categoryText,
-            categoryColor = event.categoryColor.value.toInt(),
+            categoryColor = event.categoryColor.toArgb(),
             priority = event.priority?.name,
             location = location,
             isCompleted = event.isCompleted

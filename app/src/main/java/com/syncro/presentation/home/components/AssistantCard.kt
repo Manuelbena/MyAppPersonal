@@ -86,7 +86,7 @@ fun AssistantCard(
             Column {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = "AURA ASSISTANT",
+                        text = "SYNCRO ASSISTANT",
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onPrimaryContainer,

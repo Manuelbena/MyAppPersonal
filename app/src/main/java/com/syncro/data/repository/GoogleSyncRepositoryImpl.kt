@@ -77,7 +77,9 @@ class GoogleSyncRepositoryImpl @Inject constructor(
                                 description = googleTask.notes ?: "",
                                 date = taskDateEpoch,
                                 time = time,
-                                isCompleted = googleTask.status == "completed"
+                                isCompleted = googleTask.status == "completed",
+                                categoryText = "General",
+                                categoryColor = 0xFF94A3B8.toInt() // Slate400
                             )
                             taskDao.insertTask(taskEntity)
                         }
@@ -220,6 +222,38 @@ class GoogleSyncRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun uploadUnsyncedItems(date: LocalDate): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val dateEpoch = date.toEpochDay()
+            
+            // 1. Subir Tareas locales no sincronizadas
+            val unsyncedTasks = taskDao.getUnsyncedTasksByDate(dateEpoch)
+            for (task in unsyncedTasks) {
+                uploadTaskToGoogle(task.title, task.description, date)
+            }
+
+            // 2. Subir Eventos locales no sincronizados
+            val unsyncedEvents = eventDao.getUnsyncedEventsByDate(dateEpoch)
+            for (eventWithSubtasks in unsyncedEvents) {
+                val event = eventWithSubtasks.event
+                val subtasks = eventWithSubtasks.subtasks.map { it.title }
+                uploadEventToGoogle(
+                    title = event.title,
+                    description = event.description,
+                    location = event.location,
+                    startDate = date,
+                    startTime = event.startTime,
+                    endTime = event.endTime,
+                    category = event.categoryText,
+                    subtasks = subtasks
+                )
+            }
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     override suspend fun uploadTaskToGoogle(title: String, notes: String?, date: LocalDate): Result<Unit> = withContext(Dispatchers.IO) {
         try {
             val user = userDao.getUser().first() ?: return@withContext Result.failure(Exception("No user logged in"))
@@ -251,7 +285,8 @@ class GoogleSyncRepositoryImpl @Inject constructor(
         startDate: LocalDate, 
         startTime: String, 
         endTime: String,
-        category: String?
+        category: String?,
+        subtasks: List<String>
     ): Result<Unit> = withContext(Dispatchers.IO) {
         try {
             val user = userDao.getUser().first() ?: return@withContext Result.failure(Exception("No user logged in"))
@@ -267,9 +302,17 @@ class GoogleSyncRepositoryImpl @Inject constructor(
             val startDT = OffsetDateTime.of(startDate.atTime(startLT), ZoneId.systemDefault().rules.getOffset(Instant.now()))
             val endDT = OffsetDateTime.of(startDate.atTime(endLT), ZoneId.systemDefault().rules.getOffset(Instant.now()))
 
+            // Preparar descripción con subtareas si existen
+            val finalDescription = StringBuilder()
+            description?.let { finalDescription.append(it).append("\n\n") }
+            if (subtasks.isNotEmpty()) {
+                finalDescription.append("Subtareas:\n")
+                subtasks.forEach { finalDescription.append("- [ ] $it\n") }
+            }
+
             val event = Event().apply {
                 summary = title
-                this.description = description
+                this.description = finalDescription.toString().trim()
                 this.location = location
                 // Asignar el color de Google basado en la categoría de la app
                 colorId = when (category) {

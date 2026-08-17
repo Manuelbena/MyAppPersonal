@@ -1,6 +1,7 @@
 package com.syncro.data.repository
 
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import com.syncro.data.local.dao.TaskDao
 import com.syncro.data.local.entity.TaskEntity
 import com.syncro.domain.model.SyncroItem
@@ -32,7 +33,7 @@ class TaskRepositoryImpl @Inject constructor(
                 time = task.time,
                 isCompleted = task.isCompleted,
                 categoryText = task.categoryText,
-                categoryColor = task.categoryColor?.value?.toInt()
+                categoryColor = task.categoryColor?.toArgb()
             )
         )
     }
@@ -48,10 +49,11 @@ class TaskRepositoryImpl @Inject constructor(
             id = id,
             title = title,
             description = description,
+            date = LocalDate.ofEpochDay(date),
             time = time,
             isCompleted = isCompleted,
             categoryText = categoryText,
-            categoryColor = categoryColor?.let { Color(it.toLong()) }
+            categoryColor = categoryColor?.let { Color(it) }
         )
     }
 }

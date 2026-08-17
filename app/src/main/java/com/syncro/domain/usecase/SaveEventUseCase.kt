@@ -29,6 +29,7 @@ class SaveEventUseCase @Inject constructor(
             id = "0", // Generated in repository
             title = title,
             description = description,
+            date = date,
             startTime = startTime,
             endTime = endTime,
             categoryText = categoryText,
@@ -47,7 +48,8 @@ class SaveEventUseCase @Inject constructor(
             startDate = date,
             startTime = startTime,
             endTime = endTime,
-            category = categoryText
+            category = categoryText,
+            subtasks = subtasks
         )
     }
 }

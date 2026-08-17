@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.google.api.client.googleapis.extensions.android.gms.auth.UserRecoverableAuthIOException
 import androidx.compose.ui.graphics.Color
 import com.syncro.domain.model.Priority
+import com.syncro.domain.model.QuotesProvider
 import com.syncro.domain.model.SyncroItem
 import com.syncro.domain.usecase.GetTimelineUseCase
 import com.syncro.domain.usecase.SaveEventUseCase
@@ -53,7 +54,8 @@ class HomeViewModel @Inject constructor(
     private val toggleSubtaskCompletionUseCase: ToggleSubtaskCompletionUseCase,
     private val toggleEventCompletionUseCase: ToggleEventCompletionUseCase,
     private val syncGoogleTasksUseCase: SyncGoogleTasksUseCase,
-    private val syncGoogleCalendarUseCase: SyncGoogleCalendarUseCase
+    private val syncGoogleCalendarUseCase: SyncGoogleCalendarUseCase,
+    private val uploadUnsyncedItemsUseCase: com.syncro.domain.usecase.UploadUnsyncedItemsUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HomeUiState())
@@ -65,6 +67,12 @@ class HomeViewModel @Inject constructor(
     private var syncJob: Job? = null
 
     init {
+        // Frase del día basada en el día del año
+        val dayOfYear = LocalDate.now().dayOfYear
+        val quoteIndex = dayOfYear % QuotesProvider.quotes.size
+        val dailyQuote = QuotesProvider.quotes[quoteIndex]
+        _uiState.update { it.copy(quote = dailyQuote.text, quoteAuthor = dailyQuote.author) }
+
         // Observar cambios en la fecha seleccionada
         _uiState
             .map { it.selectedDate }
@@ -89,7 +97,10 @@ class HomeViewModel @Inject constructor(
         syncJob = viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
             try {
-                // Sincronizamos Calendar y Tasks en paralelo
+                // 1. Primero subimos lo que esté en local y no en Google
+                uploadUnsyncedItemsUseCase(date)
+
+                // 2. Sincronizamos Calendar y Tasks en paralelo
                 val tasksDeferred = async { syncGoogleTasksUseCase(date) }
                 val calendarDeferred = async { syncGoogleCalendarUseCase(date) }
 

@@ -1,6 +1,16 @@
 package com.syncro.presentation.navigation
 
+import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.layout.*
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -13,7 +23,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.syncro.presentation.AuthViewModel
-import com.syncro.presentation.assistant.AssistantScreen
+import com.syncro.presentation.assistant.AssistantMainScreen
 import com.syncro.presentation.calendar.CalendarScreen
 import com.syncro.presentation.event.AddEventScreen
 import com.syncro.presentation.home.HomeScreen
@@ -36,33 +46,79 @@ fun MainScaffold(
     val showBottomBar = currentRoute != AppScreen.AddEvent.route && currentRoute != AppScreen.Login.route
 
     SyncroTheme(darkTheme = isDarkTheme) {
-        Scaffold(
-            bottomBar = {
-                if (showBottomBar) {
-                    FloatingBottomNav(
-                        items = bottomNavItems,
-                        currentRoute = currentRoute,
-                        onItemClick = { screen ->
-                            navController.navigate(screen.route) {
-                                popUpTo(navController.graph.startDestinationId) {
-                                    saveState = true
+            Scaffold(
+                bottomBar = {
+                    if (showBottomBar) {
+                        FloatingBottomNav(
+                            items = bottomNavItems,
+                            currentRoute = currentRoute,
+                            onItemClick = { screen ->
+                                navController.navigate(screen.route) {
+                                    popUpTo(navController.graph.startDestinationId) {
+                                        saveState = true
+                                    }
+                                    launchSingleTop = true
+                                    restoreState = true
                                 }
-                                launchSingleTop = true
-                                restoreState = true
                             }
+                        )
+                    }
+                },
+                containerColor = Color.Transparent,
+                contentWindowInsets = WindowInsets(0, 0, 0, 0)
+            ) { paddingValues ->
+                // Ingnoramos paddingValues para que el contenido sea inmersivo
+                NavHost(
+                    navController = navController,
+                    startDestination = if (currentUser == null) AppScreen.Login.route else AppScreen.Home.route,
+                    modifier = Modifier.fillMaxSize(),
+                    enterTransition = {
+                        val initialRoute = initialState.destination.route
+                        val targetRoute = targetState.destination.route
+                        
+                        val initialIndex = bottomNavItems.indexOfFirst { it.route == initialRoute }
+                        val targetIndex = bottomNavItems.indexOfFirst { it.route == targetRoute }
+
+                        if (initialIndex != -1 && targetIndex != -1 && initialIndex != targetIndex) {
+                            if (targetIndex > initialIndex) {
+                                slideInHorizontally(
+                                    initialOffsetX = { it },
+                                    animationSpec = tween(700, easing = FastOutSlowInEasing)
+                                ) + fadeIn(animationSpec = tween(700))
+                            } else {
+                                slideInHorizontally(
+                                    initialOffsetX = { -it },
+                                    animationSpec = tween(700, easing = FastOutSlowInEasing)
+                                ) + fadeIn(animationSpec = tween(700))
+                            }
+                        } else {
+                            fadeIn(animationSpec = tween(700)) + scaleIn(initialScale = 0.92f, animationSpec = tween(700, easing = FastOutSlowInEasing))
                         }
-                    )
-                }
-            },
-            containerColor = Color.Transparent,
-            contentWindowInsets = WindowInsets(0, 0, 0, 0)
-        ) { paddingValues ->
-            // Ingnoramos paddingValues para que el contenido sea inmersivo
-            NavHost(
-                navController = navController,
-                startDestination = if (currentUser == null) AppScreen.Login.route else AppScreen.Home.route,
-                modifier = Modifier.fillMaxSize()
-            ) {
+                    },
+                    exitTransition = {
+                        val initialRoute = initialState.destination.route
+                        val targetRoute = targetState.destination.route
+                        
+                        val initialIndex = bottomNavItems.indexOfFirst { it.route == initialRoute }
+                        val targetIndex = bottomNavItems.indexOfFirst { it.route == targetRoute }
+
+                        if (initialIndex != -1 && targetIndex != -1 && initialIndex != targetIndex) {
+                            if (targetIndex > initialIndex) {
+                                slideOutHorizontally(
+                                    targetOffsetX = { -it },
+                                    animationSpec = tween(700, easing = FastOutSlowInEasing)
+                                ) + fadeOut(animationSpec = tween(700))
+                            } else {
+                                slideOutHorizontally(
+                                    targetOffsetX = { it },
+                                    animationSpec = tween(700, easing = FastOutSlowInEasing)
+                                ) + fadeOut(animationSpec = tween(700))
+                            }
+                        } else {
+                            fadeOut(animationSpec = tween(500))
+                        }
+                    }
+                ) {
                 composable(AppScreen.Login.route) {
                     LoginScreen(
                         onLoginSuccess = {
@@ -86,7 +142,7 @@ fun MainScaffold(
                      //SavingsScreen()
                 }
                 composable(AppScreen.Assistant.route) {
-                     AssistantScreen()
+                     AssistantMainScreen()
                 }
                 // Quitamos la ruta separada de AddEvent para evitar el pantallazo blanco
             }

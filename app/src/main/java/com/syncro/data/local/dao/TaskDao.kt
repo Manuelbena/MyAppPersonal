@@ -20,4 +20,7 @@ interface TaskDao {
     
     @Query("SELECT * FROM tasks WHERE id = :id")
     suspend fun getTaskById(id: String): TaskEntity?
+
+    @Query("SELECT * FROM tasks WHERE remoteId IS NULL AND date = :dateEpoch")
+    suspend fun getUnsyncedTasksByDate(dateEpoch: Long): List<TaskEntity>
 }
