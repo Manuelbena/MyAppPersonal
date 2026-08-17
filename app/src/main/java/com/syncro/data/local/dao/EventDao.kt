@@ -2,13 +2,15 @@ package com.syncro.data.local.dao
 
 import androidx.room.*
 import com.syncro.data.local.entity.EventEntity
+import com.syncro.data.local.entity.EventWithSubtasks
 import com.syncro.data.local.entity.SubtaskEntity
 import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface EventDao {
+    @Transaction
     @Query("SELECT * FROM events WHERE date = :dateEpoch")
-    fun getEventsByDate(dateEpoch: Long): Flow<List<EventEntity>>
+    fun getEventsByDate(dateEpoch: Long): Flow<List<EventWithSubtasks>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertEvent(event: EventEntity): Long

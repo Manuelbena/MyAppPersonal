@@ -5,8 +5,11 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.api.client.googleapis.extensions.android.gms.auth.UserRecoverableAuthIOException
+import androidx.compose.ui.graphics.Color
+import com.syncro.domain.model.Priority
 import com.syncro.domain.model.SyncroItem
 import com.syncro.domain.usecase.GetTimelineUseCase
+import com.syncro.domain.usecase.SaveEventUseCase
 import com.syncro.domain.usecase.SaveTaskUseCase
 import com.syncro.domain.usecase.SyncGoogleCalendarUseCase
 import com.syncro.domain.usecase.SyncGoogleTasksUseCase
@@ -31,11 +34,13 @@ data class HomeUiState(
     val quote: String = "La mejor manera de empezar es dejar de hablar y empezar a hacer.",
     val quoteAuthor: String = "Walt Disney",
     val timelineItems: List<SyncroItem> = emptyList(),
-    val isLoading: Boolean = false
+    val isLoading: Boolean = false,
+    val syncMessage: String? = null
 )
 
 sealed class HomeEffect {
     data class LaunchAuthRecovery(val intent: Intent) : HomeEffect()
+    data class ShowSnackbar(val message: String) : HomeEffect()
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -43,6 +48,7 @@ sealed class HomeEffect {
 class HomeViewModel @Inject constructor(
     private val getTimelineUseCase: GetTimelineUseCase,
     private val saveTaskUseCase: SaveTaskUseCase,
+    private val saveEventUseCase: SaveEventUseCase,
     private val toggleTaskCompletionUseCase: ToggleTaskCompletionUseCase,
     private val toggleSubtaskCompletionUseCase: ToggleSubtaskCompletionUseCase,
     private val toggleEventCompletionUseCase: ToggleEventCompletionUseCase,
@@ -87,12 +93,16 @@ class HomeViewModel @Inject constructor(
                 val tasksDeferred = async { syncGoogleTasksUseCase(date) }
                 val calendarDeferred = async { syncGoogleCalendarUseCase(date) }
 
-                tasksDeferred.await().onFailure { handleSyncError(it) }
-                calendarDeferred.await().onFailure { handleSyncError(it) }
+                val tasksResult = tasksDeferred.await()
+                val calendarResult = calendarDeferred.await()
+
+                if (!tasksResult.isSuccess || !calendarResult.isSuccess) {
+                    tasksResult.onFailure { handleSyncError(it) }
+                    calendarResult.onFailure { handleSyncError(it) }
+                }
             } catch (e: Exception) {
                 Log.e("HomeViewModel", "Error en la sincronización", e)
             } finally {
-                // Solo quitamos el cargando cuando ambas peticiones han terminado y guardado en BBDD
                 _uiState.update { it.copy(isLoading = false) }
             }
         }
@@ -117,10 +127,54 @@ class HomeViewModel @Inject constructor(
         _uiState.update { it.copy(selectedDate = date) }
     }
 
-    fun saveQuickTask(title: String, description: String, date: LocalDate, time: LocalTime) {
+    fun saveQuickTask(
+        title: String, 
+        description: String, 
+        date: LocalDate, 
+        time: LocalTime,
+        categoryText: String? = null,
+        categoryColor: Color? = null
+    ) {
         viewModelScope.launch {
             val timeString = time.format(DateTimeFormatter.ofPattern("HH:mm"))
-            saveTaskUseCase(title, description, date, timeString)
+            saveTaskUseCase(
+                title = title, 
+                description = description, 
+                date = date, 
+                time = timeString,
+                categoryText = categoryText,
+                categoryColor = categoryColor
+            )
+            _effect.send(HomeEffect.ShowSnackbar("Tarea creada correctamente"))
+        }
+    }
+
+    fun saveDetailedEvent(
+        title: String,
+        description: String?,
+        location: String?,
+        date: LocalDate,
+        startTime: LocalTime,
+        endTime: LocalTime,
+        categoryText: String,
+        categoryColor: Color,
+        priority: Priority?,
+        subtasks: List<String>
+    ) {
+        viewModelScope.launch {
+            saveEventUseCase(
+                title = title,
+                description = description,
+                location = location,
+                date = date,
+                startTime = startTime.format(DateTimeFormatter.ofPattern("HH:mm")),
+                endTime = endTime.format(DateTimeFormatter.ofPattern("HH:mm")),
+                categoryText = categoryText,
+                categoryColor = categoryColor,
+                priority = priority,
+                subtasks = subtasks
+            )
+            _effect.send(HomeEffect.ShowSnackbar("Evento creado correctamente"))
         }
     }
 

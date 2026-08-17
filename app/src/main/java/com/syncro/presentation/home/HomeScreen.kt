@@ -18,6 +18,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.syncro.presentation.event.AddEventScreen
 import com.syncro.presentation.home.components.*
 import com.syncro.domain.model.SyncroItem
 import com.syncro.presentation.navigation.AppScreen
@@ -35,8 +36,10 @@ fun HomeScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val scrollState = rememberScrollState()
+    val snackbarHostState = remember { SnackbarHostState() }
     var showAddItemSheet by remember { mutableStateOf(false) }
     var showQuickTaskSheet by remember { mutableStateOf(false) }
+    var showDetailedEventSheet by remember { mutableStateOf(false) }
     var selectedTaskForDetail by remember { mutableStateOf<SyncroItem.Task?>(null) }
 
     val authLauncher = rememberLauncherForActivityResult(
@@ -54,6 +57,12 @@ fun HomeScreen(
                 is HomeEffect.LaunchAuthRecovery -> {
                     authLauncher.launch(effect.intent)
                 }
+                is HomeEffect.ShowSnackbar -> {
+                    snackbarHostState.showSnackbar(
+                        message = effect.message,
+                        duration = SnackbarDuration.Short
+                    )
+                }
             }
         }
     }
@@ -66,6 +75,7 @@ fun HomeScreen(
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         floatingActionButton = {
             FloatingActionButton(
                 onClick = { showAddItemSheet = true },
@@ -221,16 +231,22 @@ fun HomeScreen(
             },
             onDetailedEventClick = { 
                 showAddItemSheet = false
-                onNavigateToAddEvent()
+                showDetailedEventSheet = true
             }
+        )
+    }
+
+    if (showDetailedEventSheet) {
+        AddEventScreen(
+            onDismiss = { showDetailedEventSheet = false }
         )
     }
 
     if (showQuickTaskSheet) {
         QuickTaskSheet(
             onDismiss = { showQuickTaskSheet = false },
-            onSave = { title, description, date, time ->
-                viewModel.saveQuickTask(title, description, date, time)
+            onSave = { title, description, date, time, categoryText, categoryColor ->
+                viewModel.saveQuickTask(title, description, date, time, categoryText, categoryColor)
                 showQuickTaskSheet = false
             }
         )

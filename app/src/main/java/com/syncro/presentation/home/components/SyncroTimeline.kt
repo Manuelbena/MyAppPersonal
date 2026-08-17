@@ -287,13 +287,19 @@ fun TaskRow(
                 Spacer(modifier = Modifier.width(12.dp))
                 
                 Column {
-                    Text(
-                        text = task.title,
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        textDecoration = if (task.isCompleted) TextDecoration.LineThrough else TextDecoration.None
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = task.title,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            textDecoration = if (task.isCompleted) TextDecoration.LineThrough else TextDecoration.None
+                        )
+                        if (task.categoryText != null && task.categoryColor != null) {
+                            Spacer(modifier = Modifier.width(8.dp))
+                            TagChip(text = task.categoryText, color = task.categoryColor)
+                        }
+                    }
                     
                     if (!task.description.isNullOrEmpty()) {
                         Text(
@@ -424,18 +430,23 @@ fun TaskDetailDialog(
 
 @Composable
 fun TagChip(text: String, color: Color) {
-    val icon = when (text.lowercase()) {
+    if (text.isBlank()) return // Evitar chips vacíos
+
+    val icon = when (text.lowercase().trim()) {
         "trabajo" -> Icons.Rounded.Work
         "personal" -> Icons.Rounded.Person
         "google calendar" -> Icons.Rounded.CalendarMonth
+        "salud" -> Icons.Rounded.Favorite
+        "ocio" -> Icons.Rounded.SportsEsports
+        "general" -> Icons.AutoMirrored.Rounded.Label
         else -> Icons.AutoMirrored.Rounded.Label
     }
 
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(8.dp))
-            .background(color.copy(alpha = 0.1f))
-            .border(BorderStroke(1.dp, color.copy(alpha = 0.2f)), RoundedCornerShape(8.dp))
+            .background(color.copy(alpha = 0.15f)) // Un poco más de contraste
+            .border(BorderStroke(1.dp, color.copy(alpha = 0.3f)), RoundedCornerShape(8.dp))
             .padding(horizontal = 10.dp, vertical = 4.dp)
     ) {
         Row(

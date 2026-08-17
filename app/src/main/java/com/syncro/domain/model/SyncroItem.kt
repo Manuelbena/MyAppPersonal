@@ -32,6 +32,8 @@ sealed class SyncroItem {
         val title: String,
         val description: String? = null,
         val time: String,
-        val isCompleted: Boolean
+        val isCompleted: Boolean,
+        val categoryText: String? = null,
+        val categoryColor: Color? = null
     ) : SyncroItem()
 }

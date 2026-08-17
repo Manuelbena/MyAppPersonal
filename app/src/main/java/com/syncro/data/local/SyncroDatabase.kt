@@ -12,7 +12,7 @@ import com.syncro.data.local.entity.UserEntity
 
 @Database(
     entities = [TaskEntity::class, UserEntity::class, EventEntity::class, SubtaskEntity::class], 
-    version = 5,
+    version = 6,
     exportSchema = false
 )
 abstract class SyncroDatabase : RoomDatabase() {

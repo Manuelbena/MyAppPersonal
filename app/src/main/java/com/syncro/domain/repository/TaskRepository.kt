@@ -6,6 +6,6 @@ import java.time.LocalDate
 
 interface TaskRepository {
     fun getTasksByDate(date: LocalDate): Flow<List<SyncroItem.Task>>
-    suspend fun insertTask(task: SyncroItem.Task, description: String, date: LocalDate)
+    suspend fun insertTask(task: SyncroItem.Task, date: LocalDate)
     suspend fun toggleTaskCompletion(taskId: String)
 }

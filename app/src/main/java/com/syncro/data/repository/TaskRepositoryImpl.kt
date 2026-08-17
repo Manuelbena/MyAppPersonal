@@ -1,5 +1,6 @@
 package com.syncro.data.repository
 
+import androidx.compose.ui.graphics.Color
 import com.syncro.data.local.dao.TaskDao
 import com.syncro.data.local.entity.TaskEntity
 import com.syncro.domain.model.SyncroItem
@@ -20,16 +21,18 @@ class TaskRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun insertTask(task: SyncroItem.Task, description: String, date: LocalDate) {
+    override suspend fun insertTask(task: SyncroItem.Task, date: LocalDate) {
         val dateEpoch = date.toEpochDay()
         dao.insertTask(
             TaskEntity(
                 id = "${dateEpoch}_${task.title}_${task.time}",
                 title = task.title,
-                description = description,
+                description = task.description ?: "",
                 date = dateEpoch,
                 time = task.time,
-                isCompleted = task.isCompleted
+                isCompleted = task.isCompleted,
+                categoryText = task.categoryText,
+                categoryColor = task.categoryColor?.value?.toInt()
             )
         )
     }
@@ -46,7 +49,9 @@ class TaskRepositoryImpl @Inject constructor(
             title = title,
             description = description,
             time = time,
-            isCompleted = isCompleted
+            isCompleted = isCompleted,
+            categoryText = categoryText,
+            categoryColor = categoryColor?.let { Color(it.toLong()) }
         )
     }
 }

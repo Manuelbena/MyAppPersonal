@@ -9,6 +9,9 @@ import com.google.api.client.http.javanet.NetHttpTransport
 import com.google.api.client.json.gson.GsonFactory
 import com.google.api.services.calendar.Calendar
 import com.google.api.services.tasks.Tasks
+import com.google.api.services.calendar.model.Event
+import com.google.api.services.calendar.model.EventDateTime
+import com.google.api.services.tasks.model.Task
 import com.syncro.data.local.dao.EventDao
 import com.syncro.data.local.dao.TaskDao
 import com.syncro.data.local.dao.UserDao
@@ -21,6 +24,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import java.time.Instant
 import java.time.LocalDate
+import java.time.LocalTime
 import java.time.OffsetDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -44,7 +48,7 @@ class GoogleSyncRepositoryImpl @Inject constructor(
                 return@withContext Result.failure(Exception("Invalid user email: ${user.email}"))
             }
 
-            val tasksScopes = listOf("https://www.googleapis.com/auth/tasks.readonly")
+            val tasksScopes = listOf("https://www.googleapis.com/auth/tasks")
             val account = Account(user.email, "com.google")
             val credential = GoogleAccountCredential.usingOAuth2(context, tasksScopes)
             credential.selectedAccount = account
@@ -96,7 +100,7 @@ class GoogleSyncRepositoryImpl @Inject constructor(
                 return@withContext Result.failure(Exception("Invalid user email: ${user.email}"))
             }
 
-            val calendarScopes = listOf("https://www.googleapis.com/auth/calendar.readonly")
+            val calendarScopes = listOf("https://www.googleapis.com/auth/calendar")
             val account = Account(user.email, "com.google")
             val credential = GoogleAccountCredential.usingOAuth2(context, calendarScopes)
             credential.selectedAccount = account
@@ -178,9 +182,11 @@ class GoogleSyncRepositoryImpl @Inject constructor(
                     
                     // Lógica de categoría dinámica basada en el color o título
                     val (categoryName, finalColor) = when {
-                        title.contains("Trabajo", ignoreCase = true) || colorId == "6" -> "Trabajo" to 0xFFE67C73.toInt() // Mandarina/Rojizo para Trabajo
-                        title.contains("Cita", ignoreCase = true) || title.contains("Médico", ignoreCase = true) || colorId == "11" -> "Personal" to 0xFF7AE7BF.toInt() // Esmeralda para Personal
-                        else -> "General" to categoryColor
+                        title.contains("Trabajo", ignoreCase = true) || colorId == "6" -> "Trabajo" to 0xFF6366F1.toInt() // Indigo500 (Trabajo)
+                        title.contains("Salud", ignoreCase = true) || colorId == "11" -> "Salud" to 0xFFFF5252.toInt() // Rojo Salud
+                        title.contains("Ocio", ignoreCase = true) || colorId == "5" -> "Ocio" to 0xFFF59E0B.toInt() // Amber500 (Ocio)
+                        title.contains("Personal", ignoreCase = true) || title.contains("Cita", ignoreCase = true) || title.contains("Médico", ignoreCase = true) || colorId == "2" -> "Personal" to 0xFF10B981.toInt() // Emerald500 (Personal)
+                        else -> "General" to if (categoryColor == 0xFFE1E1E1.toInt()) 0xFF94A3B8.toInt() else categoryColor // Slate400 si es muy gris
                     }
 
                     val eventEntity = EventEntity(
@@ -209,6 +215,76 @@ class GoogleSyncRepositoryImpl @Inject constructor(
             Result.success(Unit)
         } catch (e: UserRecoverableAuthIOException) {
             Result.failure(e)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun uploadTaskToGoogle(title: String, notes: String?, date: LocalDate): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val user = userDao.getUser().first() ?: return@withContext Result.failure(Exception("No user logged in"))
+            val tasksScopes = listOf("https://www.googleapis.com/auth/tasks")
+            val credential = GoogleAccountCredential.usingOAuth2(context, tasksScopes)
+            credential.selectedAccount = Account(user.email, "com.google")
+
+            val tasksService = Tasks.Builder(transport, jsonFactory, credential).setApplicationName("Syncro").build()
+            
+            val googleTask = Task().apply {
+                setTitle(title)
+                setNotes(notes)
+                val dueDateTime = OffsetDateTime.of(date.atTime(9, 0), ZoneId.systemDefault().rules.getOffset(Instant.now()))
+                setDue(dueDateTime.format(DateTimeFormatter.ISO_OFFSET_DATE_TIME))
+            }
+
+            // Usamos la lista principal (@default)
+            tasksService.tasks().insert("@default", googleTask).execute()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun uploadEventToGoogle(
+        title: String, 
+        description: String?, 
+        location: String?, 
+        startDate: LocalDate, 
+        startTime: String, 
+        endTime: String,
+        category: String?
+    ): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val user = userDao.getUser().first() ?: return@withContext Result.failure(Exception("No user logged in"))
+            val calendarScopes = listOf("https://www.googleapis.com/auth/calendar")
+            val credential = GoogleAccountCredential.usingOAuth2(context, calendarScopes)
+            credential.selectedAccount = Account(user.email, "com.google")
+
+            val calendarService = Calendar.Builder(transport, jsonFactory, credential).setApplicationName("Syncro").build()
+
+            val startLT = LocalTime.parse(startTime)
+            val endLT = LocalTime.parse(endTime)
+            
+            val startDT = OffsetDateTime.of(startDate.atTime(startLT), ZoneId.systemDefault().rules.getOffset(Instant.now()))
+            val endDT = OffsetDateTime.of(startDate.atTime(endLT), ZoneId.systemDefault().rules.getOffset(Instant.now()))
+
+            val event = Event().apply {
+                summary = title
+                this.description = description
+                this.location = location
+                // Asignar el color de Google basado en la categoría de la app
+                colorId = when (category) {
+                    "Trabajo" -> "6"   // Mandarina
+                    "Personal" -> "2"  // Salvia/Verde
+                    "Salud" -> "11"    // Tomate/Rojo
+                    "Ocio" -> "5"      // Plátano/Amarillo
+                    else -> null
+                }
+                start = EventDateTime().setDateTime(com.google.api.client.util.DateTime(startDT.toInstant().toEpochMilli()))
+                end = EventDateTime().setDateTime(com.google.api.client.util.DateTime(endDT.toInstant().toEpochMilli()))
+            }
+
+            calendarService.events().insert("primary", event).execute()
+            Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
         }

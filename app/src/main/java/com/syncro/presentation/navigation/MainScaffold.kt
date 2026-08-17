@@ -76,7 +76,7 @@ fun MainScaffold(
                      HomeScreen(
                          isDarkTheme = isDarkTheme,
                          onThemeToggle = { themeViewModel.toggleTheme() },
-                         onNavigateToAddEvent = { navController.navigate(AppScreen.AddEvent.route) }
+                         onNavigateToAddEvent = { /* Ya no navegamos, se gestiona internamente */ }
                      )
                 }
                 composable(AppScreen.Calendar.route) {
@@ -88,15 +88,7 @@ fun MainScaffold(
                 composable(AppScreen.Assistant.route) {
                      AssistantScreen()
                 }
-                composable(AppScreen.AddEvent.route) {
-                    AddEventScreen(
-                        onDismiss = { navController.popBackStack() },
-                        onSave = { 
-                            // TODO: Implementar guardado
-                            navController.popBackStack() 
-                        }
-                    )
-                }
+                // Quitamos la ruta separada de AddEvent para evitar el pantallazo blanco
             }
         }
     }

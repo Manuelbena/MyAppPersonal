@@ -1,12 +1,21 @@
 package com.syncro.presentation.home.components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AccessTime
 import androidx.compose.material.icons.outlined.Notes
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.Favorite
+import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material.icons.rounded.SportsEsports
+import androidx.compose.material.icons.rounded.Work
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -17,6 +26,9 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.syncro.presentation.event.CategoryItem
+import com.syncro.presentation.event.clickableWithoutRipple
+import com.syncro.presentation.theme.*
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
@@ -26,12 +38,13 @@ import java.util.Locale
 @Composable
 fun QuickTaskSheet(
     onDismiss: () -> Unit,
-    onSave: (String, String, LocalDate, LocalTime) -> Unit
+    onSave: (String, String, LocalDate, LocalTime, String?, Color?) -> Unit
 ) {
     var title by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
     var selectedDate by remember { mutableStateOf(LocalDate.now()) }
     var selectedTime by remember { mutableStateOf(LocalTime.now()) }
+    var selectedCategory by remember { mutableStateOf<CategoryItem?>(null) }
     
     var showDatePicker by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
@@ -40,20 +53,26 @@ fun QuickTaskSheet(
     val dateFormatter = DateTimeFormatter.ofPattern("d 'de' MMMM", Locale("es", "ES"))
     val timeFormatter = DateTimeFormatter.ofPattern("HH:mm")
 
+    val categories = listOf(
+        CategoryItem("Personal", Icons.Rounded.Person, Emerald500),
+        CategoryItem("Trabajo", Icons.Rounded.Work, Indigo500),
+        CategoryItem("Salud", Icons.Rounded.Favorite, Color(0xFFFF5252)),
+        CategoryItem("Ocio", Icons.Rounded.SportsEsports, Amber500)
+    )
+
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         containerColor = MaterialTheme.colorScheme.surface,
         shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
-        dragHandle = null // Diseño más limpio sin drag handle como en la foto
+        dragHandle = null
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(24.dp)
-                .navigationBarsPadding() // Para que el teclado no lo tape
+                .navigationBarsPadding()
         ) {
-            // Campo de Título (Minimalista)
             BasicTextField(
                 value = title,
                 onValueChange = { title = it },
@@ -96,12 +115,54 @@ fun QuickTaskSheet(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Botones de Acción (Fecha y Detalles)
+            // Categorías en Quick Task
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                items(categories) { category ->
+                    val isSelected = selectedCategory?.name == category.name
+                    val backgroundColor = if (isSelected) category.color.copy(alpha = 0.2f) else MaterialTheme.colorScheme.surface
+                    val contentColor = if (isSelected) category.color else MaterialTheme.colorScheme.onSurfaceVariant
+                    val borderColor = if (isSelected) category.color.copy(alpha = 0.5f) else MaterialTheme.colorScheme.outline
+
+                    Surface(
+                        modifier = Modifier.clickableWithoutRipple { 
+                            selectedCategory = if (isSelected) null else category
+                        },
+                        shape = RoundedCornerShape(12.dp),
+                        color = backgroundColor,
+                        border = BorderStroke(1.dp, borderColor)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = category.icon,
+                                contentDescription = null,
+                                tint = contentColor,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = category.name,
+                                color = contentColor,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // Botón Fecha/Hora
                 AssistChip(
                     onClick = { showDatePicker = true },
                     label = { 
@@ -123,11 +184,10 @@ fun QuickTaskSheet(
                     border = null
                 )
 
-                // Botón Añadir Detalles
                 if (!showDescriptionField) {
                     AssistChip(
                         onClick = { showDescriptionField = true },
-                        label = { Text("Añadir detalles") },
+                        label = { Text("Detalles") },
                         leadingIcon = {
                             Icon(
                                 imageVector = Icons.Outlined.Notes,
@@ -146,7 +206,6 @@ fun QuickTaskSheet(
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            // Botones Finales
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -162,7 +221,11 @@ fun QuickTaskSheet(
                 }
 
                 Button(
-                    onClick = { if (title.isNotBlank()) onSave(title, description, selectedDate, selectedTime) },
+                    onClick = { 
+                        if (title.isNotBlank()) {
+                            onSave(title, description, selectedDate, selectedTime, selectedCategory?.name, selectedCategory?.color) 
+                        }
+                    },
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.primary,
@@ -177,7 +240,6 @@ fun QuickTaskSheet(
         }
     }
 
-    // DatePicker Dialog
     if (showDatePicker) {
         val datePickerState = rememberDatePickerState(
             initialSelectedDateMillis = selectedDate.atStartOfDay().toInstant(java.time.ZoneOffset.UTC).toEpochMilli()
@@ -192,7 +254,7 @@ fun QuickTaskSheet(
                             .toLocalDate()
                     }
                     showDatePicker = false
-                    showTimePicker = true // Después de la fecha, pedimos la hora
+                    showTimePicker = true
                 }) { Text("Siguiente") }
             }
         ) {
@@ -200,7 +262,6 @@ fun QuickTaskSheet(
         }
     }
 
-    // TimePicker Dialog
     if (showTimePicker) {
         val timePickerState = rememberTimePickerState(
             initialHour = selectedTime.hour,

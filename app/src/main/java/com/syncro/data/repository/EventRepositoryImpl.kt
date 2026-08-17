@@ -3,6 +3,7 @@ package com.syncro.data.repository
 import androidx.compose.ui.graphics.Color
 import com.syncro.data.local.dao.EventDao
 import com.syncro.data.local.entity.EventEntity
+import com.syncro.data.local.entity.SubtaskEntity
 import com.syncro.domain.model.Priority
 import com.syncro.domain.model.Subtask
 import com.syncro.domain.model.SyncroItem
@@ -17,9 +18,10 @@ class EventRepositoryImpl @Inject constructor(
 ) : EventRepository {
 
     override fun getEventsByDate(date: LocalDate): Flow<List<SyncroItem.Event>> {
-        return dao.getEventsByDate(date.toEpochDay()).map { entities ->
-            entities.map { entity ->
-                val subtasks = dao.getSubtasksForEvent(entity.id).map {
+        return dao.getEventsByDate(date.toEpochDay()).map { relations ->
+            relations.map { relation ->
+                val entity = relation.event
+                val subtasks = relation.subtasks.map {
                     Subtask(title = it.title, isCompleted = it.isCompleted)
                 }
                 
@@ -39,10 +41,11 @@ class EventRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun insertEvent(event: SyncroItem.Event, date: LocalDate) {
+    override suspend fun insertEvent(event: SyncroItem.Event, date: LocalDate, location: String?) {
         val dateEpoch = date.toEpochDay()
+        val eventId = "${dateEpoch}_${event.title}_${event.startTime}"
         val entity = EventEntity(
-            id = "${dateEpoch}_${event.title}_${event.startTime}",
+            id = eventId,
             title = event.title,
             description = event.description,
             date = dateEpoch,
@@ -51,9 +54,18 @@ class EventRepositoryImpl @Inject constructor(
             categoryText = event.categoryText,
             categoryColor = event.categoryColor.value.toInt(),
             priority = event.priority?.name,
+            location = location,
             isCompleted = event.isCompleted
         )
-        dao.insertEvent(entity)
+        
+        if (event.subtasks.isEmpty()) {
+            dao.insertEvent(entity)
+        } else {
+            val subtaskEntities = event.subtasks.map { 
+                SubtaskEntity(eventId = eventId, title = it.title, isCompleted = it.isCompleted)
+            }
+            dao.insertEventWithSubtasks(entity, subtaskEntities)
+        }
     }
 
     override suspend fun toggleSubtaskCompletion(eventId: String, subtaskTitle: String) {

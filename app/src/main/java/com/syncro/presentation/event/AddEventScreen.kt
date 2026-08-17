@@ -25,6 +25,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.syncro.domain.model.Priority
 import com.syncro.presentation.theme.*
 import java.time.Instant
@@ -38,7 +39,32 @@ import java.util.Locale
 @Composable
 fun AddEventScreen(
     onDismiss: () -> Unit,
-    onSave: () -> Unit
+    viewModel: com.syncro.presentation.home.HomeViewModel = hiltViewModel()
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        dragHandle = { BottomSheetDefaults.DragHandle() },
+        containerColor = MaterialTheme.colorScheme.surface,
+        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+    ) {
+        AddEventContent(
+            onDismiss = onDismiss,
+            onSave = { title, desc, loc, date, start, end, catText, catCol, priority, subs ->
+                viewModel.saveDetailedEvent(title, desc, loc, date, start, end, catText, catCol, priority, subs)
+                onDismiss()
+            }
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AddEventContent(
+    onDismiss: () -> Unit,
+    onSave: (String, String?, String?, LocalDate, LocalTime, LocalTime, String, Color, Priority?, List<String>) -> Unit
 ) {
     var title by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
@@ -74,64 +100,178 @@ fun AddEventScreen(
 
     val priorities = Priority.entries.toTypedArray()
 
-    Scaffold(
-        modifier = Modifier.fillMaxSize(),
-        topBar = {
-            CenterAlignedTopAppBar(
-                title = { 
-                    Text(
-                        "Nuevo evento", 
-                        fontSize = 18.sp, 
-                        fontWeight = FontWeight.Bold 
-                    ) 
-                },
-                navigationIcon = {
-                    IconButton(onClick = onDismiss) {
-                        Icon(Icons.Rounded.Close, contentDescription = "Cerrar")
-                    }
-                },
-                actions = {
-                    Button(
-                        onClick = onSave,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Cyan900,
-                            contentColor = Cyan400
-                        ),
-                        shape = RoundedCornerShape(12.dp),
-                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
-                    ) {
-                        Text("Guardar", fontWeight = FontWeight.Bold)
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background
-                )
-            )
-        }
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .consumeWindowInsets(padding)
-                .imePadding()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 24.dp)
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 24.dp)
+            .padding(bottom = 40.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Spacer(modifier = Modifier.height(24.dp))
-            
-            // Título
+            Text(
+                "Nuevo evento",
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Button(
+                onClick = {
+                    onSave(
+                        title, 
+                        description.ifBlank { null }, 
+                        location.ifBlank { null }, 
+                        startDate, 
+                        startTime, 
+                        endTime, 
+                        selectedCategory, 
+                        categories.find { it.name == selectedCategory }?.color ?: Emerald500,
+                        selectedPriority, 
+                        subtasks.toList()
+                    )
+                },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Cyan900,
+                    contentColor = Cyan400
+                ),
+                shape = RoundedCornerShape(12.dp),
+                contentPadding = PaddingValues(horizontal = 20.dp, vertical = 10.dp)
+            ) {
+                Text("Guardar", fontWeight = FontWeight.Bold)
+            }
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+        
+        // Título
+        TextField(
+            value = title,
+            onValueChange = { title = it },
+            placeholder = { 
+                Text(
+                    "Añade un título", 
+                    fontSize = 28.sp, 
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                ) 
+            },
+            colors = TextFieldDefaults.colors(
+                focusedContainerColor = Color.Transparent,
+                unfocusedContainerColor = Color.Transparent,
+                disabledContainerColor = Color.Transparent,
+                focusedIndicatorColor = Color.Transparent,
+                unfocusedIndicatorColor = Color.Transparent,
+                cursorColor = MaterialTheme.colorScheme.primary
+            ),
+            textStyle = MaterialTheme.typography.headlineMedium.copy(
+                fontWeight = FontWeight.Bold,
+                fontSize = 28.sp
+            ),
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Spacer(modifier = Modifier.height(32.dp))
+
+        // Sección de Tiempo
+        EventSection(icon = Icons.Rounded.Schedule) {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                DateTimeSelector(
+                    label = "Empieza",
+                    dateTime = "${startDate.format(dateFormatter)} • ${startTime.format(timeFormatter)}",
+                    onClick = { 
+                        pickingStart = true
+                        showDatePicker = true 
+                    }
+                )
+                DateTimeSelector(
+                    label = "Termina",
+                    dateTime = "${endDate.format(dateFormatter)} • ${endTime.format(timeFormatter)}",
+                    onClick = { 
+                        pickingStart = false
+                        showDatePicker = true 
+                    }
+                )
+                
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        "Todo el día", 
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Switch(
+                        checked = isAllDay,
+                        onCheckedChange = { isAllDay = it },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Cyan400,
+                            checkedTrackColor = Cyan900
+                        )
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(32.dp))
+
+        // Categoría
+        EventSection(icon = Icons.Rounded.LocalOffer) {
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                items(categories) { category ->
+                    CategoryChip(
+                        item = category,
+                        isSelected = selectedCategory == category.name,
+                        onClick = { selectedCategory = category.name }
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // Prioridad
+        EventSection(icon = Icons.Rounded.Flag) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                priorities.forEach { priority ->
+                    PriorityChip(
+                        priority = priority,
+                        isSelected = selectedPriority == priority,
+                        onClick = { selectedPriority = priority }
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(32.dp))
+
+        // Descripción
+        EventSection(icon = Icons.AutoMirrored.Rounded.Notes) {
             TextField(
-                value = title,
-                onValueChange = { title = it },
+                value = description,
+                onValueChange = { description = it },
                 placeholder = { 
                     Text(
-                        "Añade un título", 
-                        fontSize = 28.sp, 
-                        fontWeight = FontWeight.Bold,
+                        "Añadir descripción o notas...",
+                        fontSize = 16.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
                     ) 
                 },
+                modifier = Modifier.fillMaxWidth(),
                 colors = TextFieldDefaults.colors(
                     focusedContainerColor = Color.Transparent,
                     unfocusedContainerColor = Color.Transparent,
@@ -140,321 +280,200 @@ fun AddEventScreen(
                     unfocusedIndicatorColor = Color.Transparent,
                     cursorColor = MaterialTheme.colorScheme.primary
                 ),
-                textStyle = MaterialTheme.typography.headlineMedium.copy(
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 28.sp
-                ),
-                modifier = Modifier.fillMaxWidth()
+                textStyle = TextStyle(
+                    fontSize = 16.sp,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
             )
+        }
 
-            Spacer(modifier = Modifier.height(32.dp))
+        Spacer(modifier = Modifier.height(8.dp))
 
-            // Sección de Tiempo
-            EventSection(icon = Icons.Rounded.Schedule) {
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    DateTimeSelector(
-                        label = "Empieza",
-                        dateTime = "${startDate.format(dateFormatter)} • ${startTime.format(timeFormatter)}",
-                        onClick = { 
-                            pickingStart = true
-                            showDatePicker = true 
-                        }
-                    )
-                    DateTimeSelector(
-                        label = "Termina",
-                        dateTime = "${endDate.format(dateFormatter)} • ${endTime.format(timeFormatter)}",
-                        onClick = { 
-                            pickingStart = false
-                            showDatePicker = true 
-                        }
-                    )
-                    
+        // Ubicación (Minimalista como título)
+        EventSection(icon = Icons.Rounded.LocationOn) {
+            TextField(
+                value = location,
+                onValueChange = { location = it },
+                placeholder = { 
+                    Text(
+                        "Añadir ubicación",
+                        fontSize = 16.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                    ) 
+                },
+                modifier = Modifier.fillMaxWidth(),
+                colors = TextFieldDefaults.colors(
+                    focusedContainerColor = Color.Transparent,
+                    unfocusedContainerColor = Color.Transparent,
+                    disabledContainerColor = Color.Transparent,
+                    focusedIndicatorColor = Color.Transparent,
+                    unfocusedIndicatorColor = Color.Transparent,
+                    cursorColor = MaterialTheme.colorScheme.primary
+                ),
+                textStyle = TextStyle(
+                    fontSize = 16.sp,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            )
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Subtareas Dinámicas
+        EventSection(icon = Icons.Rounded.CheckCircle) {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                subtasks.forEachIndexed { index, subtask ->
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
+                        Icon(
+                            imageVector = Icons.Rounded.RadioButtonUnchecked,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
                         Text(
-                            "Todo el día", 
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontWeight = FontWeight.Medium
+                            text = subtask,
+                            fontSize = 14.sp,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.weight(1f)
                         )
-                        Switch(
-                            checked = isAllDay,
-                            onCheckedChange = { isAllDay = it },
-                            colors = SwitchDefaults.colors(
-                                checkedThumbColor = Cyan400,
-                                checkedTrackColor = Cyan900
-                            )
-                        )
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(32.dp))
-
-            // Categoría
-            EventSection(icon = Icons.Rounded.LocalOffer) {
-                LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    items(categories) { category ->
-                        CategoryChip(
-                            item = category,
-                            isSelected = selectedCategory == category.name,
-                            onClick = { selectedCategory = category.name }
-                        )
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // Prioridad
-            EventSection(icon = Icons.Rounded.Flag) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    priorities.forEach { priority ->
-                        PriorityChip(
-                            priority = priority,
-                            isSelected = selectedPriority == priority,
-                            onClick = { selectedPriority = priority }
-                        )
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(32.dp))
-
-            // Descripción
-            EventSection(icon = Icons.AutoMirrored.Rounded.Notes) {
-                TextField(
-                    value = description,
-                    onValueChange = { description = it },
-                    placeholder = { 
-                        Text(
-                            "Añadir descripción o notas...",
-                            fontSize = 16.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-                        ) 
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = TextFieldDefaults.colors(
-                        focusedContainerColor = Color.Transparent,
-                        unfocusedContainerColor = Color.Transparent,
-                        disabledContainerColor = Color.Transparent,
-                        focusedIndicatorColor = Color.Transparent,
-                        unfocusedIndicatorColor = Color.Transparent,
-                        cursorColor = MaterialTheme.colorScheme.primary
-                    ),
-                    textStyle = TextStyle(
-                        fontSize = 16.sp,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                )
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // Ubicación (Minimalista como título)
-            EventSection(icon = Icons.Rounded.LocationOn) {
-                TextField(
-                    value = location,
-                    onValueChange = { location = it },
-                    placeholder = { 
-                        Text(
-                            "Añadir ubicación",
-                            fontSize = 16.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-                        ) 
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = TextFieldDefaults.colors(
-                        focusedContainerColor = Color.Transparent,
-                        unfocusedContainerColor = Color.Transparent,
-                        disabledContainerColor = Color.Transparent,
-                        focusedIndicatorColor = Color.Transparent,
-                        unfocusedIndicatorColor = Color.Transparent,
-                        cursorColor = MaterialTheme.colorScheme.primary
-                    ),
-                    textStyle = TextStyle(
-                        fontSize = 16.sp,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                )
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Subtareas Dinámicas
-            EventSection(icon = Icons.Rounded.CheckCircle) {
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    // Lista de subtareas ya añadidas
-                    subtasks.forEachIndexed { index, subtask ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                        IconButton(
+                            onClick = { subtasks.removeAt(index) },
+                            modifier = Modifier.size(24.dp)
                         ) {
                             Icon(
-                                imageVector = Icons.Rounded.RadioButtonUnchecked,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(18.dp)
+                                Icons.Rounded.Close,
+                                contentDescription = "Borrar",
+                                modifier = Modifier.size(16.dp),
+                                tint = MaterialTheme.colorScheme.error
                             )
-                            Spacer(modifier = Modifier.width(12.dp))
+                        }
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    TextField(
+                        value = subtaskInput,
+                        onValueChange = { subtaskInput = it },
+                        placeholder = { 
                             Text(
-                                text = subtask,
-                                fontSize = 14.sp,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                modifier = Modifier.weight(1f)
-                            )
-                            IconButton(
-                                onClick = { subtasks.removeAt(index) },
-                                modifier = Modifier.size(24.dp)
-                            ) {
-                                Icon(
-                                    Icons.Rounded.Close,
-                                    contentDescription = "Borrar",
-                                    modifier = Modifier.size(16.dp),
-                                    tint = MaterialTheme.colorScheme.error
-                                )
-                            }
-                        }
-                    }
-
-                    // Campo para añadir nueva subtarea
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        TextField(
-                            value = subtaskInput,
-                            onValueChange = { subtaskInput = it },
-                            placeholder = { 
-                                Text(
-                                    "Añadir subtarea",
-                                    fontSize = 16.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-                                ) 
+                                "Añadir subtarea",
+                                fontSize = 16.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                            ) 
+                        },
+                        modifier = Modifier.weight(1f),
+                        colors = TextFieldDefaults.colors(
+                            focusedContainerColor = Color.Transparent,
+                            unfocusedContainerColor = Color.Transparent,
+                            disabledContainerColor = Color.Transparent,
+                            focusedIndicatorColor = Color.Transparent,
+                            unfocusedIndicatorColor = Color.Transparent,
+                            cursorColor = MaterialTheme.colorScheme.primary
+                        ),
+                        textStyle = TextStyle(fontSize = 16.sp)
+                    )
+                    
+                    if (subtaskInput.isNotEmpty()) {
+                        IconButton(
+                            onClick = {
+                                if (subtaskInput.isNotBlank()) {
+                                    subtasks.add(subtaskInput)
+                                    subtaskInput = ""
+                                }
                             },
-                            modifier = Modifier.weight(1f),
-                            colors = TextFieldDefaults.colors(
-                                focusedContainerColor = Color.Transparent,
-                                unfocusedContainerColor = Color.Transparent,
-                                disabledContainerColor = Color.Transparent,
-                                focusedIndicatorColor = Color.Transparent,
-                                unfocusedIndicatorColor = Color.Transparent,
-                                cursorColor = MaterialTheme.colorScheme.primary
-                            ),
-                            textStyle = TextStyle(fontSize = 16.sp)
-                        )
-                        
-                        if (subtaskInput.isNotEmpty()) {
-                            IconButton(
-                                onClick = {
-                                    if (subtaskInput.isNotBlank()) {
-                                        subtasks.add(subtaskInput)
-                                        subtaskInput = ""
-                                    }
-                                },
-                                modifier = Modifier
-                                    .size(32.dp)
-                                    .background(Cyan400.copy(alpha = 0.1f), CircleShape)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Rounded.Add,
-                                    contentDescription = "Añadir",
-                                    tint = Cyan400,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
+                            modifier = Modifier
+                                .size(32.dp)
+                                .background(Cyan400.copy(alpha = 0.1f), CircleShape)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Add,
+                                contentDescription = "Añadir",
+                                tint = Cyan400,
+                                modifier = Modifier.size(20.dp)
+                            )
                         }
                     }
                 }
             }
-
-            Spacer(modifier = Modifier.height(32.dp))
-            
-            // SECCIÓN FINAL (Recurrencia, Notificación)
-            Column(
-                verticalArrangement = Arrangement.spacedBy(20.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                // Recurrencia
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            Icons.Rounded.Repeat, 
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(24.dp)
-                        )
-                        Spacer(modifier = Modifier.width(16.dp))
-                        Text(
-                            "Repetir", 
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
-                    Switch(
-                        checked = isRecurring,
-                        onCheckedChange = { isRecurring = it },
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = Cyan400,
-                            checkedTrackColor = Cyan900
-                        )
-                    )
-                }
-                
-                // Notificación
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            Icons.Rounded.NotificationsActive, 
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(24.dp)
-                        )
-                        Spacer(modifier = Modifier.width(16.dp))
-                        Text(
-                            "Notificación", 
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
-                    Switch(
-                        checked = notificationEnabled,
-                        onCheckedChange = { notificationEnabled = it },
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = Cyan400,
-                            checkedTrackColor = Cyan900
-                        )
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(40.dp))
         }
+
+        Spacer(modifier = Modifier.height(32.dp))
+        
+        Column(
+            verticalArrangement = Arrangement.spacedBy(20.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Rounded.Repeat, 
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Text(
+                        "Repetir", 
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+                Switch(
+                    checked = isRecurring,
+                    onCheckedChange = { isRecurring = it },
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = Cyan400,
+                        checkedTrackColor = Cyan900
+                    )
+                )
+            }
+            
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Rounded.NotificationsActive, 
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Text(
+                        "Notificación", 
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+                Switch(
+                    checked = notificationEnabled,
+                    onCheckedChange = { notificationEnabled = it },
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = Cyan400,
+                        checkedTrackColor = Cyan900
+                    )
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(40.dp))
     }
 
-    // DatePicker Dialog
     if (showDatePicker) {
         val initialDate = if (pickingStart) startDate else endDate
         val datePickerState = rememberDatePickerState(
@@ -477,7 +496,6 @@ fun AddEventScreen(
         }
     }
 
-    // TimePicker Dialog
     if (showTimePicker) {
         val initialTime = if (pickingStart) startTime else endTime
         val timePickerState = rememberTimePickerState(

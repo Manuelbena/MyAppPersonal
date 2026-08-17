@@ -11,5 +11,7 @@ data class TaskEntity(
     val description: String,
     val date: Long, // Epoch millis
     val time: String, // HH:mm
-    val isCompleted: Boolean = false
+    val isCompleted: Boolean = false,
+    val categoryText: String? = null,
+    val categoryColor: Int? = null
 )
