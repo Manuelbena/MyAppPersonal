@@ -70,17 +70,30 @@ class GoogleSyncRepositoryImpl @Inject constructor(
                             val title = googleTask.title ?: ""
                             val time = parseGoogleTime(googleTask.due)
                             
-                            val taskEntity = TaskEntity(
-                                id = "${taskDateEpoch}_${title}_${time}",
-                                remoteId = googleTask.id,
-                                title = title,
-                                description = googleTask.notes ?: "",
-                                date = taskDateEpoch,
-                                time = time,
-                                isCompleted = googleTask.status == "completed",
-                                categoryText = "General",
-                                categoryColor = 0xFF94A3B8.toInt() // Slate400
-                            )
+                            // 1. Intentar buscar por remoteId primero
+                            val existingTaskByRemote = taskDao.getTaskByRemoteId(googleTask.id)
+                            
+                            val taskEntity = if (existingTaskByRemote != null) {
+                                existingTaskByRemote.copy(
+                                    title = title,
+                                    description = googleTask.notes ?: "",
+                                    date = taskDateEpoch,
+                                    time = time,
+                                    isCompleted = googleTask.status == "completed"
+                                )
+                            } else {
+                                TaskEntity(
+                                    id = "${taskDateEpoch}_${title}_${time}",
+                                    remoteId = googleTask.id,
+                                    title = title,
+                                    description = googleTask.notes ?: "",
+                                    date = taskDateEpoch,
+                                    time = time,
+                                    isCompleted = googleTask.status == "completed",
+                                    categoryText = "General",
+                                    categoryColor = 0xFF94A3B8.toInt() // Slate400
+                                )
+                            }
                             taskDao.insertTask(taskEntity)
                         }
                     }
@@ -134,7 +147,17 @@ class GoogleSyncRepositoryImpl @Inject constructor(
                     val startTime = formatGoogleDateTime(googleEvent.start.dateTime)
                     val rawDescription = googleEvent.description ?: ""
 
-                    val eventId = "${dateEpoch}_${title}_${startTime}"
+                    // 1. Limpiar el título de emojis o marcas de completado
+                    val cleanTitle = title
+                        .replace("[x]", "", ignoreCase = true)
+                        .replace("[ ]", "", ignoreCase = true)
+                        .replace("✅", "")
+                        .trim()
+
+                    // 2. Intentar buscar por remoteId para evitar duplicados si el título cambió
+                    val existingEventByRemote = eventDao.getEventByRemoteId(googleEvent.id)
+                    
+                    val eventId = existingEventByRemote?.id ?: "${dateEpoch}_${cleanTitle}_${startTime}"
                     
                     // Extraer subtareas y limpiar descripción
                     var cleanDescription = rawDescription
@@ -173,12 +196,6 @@ class GoogleSyncRepositoryImpl @Inject constructor(
                                          title.startsWith("Done", ignoreCase = true) ||
                                          title.contains("✅")
                     
-                    val cleanTitle = title
-                        .replace("[x]", "", ignoreCase = true)
-                        .replace("[ ]", "", ignoreCase = true)
-                        .replace("✅", "")
-                        .trim()
-
                     val colorId = googleEvent.colorId
                     val categoryColor = mapGoogleColorToHex(colorId)
                     
@@ -229,7 +246,7 @@ class GoogleSyncRepositoryImpl @Inject constructor(
             // 1. Subir Tareas locales no sincronizadas
             val unsyncedTasks = taskDao.getUnsyncedTasksByDate(dateEpoch)
             for (task in unsyncedTasks) {
-                uploadTaskToGoogle(task.title, task.description, date)
+                uploadTaskToGoogle(task.id, task.title, task.description, date)
             }
 
             // 2. Subir Eventos locales no sincronizados
@@ -238,6 +255,7 @@ class GoogleSyncRepositoryImpl @Inject constructor(
                 val event = eventWithSubtasks.event
                 val subtasks = eventWithSubtasks.subtasks.map { it.title }
                 uploadEventToGoogle(
+                    eventId = event.id,
                     title = event.title,
                     description = event.description,
                     location = event.location,
@@ -254,7 +272,7 @@ class GoogleSyncRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun uploadTaskToGoogle(title: String, notes: String?, date: LocalDate): Result<Unit> = withContext(Dispatchers.IO) {
+    override suspend fun uploadTaskToGoogle(taskId: String, title: String, notes: String?, date: LocalDate): Result<Unit> = withContext(Dispatchers.IO) {
         try {
             val user = userDao.getUser().first() ?: return@withContext Result.failure(Exception("No user logged in"))
             val tasksScopes = listOf("https://www.googleapis.com/auth/tasks")
@@ -266,12 +284,46 @@ class GoogleSyncRepositoryImpl @Inject constructor(
             val googleTask = Task().apply {
                 setTitle(title)
                 setNotes(notes)
+                // Para simplificar, ponemos fecha de vencimiento a las 9 AM del día elegido
                 val dueDateTime = OffsetDateTime.of(date.atTime(9, 0), ZoneId.systemDefault().rules.getOffset(Instant.now()))
                 setDue(dueDateTime.format(DateTimeFormatter.ISO_OFFSET_DATE_TIME))
             }
 
             // Usamos la lista principal (@default)
-            tasksService.tasks().insert("@default", googleTask).execute()
+            val insertedTask = tasksService.tasks().insert("@default", googleTask).execute()
+            
+            // Actualizar el remoteId en la base de datos local usando el ID real
+            taskDao.getTaskById(taskId)?.let { entity ->
+                taskDao.updateTask(entity.copy(remoteId = insertedTask.id))
+            }
+            
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun updateTaskInGoogle(remoteId: String, title: String, notes: String?, isCompleted: Boolean): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val user = userDao.getUser().first() ?: return@withContext Result.failure(Exception("No user logged in"))
+            val tasksScopes = listOf("https://www.googleapis.com/auth/tasks")
+            val credential = GoogleAccountCredential.usingOAuth2(context, tasksScopes)
+            credential.selectedAccount = Account(user.email, "com.google")
+
+            val tasksService = Tasks.Builder(transport, jsonFactory, credential).setApplicationName("Syncro").build()
+            
+            val taskToUpdate = tasksService.tasks().get("@default", remoteId).execute()
+            taskToUpdate.setTitle(title)
+            taskToUpdate.setNotes(notes)
+            taskToUpdate.setStatus(if (isCompleted) "completed" else "needsAction")
+            if (isCompleted) {
+                // Para Google Tasks, la fecha de completado debe enviarse como RFC3339 String o manejarse vía status
+                taskToUpdate.setCompleted(com.google.api.client.util.DateTime(System.currentTimeMillis()).toStringRfc3339())
+            } else {
+                taskToUpdate.setCompleted(null)
+            }
+
+            tasksService.tasks().update("@default", remoteId, taskToUpdate).execute()
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
@@ -279,6 +331,7 @@ class GoogleSyncRepositoryImpl @Inject constructor(
     }
 
     override suspend fun uploadEventToGoogle(
+        eventId: String,
         title: String, 
         description: String?, 
         location: String?, 
@@ -326,7 +379,41 @@ class GoogleSyncRepositoryImpl @Inject constructor(
                 end = EventDateTime().setDateTime(com.google.api.client.util.DateTime(endDT.toInstant().toEpochMilli()))
             }
 
-            calendarService.events().insert("primary", event).execute()
+            val insertedEvent = calendarService.events().insert("primary", event).execute()
+            
+            // Actualizar el remoteId localmente usando el ID real
+            eventDao.getEventById(eventId)?.let { entity ->
+                eventDao.updateEvent(entity.copy(remoteId = insertedEvent.id))
+            }
+
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun updateEventInGoogle(
+        remoteId: String,
+        title: String,
+        description: String?,
+        isCompleted: Boolean
+    ): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val user = userDao.getUser().first() ?: return@withContext Result.failure(Exception("No user logged in"))
+            val calendarScopes = listOf("https://www.googleapis.com/auth/calendar")
+            val credential = GoogleAccountCredential.usingOAuth2(context, calendarScopes)
+            credential.selectedAccount = Account(user.email, "com.google")
+
+            val calendarService = Calendar.Builder(transport, jsonFactory, credential).setApplicationName("Syncro").build()
+
+            val eventToUpdate = calendarService.events().get("primary", remoteId).execute()
+            
+            // Marcar como completado en el título si es necesario
+            val newTitle = if (isCompleted && !title.contains("✅")) "✅ $title" else title
+            eventToUpdate.summary = newTitle
+            eventToUpdate.description = description
+
+            calendarService.events().update("primary", remoteId, eventToUpdate).execute()
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)

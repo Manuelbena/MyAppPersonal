@@ -1,6 +1,8 @@
 package com.syncro.presentation.navigation
 
 import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.core.EaseInOutQuart
+import androidx.compose.animation.core.EaseOutQuart
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -9,6 +11,7 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -46,6 +49,11 @@ fun MainScaffold(
     val showBottomBar = currentRoute != AppScreen.AddEvent.route && currentRoute != AppScreen.Login.route
 
     SyncroTheme(darkTheme = isDarkTheme) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
+        ) {
             Scaffold(
                 bottomBar = {
                     if (showBottomBar) {
@@ -82,17 +90,18 @@ fun MainScaffold(
                         if (initialIndex != -1 && targetIndex != -1 && initialIndex != targetIndex) {
                             if (targetIndex > initialIndex) {
                                 slideInHorizontally(
-                                    initialOffsetX = { it },
-                                    animationSpec = tween(700, easing = FastOutSlowInEasing)
-                                ) + fadeIn(animationSpec = tween(700))
+                                    initialOffsetX = { it / 3 },
+                                    animationSpec = tween(900, easing = EaseOutQuart)
+                                ) + fadeIn(animationSpec = tween(800, easing = EaseInOutQuart))
                             } else {
                                 slideInHorizontally(
-                                    initialOffsetX = { -it },
-                                    animationSpec = tween(700, easing = FastOutSlowInEasing)
-                                ) + fadeIn(animationSpec = tween(700))
+                                    initialOffsetX = { -it / 3 },
+                                    animationSpec = tween(900, easing = EaseOutQuart)
+                                ) + fadeIn(animationSpec = tween(800, easing = EaseInOutQuart))
                             }
                         } else {
-                            fadeIn(animationSpec = tween(700)) + scaleIn(initialScale = 0.92f, animationSpec = tween(700, easing = FastOutSlowInEasing))
+                            fadeIn(animationSpec = tween(900, easing = EaseInOutQuart)) + 
+                            scaleIn(initialScale = 0.95f, animationSpec = tween(900, easing = EaseOutQuart))
                         }
                     },
                     exitTransition = {
@@ -105,17 +114,17 @@ fun MainScaffold(
                         if (initialIndex != -1 && targetIndex != -1 && initialIndex != targetIndex) {
                             if (targetIndex > initialIndex) {
                                 slideOutHorizontally(
-                                    targetOffsetX = { -it },
-                                    animationSpec = tween(700, easing = FastOutSlowInEasing)
-                                ) + fadeOut(animationSpec = tween(700))
+                                    targetOffsetX = { -it / 3 },
+                                    animationSpec = tween(900, easing = EaseOutQuart)
+                                ) + fadeOut(animationSpec = tween(700, easing = EaseInOutQuart))
                             } else {
                                 slideOutHorizontally(
-                                    targetOffsetX = { it },
-                                    animationSpec = tween(700, easing = FastOutSlowInEasing)
-                                ) + fadeOut(animationSpec = tween(700))
+                                    targetOffsetX = { it / 3 },
+                                    animationSpec = tween(900, easing = EaseOutQuart)
+                                ) + fadeOut(animationSpec = tween(700, easing = EaseInOutQuart))
                             }
                         } else {
-                            fadeOut(animationSpec = tween(500))
+                            fadeOut(animationSpec = tween(700, easing = EaseInOutQuart))
                         }
                     }
                 ) {
@@ -145,6 +154,7 @@ fun MainScaffold(
                      AssistantMainScreen()
                 }
                 // Quitamos la ruta separada de AddEvent para evitar el pantallazo blanco
+                }
             }
         }
     }

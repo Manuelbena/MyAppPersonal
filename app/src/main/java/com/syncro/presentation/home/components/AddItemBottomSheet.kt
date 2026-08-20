@@ -8,6 +8,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.EditNote
 import androidx.compose.material.icons.outlined.FlashOn
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -21,13 +22,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.syncro.presentation.theme.Cyan400
 import com.syncro.presentation.theme.Emerald500
+import com.syncro.presentation.theme.Amber500
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddItemBottomSheet(
     onDismiss: () -> Unit,
     onQuickTaskClick: () -> Unit,
-    onDetailedEventClick: () -> Unit
+    onDetailedEventClick: () -> Unit,
+    onNoteClick: () -> Unit
 ) {
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -94,6 +97,16 @@ fun AddItemBottomSheet(
                 icon = Icons.Outlined.CalendarMonth,
                 iconColor = Emerald500,
                 onClick = onDetailedEventClick
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            AddOptionItem(
+                title = "Nota personal",
+                description = "Guarda ideas, libros o pensamientos en tu libreta.",
+                icon = Icons.Outlined.EditNote,
+                iconColor = Amber500,
+                onClick = onNoteClick
             )
         }
     }

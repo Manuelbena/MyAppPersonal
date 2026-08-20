@@ -24,6 +24,7 @@ class GetTimelineUseCase @Inject constructor(
                 when (item) {
                     is SyncroItem.Task -> item.time
                     is SyncroItem.Event -> item.startTime
+                    is SyncroItem.Note -> "00:00" // Las notas no tienen hora, las ponemos al inicio o no las mostramos aquí
                 }
             }
         }

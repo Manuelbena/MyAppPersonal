@@ -28,6 +28,7 @@ class EventRepositoryImpl @Inject constructor(
                 
                 SyncroItem.Event(
                     id = entity.id,
+                    remoteId = entity.remoteId,
                     title = entity.title,
                     description = entity.description,
                     date = LocalDate.ofEpochDay(entity.date),
@@ -53,6 +54,7 @@ class EventRepositoryImpl @Inject constructor(
 
                 SyncroItem.Event(
                     id = entity.id,
+                    remoteId = entity.remoteId,
                     title = entity.title,
                     description = entity.description,
                     date = LocalDate.ofEpochDay(entity.date),
@@ -68,11 +70,12 @@ class EventRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun insertEvent(event: SyncroItem.Event, date: LocalDate, location: String?) {
+    override suspend fun insertEvent(event: SyncroItem.Event, date: LocalDate, location: String?): String {
         val dateEpoch = date.toEpochDay()
         val eventId = "${dateEpoch}_${event.title}_${event.startTime}"
         val entity = EventEntity(
             id = eventId,
+            remoteId = null,
             title = event.title,
             description = event.description,
             date = dateEpoch,
@@ -92,6 +95,29 @@ class EventRepositoryImpl @Inject constructor(
                 SubtaskEntity(eventId = eventId, title = it.title, isCompleted = it.isCompleted)
             }
             dao.insertEventWithSubtasks(entity, subtaskEntities)
+        }
+        return eventId
+    }
+
+    override suspend fun getEventById(eventId: String): SyncroItem.Event? {
+        return dao.getEventById(eventId)?.let { entity ->
+            val subtasks = dao.getSubtasksForEvent(eventId).map {
+                Subtask(title = it.title, isCompleted = it.isCompleted)
+            }
+            SyncroItem.Event(
+                id = entity.id,
+                remoteId = entity.remoteId,
+                title = entity.title,
+                description = entity.description,
+                date = LocalDate.ofEpochDay(entity.date),
+                startTime = entity.startTime,
+                endTime = entity.endTime,
+                categoryText = entity.categoryText,
+                categoryColor = Color(entity.categoryColor),
+                priority = entity.priority?.let { Priority.valueOf(it) },
+                subtasks = subtasks,
+                isCompleted = entity.isCompleted
+            )
         }
     }
 

@@ -32,7 +32,9 @@ import com.kizitonwose.calendar.core.DayPosition
 import com.kizitonwose.calendar.core.daysOfWeek
 import com.syncro.domain.model.SyncroItem
 import com.syncro.presentation.home.components.AddItemBottomSheet
+import com.syncro.presentation.home.components.AddNoteSheet
 import com.syncro.presentation.home.components.EventCard
+import com.syncro.presentation.home.components.TaskRow
 import com.syncro.presentation.event.AddEventScreen
 import com.syncro.presentation.home.components.QuickTaskSheet
 import kotlinx.coroutines.launch
@@ -66,6 +68,7 @@ fun CalendarScreen(
     var showAddItemSheet by remember { mutableStateOf(false) }
     var showDetailedEventSheet by remember { mutableStateOf(false) }
     var showQuickTaskSheet by remember { mutableStateOf(false) }
+    var showAddNoteSheet by remember { mutableStateOf(false) }
 
     LaunchedEffect(state.firstVisibleMonth) {
         viewModel.onMonthChanged(state.firstVisibleMonth.yearMonth)
@@ -112,6 +115,18 @@ fun CalendarScreen(
                 }
             )
 
+            if (uiState.isLoading) {
+                LinearProgressIndicator(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(2.dp),
+                    color = MaterialTheme.colorScheme.primary,
+                    trackColor = Color.Transparent
+                )
+            } else {
+                Spacer(modifier = Modifier.height(2.dp))
+            }
+
             // Contenedor con degradados
             Box(modifier = Modifier.fillMaxSize()) {
                 HorizontalCalendar(
@@ -120,7 +135,7 @@ fun CalendarScreen(
                     dayContent = { day ->
                         Day(
                             day = day,
-                            events = uiState.events[day.date] ?: emptyList(),
+                            items = uiState.events[day.date] ?: emptyList(),
                             onClick = { viewModel.onDateSelected(day.date) }
                         )
                     },
@@ -166,7 +181,7 @@ fun CalendarScreen(
     uiState.selectedDate?.let { date ->
         DayDetailsDialog(
             date = date,
-            events = uiState.events[date] ?: emptyList(),
+            items = uiState.events[date] ?: emptyList(),
             onDismiss = { viewModel.onDateSelected(null) },
             viewModel = viewModel
         )
@@ -183,7 +198,20 @@ fun CalendarScreen(
             onDetailedEventClick = { 
                 showAddItemSheet = false
                 showDetailedEventSheet = true
+            },
+            onNoteClick = {
+                showAddItemSheet = false
+                showAddNoteSheet = true
             }
+        )
+    }
+
+    if (showAddNoteSheet) {
+        // En CalendarScreen de momento no manejamos guardado de notas, 
+        // pero mostramos el modal para consistencia UI
+        AddNoteSheet(
+            onDismiss = { showAddNoteSheet = false },
+            onSave = { _, _, _ -> showAddNoteSheet = false }
         )
     }
 
@@ -209,7 +237,7 @@ fun CalendarScreen(
 @Composable
 fun DayDetailsDialog(
     date: LocalDate,
-    events: List<SyncroItem.Event>,
+    items: List<SyncroItem>,
     onDismiss: () -> Unit,
     viewModel: CalendarViewModel
 ) {
@@ -261,7 +289,7 @@ fun DayDetailsDialog(
                     
                     Spacer(modifier = Modifier.height(16.dp))
                     
-                    if (events.isEmpty()) {
+                    if (items.isEmpty()) {
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -269,7 +297,7 @@ fun DayDetailsDialog(
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = "No hay eventos para este día",
+                                text = "No hay eventos ni tareas para este día",
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
@@ -279,16 +307,28 @@ fun DayDetailsDialog(
                                 .verticalScroll(rememberScrollState())
                                 .padding(bottom = 8.dp)
                         ) {
-                            events.forEach { event ->
-                                EventCard(
-                                    event = event,
-                                    onSubtaskToggle = { subtaskTitle ->
-                                        viewModel.toggleSubtaskCompletion(event.id, subtaskTitle)
-                                    },
-                                    onToggleEvent = {
-                                        viewModel.toggleEventCompletion(event.id)
+                            items.forEach { item ->
+                                when (item) {
+                                    is SyncroItem.Event -> {
+                                        EventCard(
+                                            event = item,
+                                            onSubtaskToggle = { subtaskTitle ->
+                                                viewModel.toggleSubtaskCompletion(item.id, subtaskTitle)
+                                            },
+                                            onToggleEvent = {
+                                                viewModel.toggleEventCompletion(item.id)
+                                            }
+                                        )
                                     }
-                                )
+                                    is SyncroItem.Task -> {
+                                        TaskRow(
+                                            task = item,
+                                            onToggle = { /* TODO */ },
+                                            onClick = { /* TODO */ }
+                                        )
+                                    }
+                                    is SyncroItem.Note -> {}
+                                }
                             }
                         }
                     }
@@ -355,15 +395,32 @@ fun MonthHeader(daysOfWeek: List<DayOfWeek>) {
 }
 
 @Composable
-fun Day(day: CalendarDay, events: List<SyncroItem.Event>, onClick: () -> Unit) {
+fun Day(day: CalendarDay, items: List<SyncroItem>, onClick: () -> Unit) {
     val isToday = day.date == LocalDate.now()
     
+    // Obtener el color del primer evento o tarea para el fondo
+    val dayColor = remember(items) {
+        items.firstOrNull { it is SyncroItem.Event || it is SyncroItem.Task }?.let { item ->
+            when (item) {
+                is SyncroItem.Event -> item.categoryColor
+                is SyncroItem.Task -> item.categoryColor ?: Color(0xFF64748B) // Slate500 por defecto
+                else -> null
+            }
+        }
+    }
+
     Box(
         modifier = Modifier
-            .aspectRatio(0.6f) // Más alto para que quepan eventos (era 0.7f)
+            .aspectRatio(0.6f)
             .padding(2.dp)
             .clip(RoundedCornerShape(8.dp))
-            .background(if (isToday) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f) else Color.Transparent)
+            .background(
+                when {
+                    dayColor != null -> dayColor.copy(alpha = 0.15f)
+                    isToday -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                    else -> Color.Transparent
+                }
+            )
             .clickable(onClick = onClick),
         contentAlignment = Alignment.TopCenter
     ) {
@@ -388,13 +445,17 @@ fun Day(day: CalendarDay, events: List<SyncroItem.Event>, onClick: () -> Unit) {
 
             Spacer(modifier = Modifier.height(4.dp))
 
-            // Eventos (máximo 4 ahora que es más alto)
-            val visibleEvents = events.take(4)
-            visibleEvents.forEach { event ->
-                EventSnippet(event)
+            // Items (máximo 4)
+            val visibleItems = items.take(4)
+            visibleItems.forEach { item ->
+                when (item) {
+                    is SyncroItem.Event -> EventSnippet(item)
+                    is SyncroItem.Task -> TaskSnippet(item)
+                    is SyncroItem.Note -> {}
+                }
                 Spacer(modifier = Modifier.height(2.dp))
             }
-            if (events.size > 4) {
+            if (items.size > 4) {
                 Text(
                     text = "...",
                     fontSize = 10.sp,
@@ -426,6 +487,35 @@ fun EventSnippet(event: SyncroItem.Event) {
             Spacer(modifier = Modifier.width(4.dp))
             Text(
                 text = event.title,
+                fontSize = 8.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                color = MaterialTheme.colorScheme.onSurface,
+                lineHeight = 10.sp
+            )
+        }
+    }
+}
+
+@Composable
+fun TaskSnippet(task: SyncroItem.Task) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(4.dp))
+            .background(MaterialTheme.colorScheme.secondary.copy(alpha = 0.1f))
+            .padding(horizontal = 4.dp, vertical = 2.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier
+                    .size(4.dp, 12.dp)
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(MaterialTheme.colorScheme.secondary)
+            )
+            Spacer(modifier = Modifier.width(4.dp))
+            Text(
+                text = task.title,
                 fontSize = 8.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,

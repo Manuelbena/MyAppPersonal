@@ -18,6 +18,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.syncro.presentation.event.AddEventScreen
@@ -42,7 +45,9 @@ fun HomeScreen(
     var showAddItemSheet by remember { mutableStateOf(false) }
     var showQuickTaskSheet by remember { mutableStateOf(false) }
     var showDetailedEventSheet by remember { mutableStateOf(false) }
+    var showAddNoteSheet by remember { mutableStateOf(false) }
     var selectedTaskForDetail by remember { mutableStateOf<SyncroItem.Task?>(null) }
+    var selectedNoteForDetail by remember { mutableStateOf<SyncroItem.Note?>(null) }
 
     val authLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
@@ -69,11 +74,14 @@ fun HomeScreen(
         }
     }
     
-    // Formatear la fecha actual para el header
-    val formattedDate = uiState.selectedDate.dayOfWeek.getDisplayName(TextStyle.FULL, Locale("es", "ES"))
+    // Formatear la fecha de hoy para el header
+    val today = LocalDate.now()
+    val formattedDate = today.dayOfWeek.getDisplayName(TextStyle.FULL, Locale("es", "ES"))
         .replaceFirstChar { it.uppercase() } + ", " + 
-        uiState.selectedDate.dayOfMonth + " de " + 
-        uiState.selectedDate.month.getDisplayName(TextStyle.FULL, Locale("es", "ES"))
+        today.dayOfMonth + " de " + 
+        today.month.getDisplayName(TextStyle.FULL, Locale("es", "ES"))
+
+    val tasksTitle = "Tareas del día ${uiState.selectedDate.dayOfMonth}"
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -141,21 +149,22 @@ fun HomeScreen(
                         Column(
                             modifier = Modifier
                                 .padding(horizontal = 16.dp)
-                                .padding(bottom = 160.dp) // Espacio extra para el degradado y menú
                         ) {
+                            Text(
+                                text = tasksTitle,
+                                style = MaterialTheme.typography.titleLarge.copy(
+                                    fontFamily = FontFamily.Serif,
+                                    fontStyle = FontStyle.Italic,
+                                    fontWeight = FontWeight.Medium
+                                ),
+                                color = MaterialTheme.colorScheme.onBackground,
+                                modifier = Modifier.padding(vertical = 16.dp)
+                            )
+
                             if (!uiState.isLoading && uiState.timelineItems.isEmpty()) {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(top = 40.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = "No hay eventos para hoy",
-                                        style = MaterialTheme.typography.bodyLarge,
-                                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
-                                    )
-                                }
+                                EmptyStateView(
+                                    onAddEventClick = { showAddItemSheet = true }
+                                )
                             }
 
                             uiState.timelineItems.forEach { item ->
@@ -174,9 +183,23 @@ fun HomeScreen(
                                         onToggle = { viewModel.toggleTaskCompletion(item.id) },
                                         onClick = { selectedTaskForDetail = item }
                                     )
+                                    is SyncroItem.Note -> {
+                                        // Las notas se muestran en el carrusel, no en el timeline
+                                    }
                                 }
                             }
                         }
+
+                        if (uiState.notes.isNotEmpty()) {
+                            Spacer(modifier = Modifier.height(24.dp))
+                            NotesSection(
+                                notes = uiState.notes,
+                                onNoteClick = { selectedNoteForDetail = it },
+                                onSeeAllClick = { /* TODO: Navegar a pantalla de notas */ }
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(160.dp)) // Espacio extra para el degradado y menú
                     }
 
                     // Degradado SUPERIOR (Para que las tareas se desvanezcan al subir)
@@ -227,7 +250,28 @@ fun HomeScreen(
             onDetailedEventClick = { 
                 showAddItemSheet = false
                 showDetailedEventSheet = true
+            },
+            onNoteClick = {
+                showAddItemSheet = false
+                showAddNoteSheet = true
             }
+        )
+    }
+
+    if (showAddNoteSheet) {
+        AddNoteSheet(
+            onDismiss = { showAddNoteSheet = false },
+            onSave = { title, content, color ->
+                viewModel.saveNote(title, content, color)
+                showAddNoteSheet = false
+            }
+        )
+    }
+
+    if (selectedNoteForDetail != null) {
+        NoteDetailDialog(
+            note = selectedNoteForDetail!!,
+            onDismiss = { selectedNoteForDetail = null }
         )
     }
 

@@ -9,6 +9,9 @@ interface TaskDao {
     @Query("SELECT * FROM tasks WHERE date = :dateEpoch ORDER BY time ASC")
     fun getTasksByDate(dateEpoch: Long): Flow<List<TaskEntity>>
 
+    @Query("SELECT * FROM tasks WHERE date >= :startEpoch AND date <= :endEpoch ORDER BY date ASC, time ASC")
+    fun getTasksInRange(startEpoch: Long, endEpoch: Long): Flow<List<TaskEntity>>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertTask(task: TaskEntity)
 
@@ -20,6 +23,9 @@ interface TaskDao {
     
     @Query("SELECT * FROM tasks WHERE id = :id")
     suspend fun getTaskById(id: String): TaskEntity?
+
+    @Query("SELECT * FROM tasks WHERE remoteId = :remoteId")
+    suspend fun getTaskByRemoteId(remoteId: String): TaskEntity?
 
     @Query("SELECT * FROM tasks WHERE remoteId IS NULL AND date = :dateEpoch")
     suspend fun getUnsyncedTasksByDate(dateEpoch: Long): List<TaskEntity>

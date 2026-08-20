@@ -38,10 +38,11 @@ class SaveEventUseCase @Inject constructor(
             subtasks = subtasks.map { Subtask(it, false) },
             isCompleted = false
         )
-        repository.insertEvent(event, date, location)
+        val eventId = repository.insertEvent(event, date, location)
 
         // Sincronizar con Google Calendar
         googleSyncRepository.uploadEventToGoogle(
+            eventId = eventId,
             title = title,
             description = description,
             location = location,

@@ -6,6 +6,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AutoAwesome
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -15,10 +16,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil3.SingletonImageLoader
+import coil3.compose.SubcomposeAsyncImage
+import coil3.request.ImageRequest
+import coil3.request.crossfade
+import coil3.video.VideoFrameDecoder
+import com.syncro.R
 import com.syncro.presentation.theme.Cyan400
 import com.syncro.presentation.theme.Blue500
 import com.syncro.presentation.theme.Green500
@@ -73,11 +81,32 @@ fun AssistantCard(
                     .background(MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(12.dp)),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = Icons.Outlined.AutoAwesome,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(28.dp)
+                val context = LocalContext.current
+                SubcomposeAsyncImage(
+                    model = ImageRequest.Builder(context)
+                        .data("android.resource://${context.packageName}/${R.raw.mascot_anim}")
+                        .decoderFactory { result, options, _ ->
+                            VideoFrameDecoder.Factory().create(result, options, SingletonImageLoader.get(context))
+                        }
+                        .crossfade(true)
+                        .build(),
+                    contentDescription = "Mascota",
+                    modifier = Modifier.size(40.dp),
+                    loading = {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    },
+                    error = {
+                        Icon(
+                            imageVector = Icons.Outlined.AutoAwesome,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(28.dp)
+                        )
+                    }
                 )
             }
 

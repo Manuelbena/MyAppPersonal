@@ -17,6 +17,7 @@ import com.syncro.domain.usecase.SyncGoogleTasksUseCase
 import com.syncro.domain.usecase.ToggleEventCompletionUseCase
 import com.syncro.domain.usecase.ToggleSubtaskCompletionUseCase
 import com.syncro.domain.usecase.ToggleTaskCompletionUseCase
+import com.syncro.domain.repository.NoteRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
@@ -35,6 +36,7 @@ data class HomeUiState(
     val quote: String = "La mejor manera de empezar es dejar de hablar y empezar a hacer.",
     val quoteAuthor: String = "Walt Disney",
     val timelineItems: List<SyncroItem> = emptyList(),
+    val notes: List<SyncroItem.Note> = emptyList(),
     val isLoading: Boolean = false,
     val syncMessage: String? = null
 )
@@ -55,7 +57,8 @@ class HomeViewModel @Inject constructor(
     private val toggleEventCompletionUseCase: ToggleEventCompletionUseCase,
     private val syncGoogleTasksUseCase: SyncGoogleTasksUseCase,
     private val syncGoogleCalendarUseCase: SyncGoogleCalendarUseCase,
-    private val uploadUnsyncedItemsUseCase: com.syncro.domain.usecase.UploadUnsyncedItemsUseCase
+    private val uploadUnsyncedItemsUseCase: com.syncro.domain.usecase.UploadUnsyncedItemsUseCase,
+    private val noteRepository: NoteRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HomeUiState())
@@ -87,6 +90,12 @@ class HomeViewModel @Inject constructor(
             }
             .onEach { items ->
                 _uiState.update { it.copy(timelineItems = items) }
+            }
+            .launchIn(viewModelScope)
+
+        noteRepository.getAllNotes()
+            .onEach { notes ->
+                _uiState.update { it.copy(notes = notes) }
             }
             .launchIn(viewModelScope)
     }
@@ -204,6 +213,27 @@ class HomeViewModel @Inject constructor(
     fun toggleSubtaskCompletion(eventId: String, subtaskTitle: String) {
         viewModelScope.launch {
             toggleSubtaskCompletionUseCase(eventId, subtaskTitle)
+        }
+    }
+
+    fun saveNote(title: String, content: String, color: Color) {
+        viewModelScope.launch {
+            val note = SyncroItem.Note(
+                id = java.util.UUID.randomUUID().toString(),
+                title = title,
+                content = content,
+                color = color,
+                createdAt = java.time.LocalDateTime.now()
+            )
+            noteRepository.insertNote(note)
+            _effect.send(HomeEffect.ShowSnackbar("Nota guardada"))
+        }
+    }
+
+    fun deleteNote(note: SyncroItem.Note) {
+        viewModelScope.launch {
+            noteRepository.deleteNote(note)
+            _effect.send(HomeEffect.ShowSnackbar("Nota eliminada"))
         }
     }
 }

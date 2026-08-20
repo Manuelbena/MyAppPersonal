@@ -22,11 +22,19 @@ class TaskRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun insertTask(task: SyncroItem.Task, date: LocalDate) {
+    override fun getTasksInRange(startDate: LocalDate, endDate: LocalDate): Flow<List<SyncroItem.Task>> {
+        return dao.getTasksInRange(startDate.toEpochDay(), endDate.toEpochDay()).map { entities ->
+            entities.map { it.toDomain() }
+        }
+    }
+
+    override suspend fun insertTask(task: SyncroItem.Task, date: LocalDate): String {
         val dateEpoch = date.toEpochDay()
+        val taskId = "${dateEpoch}_${task.title}_${task.time}"
         dao.insertTask(
             TaskEntity(
-                id = "${dateEpoch}_${task.title}_${task.time}",
+                id = taskId,
+                remoteId = null,
                 title = task.title,
                 description = task.description ?: "",
                 date = dateEpoch,
@@ -36,6 +44,11 @@ class TaskRepositoryImpl @Inject constructor(
                 categoryColor = task.categoryColor?.toArgb()
             )
         )
+        return taskId
+    }
+
+    override suspend fun getTaskById(taskId: String): SyncroItem.Task? {
+        return dao.getTaskById(taskId)?.toDomain()
     }
 
     override suspend fun toggleTaskCompletion(taskId: String) {
@@ -47,6 +60,7 @@ class TaskRepositoryImpl @Inject constructor(
     private fun TaskEntity.toDomain(): SyncroItem.Task {
         return SyncroItem.Task(
             id = id,
+            remoteId = remoteId,
             title = title,
             description = description,
             date = LocalDate.ofEpochDay(date),

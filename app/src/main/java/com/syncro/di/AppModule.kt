@@ -4,14 +4,17 @@ import android.content.Context
 import androidx.room.Room
 import com.syncro.data.local.SyncroDatabase
 import com.syncro.data.local.dao.EventDao
+import com.syncro.data.local.dao.NoteDao
 import com.syncro.data.local.dao.TaskDao
 import com.syncro.data.local.dao.UserDao
 import com.syncro.data.repository.EventRepositoryImpl
 import com.syncro.data.repository.GoogleSyncRepositoryImpl
+import com.syncro.data.repository.NoteRepositoryImpl
 import com.syncro.data.repository.TaskRepositoryImpl
 import com.syncro.data.repository.UserRepositoryImpl
 import com.syncro.domain.repository.EventRepository
 import com.syncro.domain.repository.GoogleSyncRepository
+import com.syncro.domain.repository.NoteRepository
 import com.syncro.domain.repository.TaskRepository
 import com.syncro.domain.repository.UserRepository
 import dagger.Module
@@ -53,9 +56,20 @@ object AppModule {
     }
 
     @Provides
+    fun provideNoteDao(db: SyncroDatabase): NoteDao {
+        return db.noteDao
+    }
+
+    @Provides
     @Singleton
     fun provideTaskRepository(dao: TaskDao): TaskRepository {
         return TaskRepositoryImpl(dao)
+    }
+
+    @Provides
+    @Singleton
+    fun provideNoteRepository(dao: NoteDao): NoteRepository {
+        return NoteRepositoryImpl(dao)
     }
 
     @Provides

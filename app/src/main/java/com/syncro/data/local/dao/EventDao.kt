@@ -38,6 +38,15 @@ interface EventDao {
     @Query("UPDATE events SET isCompleted = NOT isCompleted WHERE id = :eventId")
     suspend fun toggleEventCompletion(eventId: String)
 
+    @Query("SELECT * FROM events WHERE id = :id")
+    suspend fun getEventById(id: String): EventEntity?
+
+    @Query("SELECT * FROM events WHERE remoteId = :remoteId")
+    suspend fun getEventByRemoteId(remoteId: String): EventEntity?
+
+    @Update
+    suspend fun updateEvent(event: EventEntity)
+
     @Transaction
     @Query("SELECT * FROM events WHERE date >= :startEpoch AND date <= :endEpoch")
     fun getEventsInRange(startEpoch: Long, endEpoch: Long): Flow<List<EventWithSubtasks>>

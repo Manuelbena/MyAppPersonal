@@ -16,6 +16,7 @@ data class Subtask(
 sealed class SyncroItem {
     data class Event(
         val id: String,
+        val remoteId: String? = null,
         val title: String,
         val description: String?,
         val date: java.time.LocalDate,
@@ -30,6 +31,7 @@ sealed class SyncroItem {
 
     data class Task(
         val id: String,
+        val remoteId: String? = null,
         val title: String,
         val description: String? = null,
         val date: java.time.LocalDate,
@@ -37,5 +39,13 @@ sealed class SyncroItem {
         val isCompleted: Boolean,
         val categoryText: String? = null,
         val categoryColor: Color? = null
+    ) : SyncroItem()
+
+    data class Note(
+        val id: String,
+        val title: String,
+        val content: String,
+        val color: Color,
+        val createdAt: java.time.LocalDateTime
     ) : SyncroItem()
 }

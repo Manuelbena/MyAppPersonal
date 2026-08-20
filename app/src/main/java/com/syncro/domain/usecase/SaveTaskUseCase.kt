@@ -29,9 +29,9 @@ class SaveTaskUseCase @Inject constructor(
             categoryText = categoryText,
             categoryColor = categoryColor
         )
-        repository.insertTask(task, date)
+        val taskId = repository.insertTask(task, date)
         
         // Sincronizar con Google en segundo plano
-        googleSyncRepository.uploadTaskToGoogle(title, description, date)
+        googleSyncRepository.uploadTaskToGoogle(taskId, title, description, date)
     }
 }
