@@ -37,6 +37,7 @@ fun HomeScreen(
     isDarkTheme: Boolean,
     onThemeToggle: () -> Unit,
     onNavigateToAddEvent: () -> Unit,
+    onNavigateToNotes: () -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -195,7 +196,7 @@ fun HomeScreen(
                             NotesSection(
                                 notes = uiState.notes,
                                 onNoteClick = { selectedNoteForDetail = it },
-                                onSeeAllClick = { /* TODO: Navegar a pantalla de notas */ }
+                                onSeeAllClick = onNavigateToNotes
                             )
                         }
 
@@ -261,8 +262,8 @@ fun HomeScreen(
     if (showAddNoteSheet) {
         AddNoteSheet(
             onDismiss = { showAddNoteSheet = false },
-            onSave = { title, content, color ->
-                viewModel.saveNote(title, content, color)
+            onSave = { id, title, content, color ->
+                viewModel.saveNote(id, title, content, color)
                 showAddNoteSheet = false
             }
         )
@@ -284,8 +285,8 @@ fun HomeScreen(
     if (showQuickTaskSheet) {
         QuickTaskSheet(
             onDismiss = { showQuickTaskSheet = false },
-            onSave = { title, description, date, time, categoryText, categoryColor ->
-                viewModel.saveQuickTask(title, description, date, time, categoryText, categoryColor)
+            onSave = { title, description, date, time ->
+                viewModel.saveQuickTask(title, description, date, time)
                 showQuickTaskSheet = false
             }
         )

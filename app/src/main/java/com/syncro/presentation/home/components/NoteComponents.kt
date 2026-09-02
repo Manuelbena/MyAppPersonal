@@ -148,16 +148,17 @@ fun NoteDetailDialog(
                 .padding(16.dp),
             shape = RoundedCornerShape(32.dp),
             colors = CardDefaults.cardColors(
-                containerColor = Color(0xFF1A1A1A) // Fondo sólido oscuro (o podrías usar note.color si quieres fondo de color sólido)
+                containerColor = note.color // Usamos el color de la nota directamente como fondo sólido
             )
         ) {
             Box(modifier = Modifier.fillMaxWidth().heightIn(max = 500.dp)) {
-                // Barra de color lateral sólida
+                // Ya no necesitamos la barra lateral si el fondo es del mismo color, 
+                // pero la dejamos como un detalle sutil si quieres un borde más oscuro/claro
                 Box(
                     modifier = Modifier
                         .fillMaxHeight()
                         .width(6.dp)
-                        .background(note.color)
+                        .background(Color.Black.copy(alpha = 0.1f))
                         .align(Alignment.CenterStart)
                 )
 

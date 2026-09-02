@@ -18,6 +18,7 @@ sealed class AppScreen(val route: String, val title: String, val icon: ImageVect
     object Assistant : AppScreen("assistant", "Asistente", Icons.Outlined.AutoAwesome)
     object AddEvent : AppScreen("add_event", "Nuevo Evento", Icons.Rounded.Add)
     object Login : AppScreen("login", "Login", Icons.Outlined.Person)
+    object NotesList : AppScreen("notes_list", "Mis Notas", Icons.Outlined.Home)
 }
 
 // Lista que usaremos para pintar el menú

@@ -151,9 +151,7 @@ class HomeViewModel @Inject constructor(
         title: String, 
         description: String, 
         date: LocalDate, 
-        time: LocalTime,
-        categoryText: String? = null,
-        categoryColor: Color? = null
+        time: LocalTime
     ) {
         viewModelScope.launch {
             val timeString = time.format(DateTimeFormatter.ofPattern("HH:mm"))
@@ -161,9 +159,7 @@ class HomeViewModel @Inject constructor(
                 title = title, 
                 description = description, 
                 date = date, 
-                time = timeString,
-                categoryText = categoryText,
-                categoryColor = categoryColor
+                time = timeString
             )
             _effect.send(HomeEffect.ShowSnackbar("Tarea creada correctamente"))
         }
@@ -216,17 +212,17 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    fun saveNote(title: String, content: String, color: Color) {
+    fun saveNote(id: String? = null, title: String, content: String, color: Color) {
         viewModelScope.launch {
             val note = SyncroItem.Note(
-                id = java.util.UUID.randomUUID().toString(),
+                id = id ?: java.util.UUID.randomUUID().toString(),
                 title = title,
                 content = content,
                 color = color,
                 createdAt = java.time.LocalDateTime.now()
             )
             noteRepository.insertNote(note)
-            _effect.send(HomeEffect.ShowSnackbar("Nota guardada"))
+            _effect.send(HomeEffect.ShowSnackbar(if (id == null) "Nota guardada" else "Nota actualizada"))
         }
     }
 

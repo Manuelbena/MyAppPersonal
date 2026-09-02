@@ -287,19 +287,13 @@ fun TaskRow(
                 Spacer(modifier = Modifier.width(12.dp))
                 
                 Column {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = task.title,
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            textDecoration = if (task.isCompleted) TextDecoration.LineThrough else TextDecoration.None
-                        )
-                        if (task.categoryText != null && task.categoryColor != null) {
-                            Spacer(modifier = Modifier.width(8.dp))
-                            TagChip(text = task.categoryText, color = task.categoryColor)
-                        }
-                    }
+                    Text(
+                        text = task.title,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        textDecoration = if (task.isCompleted) TextDecoration.LineThrough else TextDecoration.None
+                    )
                     
                     if (!task.description.isNullOrEmpty()) {
                         Text(

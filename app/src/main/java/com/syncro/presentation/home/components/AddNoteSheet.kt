@@ -15,14 +15,17 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
+import com.syncro.domain.model.SyncroItem
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddNoteSheet(
+    initialNote: SyncroItem.Note? = null,
     onDismiss: () -> Unit,
-    onSave: (String, String, Color) -> Unit
+    onSave: (String?, String, String, Color) -> Unit
 ) {
-    var title by remember { mutableStateOf("") }
-    var content by remember { mutableStateOf("") }
+    var title by remember { mutableStateOf(initialNote?.title ?: "") }
+    var content by remember { mutableStateOf(initialNote?.content ?: "") }
     
     val noteColors = listOf(
         Color(0xFFFFB74D), // Naranja
@@ -31,7 +34,7 @@ fun AddNoteSheet(
         Color(0xFFBA68C8), // Violeta
         Color(0xFFFF8A65)  // Coral
     )
-    var selectedColor by remember { mutableStateOf(noteColors[0]) }
+    var selectedColor by remember { mutableStateOf(initialNote?.color ?: noteColors[0]) }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -46,7 +49,7 @@ fun AddNoteSheet(
                 .padding(bottom = 32.dp)
         ) {
             Text(
-                text = "Nueva Nota",
+                text = if (initialNote == null) "Nueva Nota" else "Editar Nota",
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold
             )
@@ -108,7 +111,7 @@ fun AddNoteSheet(
             Button(
                 onClick = {
                     if (title.isNotBlank()) {
-                        onSave(title, content, selectedColor)
+                        onSave(initialNote?.id, title, content, selectedColor)
                         onDismiss()
                     }
                 },
@@ -118,7 +121,10 @@ fun AddNoteSheet(
                 shape = RoundedCornerShape(16.dp),
                 enabled = title.isNotBlank()
             ) {
-                Text("Guardar Nota", fontWeight = FontWeight.Bold)
+                Text(
+                    text = if (initialNote == null) "Guardar Nota" else "Actualizar Nota",
+                    fontWeight = FontWeight.Bold
+                )
             }
         }
     }

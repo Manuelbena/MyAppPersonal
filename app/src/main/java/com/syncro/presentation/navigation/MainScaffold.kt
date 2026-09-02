@@ -31,6 +31,7 @@ import com.syncro.presentation.calendar.CalendarScreen
 import com.syncro.presentation.event.AddEventScreen
 import com.syncro.presentation.home.HomeScreen
 import com.syncro.presentation.login.LoginScreen
+import com.syncro.presentation.notes.NotesListScreen
 import com.syncro.presentation.theme.SyncroTheme
 import com.syncro.presentation.theme.ThemeViewModel
 
@@ -46,7 +47,9 @@ fun MainScaffold(
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
     
-    val showBottomBar = currentRoute != AppScreen.AddEvent.route && currentRoute != AppScreen.Login.route
+    val showBottomBar = currentRoute != AppScreen.AddEvent.route && 
+                       currentRoute != AppScreen.Login.route && 
+                       currentRoute != AppScreen.NotesList.route
 
     SyncroTheme(darkTheme = isDarkTheme) {
         Box(
@@ -141,8 +144,14 @@ fun MainScaffold(
                      HomeScreen(
                          isDarkTheme = isDarkTheme,
                          onThemeToggle = { themeViewModel.toggleTheme() },
-                         onNavigateToAddEvent = { /* Ya no navegamos, se gestiona internamente */ }
+                         onNavigateToAddEvent = { /* Ya no navegamos, se gestiona internamente */ },
+                         onNavigateToNotes = { navController.navigate(AppScreen.NotesList.route) }
                      )
+                }
+                composable(AppScreen.NotesList.route) {
+                    NotesListScreen(
+                        onBack = { navController.popBackStack() }
+                    )
                 }
                 composable(AppScreen.Calendar.route) {
                      CalendarScreen()

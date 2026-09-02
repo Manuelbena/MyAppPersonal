@@ -38,20 +38,12 @@ import java.util.Locale
 @Composable
 fun QuickTaskSheet(
     onDismiss: () -> Unit,
-    onSave: (String, String, LocalDate, LocalTime, String?, Color?) -> Unit
+    onSave: (String, String, LocalDate, LocalTime) -> Unit
 ) {
-    val categories = listOf(
-        CategoryItem("Personal", Icons.Rounded.Person, Emerald500),
-        CategoryItem("Trabajo", Icons.Rounded.Work, Indigo500),
-        CategoryItem("Salud", Icons.Rounded.Favorite, Color(0xFFFF5252)),
-        CategoryItem("Ocio", Icons.Rounded.SportsEsports, Amber500)
-    )
-
     var title by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
     var selectedDate by remember { mutableStateOf(LocalDate.now()) }
     var selectedTime by remember { mutableStateOf(LocalTime.now()) }
-    var selectedCategory by remember { mutableStateOf<CategoryItem?>(categories[0]) } // Default a Personal
     
     var showDatePicker by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
@@ -114,50 +106,6 @@ fun QuickTaskSheet(
             }
 
             Spacer(modifier = Modifier.height(24.dp))
-
-            // Categorías en Quick Task
-            LazyRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                items(categories) { category ->
-                    val isSelected = selectedCategory?.name == category.name
-                    val backgroundColor = if (isSelected) category.color.copy(alpha = 0.2f) else MaterialTheme.colorScheme.surface
-                    val contentColor = if (isSelected) category.color else MaterialTheme.colorScheme.onSurfaceVariant
-                    val borderColor = if (isSelected) category.color.copy(alpha = 0.5f) else MaterialTheme.colorScheme.outline
-
-                    Surface(
-                        modifier = Modifier.clickableWithoutRipple { 
-                            selectedCategory = if (isSelected) null else category
-                        },
-                        shape = RoundedCornerShape(12.dp),
-                        color = backgroundColor,
-                        border = BorderStroke(1.dp, borderColor)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = category.icon,
-                                contentDescription = null,
-                                tint = contentColor,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = category.name,
-                                color = contentColor,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 12.sp
-                            )
-                        }
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -223,7 +171,7 @@ fun QuickTaskSheet(
                 Button(
                     onClick = { 
                         if (title.isNotBlank()) {
-                            onSave(title, description, selectedDate, selectedTime, selectedCategory?.name, selectedCategory?.color) 
+                            onSave(title, description, selectedDate, selectedTime)
                         }
                     },
                     shape = RoundedCornerShape(12.dp),

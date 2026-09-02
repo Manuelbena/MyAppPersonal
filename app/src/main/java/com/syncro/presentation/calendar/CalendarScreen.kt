@@ -211,7 +211,7 @@ fun CalendarScreen(
         // pero mostramos el modal para consistencia UI
         AddNoteSheet(
             onDismiss = { showAddNoteSheet = false },
-            onSave = { _, _, _ -> showAddNoteSheet = false }
+            onSave = { _, _, _, _ -> showAddNoteSheet = false }
         )
     }
 
@@ -224,7 +224,7 @@ fun CalendarScreen(
     if (showQuickTaskSheet) {
         QuickTaskSheet(
             onDismiss = { showQuickTaskSheet = false },
-            onSave = { _, _, _, _, _, _ -> 
+            onSave = { _, _, _, _ ->
                 // En Calendar ViewModel no tenemos implementado save aún, 
                 // pero conectamos la UI
                 showQuickTaskSheet = false 
