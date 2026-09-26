@@ -4,6 +4,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import com.syncro.data.local.dao.EventDao
 import com.syncro.data.local.entity.EventEntity
+import com.syncro.data.local.entity.EventWithSubtasks
 import com.syncro.data.local.entity.SubtaskEntity
 import com.syncro.domain.model.Priority
 import com.syncro.domain.model.Subtask
@@ -12,6 +13,7 @@ import com.syncro.domain.repository.EventRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import java.time.LocalDate
+import java.util.UUID
 import javax.inject.Inject
 
 class EventRepositoryImpl @Inject constructor(
@@ -20,53 +22,13 @@ class EventRepositoryImpl @Inject constructor(
 
     override fun getEventsByDate(date: LocalDate): Flow<List<SyncroItem.Event>> {
         return dao.getEventsByDate(date.toEpochDay()).map { relations ->
-            relations.map { relation ->
-                val entity = relation.event
-                val subtasks = relation.subtasks.map {
-                    Subtask(title = it.title, isCompleted = it.isCompleted)
-                }
-                
-                SyncroItem.Event(
-                    id = entity.id,
-                    remoteId = entity.remoteId,
-                    title = entity.title,
-                    description = entity.description,
-                    date = LocalDate.ofEpochDay(entity.date),
-                    startTime = entity.startTime,
-                    endTime = entity.endTime,
-                    categoryText = entity.categoryText,
-                    categoryColor = Color(entity.categoryColor),
-                    priority = entity.priority?.let { Priority.valueOf(it) },
-                    subtasks = subtasks,
-                    isCompleted = entity.isCompleted
-                )
-            }
+            relations.map { it.toDomain() }
         }
     }
 
     override fun getEventsInRange(startDate: LocalDate, endDate: LocalDate): Flow<List<SyncroItem.Event>> {
         return dao.getEventsInRange(startDate.toEpochDay(), endDate.toEpochDay()).map { relations ->
-            relations.map { relation ->
-                val entity = relation.event
-                val subtasks = relation.subtasks.map {
-                    Subtask(title = it.title, isCompleted = it.isCompleted)
-                }
-
-                SyncroItem.Event(
-                    id = entity.id,
-                    remoteId = entity.remoteId,
-                    title = entity.title,
-                    description = entity.description,
-                    date = LocalDate.ofEpochDay(entity.date),
-                    startTime = entity.startTime,
-                    endTime = entity.endTime,
-                    categoryText = entity.categoryText,
-                    categoryColor = Color(entity.categoryColor),
-                    priority = entity.priority?.let { Priority.valueOf(it) },
-                    subtasks = subtasks,
-                    isCompleted = entity.isCompleted
-                )
-            }
+            relations.map { it.toDomain() }
         }
     }
 
@@ -75,11 +37,11 @@ class EventRepositoryImpl @Inject constructor(
         val eventId = if (event.id != "0" && event.id.isNotEmpty()) {
             event.id
         } else {
-            "${dateEpoch}_${event.title}_${event.startTime}_${System.currentTimeMillis()}"
+            UUID.randomUUID().toString()
         }
         val entity = EventEntity(
             id = eventId,
-            remoteId = null,
+            remoteId = event.remoteId,
             title = event.title,
             description = event.description,
             date = dateEpoch,
@@ -91,38 +53,39 @@ class EventRepositoryImpl @Inject constructor(
             location = location,
             isCompleted = event.isCompleted
         )
-        
-        if (event.subtasks.isEmpty()) {
-            dao.insertEvent(entity)
-        } else {
-            val subtaskEntities = event.subtasks.map { 
-                SubtaskEntity(eventId = eventId, title = it.title, isCompleted = it.isCompleted)
-            }
-            dao.insertEventWithSubtasks(entity, subtaskEntities)
+
+        // insertEventWithSubtasks siempre limpia las subtareas previas antes de reinsertar,
+        // incluso con lista vacía: evita depender del borrado en cascada implícito de REPLACE.
+        val subtaskEntities = event.subtasks.map {
+            SubtaskEntity(eventId = eventId, title = it.title, isCompleted = it.isCompleted)
         }
+        dao.insertEventWithSubtasks(entity, subtaskEntities)
         return eventId
     }
 
     override suspend fun getEventById(eventId: String): SyncroItem.Event? {
         return dao.getEventById(eventId)?.let { entity ->
-            val subtasks = dao.getSubtasksForEvent(eventId).map {
-                Subtask(title = it.title, isCompleted = it.isCompleted)
-            }
-            SyncroItem.Event(
-                id = entity.id,
-                remoteId = entity.remoteId,
-                title = entity.title,
-                description = entity.description,
-                date = LocalDate.ofEpochDay(entity.date),
-                startTime = entity.startTime,
-                endTime = entity.endTime,
-                categoryText = entity.categoryText,
-                categoryColor = Color(entity.categoryColor),
-                priority = entity.priority?.let { Priority.valueOf(it) },
-                subtasks = subtasks,
-                isCompleted = entity.isCompleted
-            )
+            val subtasks = dao.getSubtasksForEvent(eventId)
+            EventWithSubtasks(entity, subtasks).toDomain()
         }
+    }
+
+    private fun EventWithSubtasks.toDomain(): SyncroItem.Event {
+        val subtasks = subtasks.map { Subtask(title = it.title, isCompleted = it.isCompleted) }
+        return SyncroItem.Event(
+            id = event.id,
+            remoteId = event.remoteId,
+            title = event.title,
+            description = event.description,
+            date = LocalDate.ofEpochDay(event.date),
+            startTime = event.startTime,
+            endTime = event.endTime,
+            categoryText = event.categoryText,
+            categoryColor = Color(event.categoryColor),
+            priority = event.priority?.let { Priority.valueOf(it) },
+            subtasks = subtasks,
+            isCompleted = event.isCompleted
+        )
     }
 
     override suspend fun toggleSubtaskCompletion(eventId: String, subtaskTitle: String) {

@@ -9,17 +9,7 @@ class ToggleEventCompletionUseCase @Inject constructor(
     private val googleSyncRepository: GoogleSyncRepository
 ) {
     suspend operator fun invoke(eventId: String) {
-        val event = repository.getEventById(eventId)
         repository.toggleEventCompletion(eventId)
-        
-        // Si tiene remoteId, actualizar en Google Calendar
-        event?.remoteId?.let { remoteId ->
-            googleSyncRepository.updateEventInGoogle(
-                remoteId = remoteId,
-                title = event.title,
-                description = event.description,
-                isCompleted = !event.isCompleted // Invertimos porque acabamos de hacer el toggle localmente
-            )
-        }
+        googleSyncRepository.updateEventInGoogle(eventId)
     }
 }

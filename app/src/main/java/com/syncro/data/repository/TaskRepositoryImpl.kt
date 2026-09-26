@@ -9,6 +9,7 @@ import com.syncro.domain.repository.TaskRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import java.time.LocalDate
+import java.util.UUID
 import javax.inject.Inject
 
 class TaskRepositoryImpl @Inject constructor(
@@ -30,7 +31,11 @@ class TaskRepositoryImpl @Inject constructor(
 
     override suspend fun insertTask(task: SyncroItem.Task, date: LocalDate): String {
         val dateEpoch = date.toEpochDay()
-        val taskId = "${dateEpoch}_${task.title}_${task.time}"
+        val taskId = if (task.id != "0" && task.id.isNotEmpty()) {
+            task.id
+        } else {
+            UUID.randomUUID().toString()
+        }
         dao.insertTask(
             TaskEntity(
                 id = taskId,
@@ -52,9 +57,7 @@ class TaskRepositoryImpl @Inject constructor(
     }
 
     override suspend fun toggleTaskCompletion(taskId: String) {
-        dao.getTaskById(taskId)?.let { entity ->
-            dao.updateTask(entity.copy(isCompleted = !entity.isCompleted))
-        }
+        dao.toggleTaskCompletion(taskId)
     }
 
     private fun TaskEntity.toDomain(): SyncroItem.Task {

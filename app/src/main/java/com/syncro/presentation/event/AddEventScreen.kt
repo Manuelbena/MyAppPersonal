@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.syncro.domain.model.Priority
+import com.syncro.domain.model.isValidEventTimeRange
 import com.syncro.presentation.theme.*
 import java.time.Instant
 import java.time.LocalDate
@@ -115,6 +116,7 @@ fun AddEventContent(
 
     val dateFormatter = DateTimeFormatter.ofPattern("EEE, d MMM.", Locale("es", "ES"))
     val timeFormatter = DateTimeFormatter.ofPattern("HH:mm")
+    val isTimeRangeValid = isValidEventTimeRange(startTime, endTime)
 
     val categories = listOf(
         CategoryItem("Personal", Icons.Rounded.Person, Emerald500),
@@ -163,6 +165,7 @@ fun AddEventContent(
                     contentColor = Cyan400
                 ),
                 shape = RoundedCornerShape(12.dp),
+                enabled = isTimeRangeValid,
                 contentPadding = PaddingValues(horizontal = 20.dp, vertical = 10.dp)
             ) {
                 Text("Guardar", fontWeight = FontWeight.Bold)
@@ -222,6 +225,13 @@ fun AddEventContent(
                         showDatePicker = true 
                     }
                 )
+                if (!isTimeRangeValid) {
+                    Text(
+                        "La hora de fin no puede ser anterior a la de inicio",
+                        color = MaterialTheme.colorScheme.error,
+                        fontSize = 13.sp
+                    )
+                }
                 
                 Row(
                     modifier = Modifier.fillMaxWidth(),

@@ -7,7 +7,7 @@ import javax.inject.Inject
 class SyncGoogleCalendarUseCase @Inject constructor(
     private val repository: GoogleSyncRepository
 ) {
-    suspend operator fun invoke(date: LocalDate): Result<Unit> {
-        return repository.syncCalendar(date)
+    suspend operator fun invoke(startDate: LocalDate, endDate: LocalDate = startDate): Result<Unit> {
+        return repository.syncCalendar(startDate, endDate)
     }
 }

@@ -82,7 +82,7 @@ class HomeViewModel @Inject constructor(
             .distinctUntilChanged()
             .onEach { date ->
                 // Cada vez que cambia el día, lanzamos la sincronización
-                syncFromGoogle(date)
+                syncFromGoogle(date, force = false)
             }
             .flatMapLatest { date ->
                 // Observamos la base de datos para ese día
@@ -100,7 +100,7 @@ class HomeViewModel @Inject constructor(
             .launchIn(viewModelScope)
     }
 
-    fun syncFromGoogle(date: LocalDate = _uiState.value.selectedDate) {
+    fun syncFromGoogle(date: LocalDate = _uiState.value.selectedDate, force: Boolean = true) {
         syncJob?.cancel()
         isAuthRecoveryInProgress = false
         syncJob = viewModelScope.launch {
@@ -110,7 +110,7 @@ class HomeViewModel @Inject constructor(
                 uploadUnsyncedItemsUseCase(date)
 
                 // 2. Sincronizamos Calendar y Tasks en paralelo
-                val tasksDeferred = async { syncGoogleTasksUseCase(date) }
+                val tasksDeferred = async { syncGoogleTasksUseCase(force) }
                 val calendarDeferred = async { syncGoogleCalendarUseCase(date) }
 
                 val tasksResult = tasksDeferred.await()
@@ -179,7 +179,7 @@ class HomeViewModel @Inject constructor(
         subtasks: List<String>
     ) {
         viewModelScope.launch {
-            saveEventUseCase(
+            val result = saveEventUseCase(
                 id = id,
                 title = title,
                 description = description,
@@ -192,7 +192,10 @@ class HomeViewModel @Inject constructor(
                 priority = priority,
                 subtasks = subtasks
             )
-            val msg = if (id == null) "Evento creado correctamente" else "Evento actualizado correctamente"
+            val msg = result.fold(
+                onSuccess = { if (id == null) "Evento creado correctamente" else "Evento actualizado correctamente" },
+                onFailure = { it.message ?: "No se pudo guardar el evento" }
+            )
             _effect.send(HomeEffect.ShowSnackbar(msg))
         }
     }

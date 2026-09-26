@@ -36,15 +36,7 @@ class NoteRepositoryImpl @Inject constructor(
     }
 
     override suspend fun deleteNote(note: SyncroItem.Note) {
-        dao.deleteNote(
-            NoteEntity(
-                id = note.id,
-                title = note.title,
-                content = note.content,
-                color = note.color.toArgb(),
-                createdAt = note.createdAt.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
-            )
-        )
+        dao.deleteNoteById(note.id)
     }
 
     override suspend fun getNoteById(id: String): SyncroItem.Note? {

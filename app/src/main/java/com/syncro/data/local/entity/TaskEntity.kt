@@ -5,11 +5,12 @@ import androidx.room.PrimaryKey
 
 @Entity(tableName = "tasks")
 data class TaskEntity(
-    @PrimaryKey val id: String, // Generado como: date_title_time
+    @PrimaryKey val id: String, // UUID local
     val remoteId: String? = null, // ID de Google Tasks
+    val taskListId: String? = null, // Lista de Google Tasks; null = @default
     val title: String,
     val description: String,
-    val date: Long, // Epoch millis
+    val date: Long, // LocalDate.toEpochDay()
     val time: String, // HH:mm
     val isCompleted: Boolean = false,
     val categoryText: String? = null,

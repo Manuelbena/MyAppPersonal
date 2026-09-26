@@ -2,6 +2,7 @@ package com.syncro.di
 
 import android.content.Context
 import androidx.room.Room
+import com.syncro.data.local.MIGRATION_7_8
 import com.syncro.data.local.SyncroDatabase
 import com.syncro.data.local.dao.EventDao
 import com.syncro.data.local.dao.NoteDao
@@ -36,6 +37,7 @@ object AppModule {
             SyncroDatabase::class.java,
             "syncro_db"
         )
+            .addMigrations(MIGRATION_7_8)
             .fallbackToDestructiveMigration(true)
             .build()
     }
@@ -91,7 +93,7 @@ object AppModule {
         userDao: UserDao,
         taskDao: TaskDao,
         eventDao: EventDao
-    ): com.syncro.domain.repository.GoogleSyncRepository {
-        return com.syncro.data.repository.GoogleSyncRepositoryImpl(context, userDao, taskDao, eventDao)
+    ): GoogleSyncRepository {
+        return GoogleSyncRepositoryImpl(context, userDao, taskDao, eventDao)
     }
 }

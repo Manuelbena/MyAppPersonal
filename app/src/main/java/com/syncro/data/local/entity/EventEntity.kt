@@ -5,11 +5,11 @@ import androidx.room.PrimaryKey
 
 @Entity(tableName = "events")
 data class EventEntity(
-    @PrimaryKey val id: String, // Generado como: date_title_startTime
+    @PrimaryKey val id: String, // UUID local
     val remoteId: String? = null, // ID de Google Calendar
     val title: String,
     val description: String?,
-    val date: Long, // Epoch millis (fecha del evento)
+    val date: Long, // LocalDate.toEpochDay()
     val startTime: String, // HH:mm
     val endTime: String, // HH:mm
     val categoryText: String,

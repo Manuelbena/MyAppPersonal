@@ -7,8 +7,12 @@ import com.syncro.domain.usecase.GetEventsInRangeUseCase
 import com.syncro.domain.usecase.GetTasksInRangeUseCase
 import com.syncro.domain.usecase.SyncGoogleCalendarUseCase
 import com.syncro.domain.usecase.SyncGoogleTasksUseCase
+import com.syncro.domain.usecase.ToggleEventCompletionUseCase
+import com.syncro.domain.usecase.ToggleSubtaskCompletionUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -29,7 +33,9 @@ class CalendarViewModel @Inject constructor(
     private val getEventsInRangeUseCase: GetEventsInRangeUseCase,
     private val getTasksInRangeUseCase: GetTasksInRangeUseCase,
     private val syncGoogleCalendarUseCase: SyncGoogleCalendarUseCase,
-    private val syncGoogleTasksUseCase: SyncGoogleTasksUseCase
+    private val syncGoogleTasksUseCase: SyncGoogleTasksUseCase,
+    private val toggleEventCompletionUseCase: ToggleEventCompletionUseCase,
+    private val toggleSubtaskCompletionUseCase: ToggleSubtaskCompletionUseCase
 ) : ViewModel() {
 
     private val _selectedMonth = MutableStateFlow(YearMonth.now())
@@ -79,28 +85,35 @@ class CalendarViewModel @Inject constructor(
     }
 
     fun toggleEventCompletion(eventId: String) {
-        // TODO: Implement toggle in use case
+        viewModelScope.launch {
+            toggleEventCompletionUseCase(eventId)
+        }
     }
 
     fun toggleSubtaskCompletion(eventId: String, subtaskTitle: String) {
-        // TODO: Implement toggle in use case
+        viewModelScope.launch {
+            toggleSubtaskCompletionUseCase(eventId, subtaskTitle)
+        }
     }
 
+    private var syncJob: Job? = null
+
     private fun syncMonth(month: YearMonth) {
-        viewModelScope.launch {
+        // Al cambiar rápido de mes solo interesa la última sincronización
+        syncJob?.cancel()
+        syncJob = viewModelScope.launch {
             _isLoading.value = true
             try {
-                // Sincronizamos el mes cargando día a día o mediante una estrategia de rango si estuviera disponible.
-                // Por ahora, sincronizamos al menos el inicio del mes para disparar la carga de Google.
-                val calendarDeferred = async { syncGoogleCalendarUseCase(month.atDay(1)) }
-                val tasksDeferred = async { syncGoogleTasksUseCase(month.atDay(1)) }
+                val calendarDeferred = async { syncGoogleCalendarUseCase(month.atDay(1), month.atEndOfMonth()) }
+                val tasksDeferred = async { syncGoogleTasksUseCase() }
                 
                 calendarDeferred.await()
                 tasksDeferred.await()
             } catch (e: Exception) {
                 // Manejar error de red, se mantienen los datos locales
             } finally {
-                _isLoading.value = false
+                // Si se canceló por un cambio de mes, el indicador lo gestiona la sync nueva
+                if (isActive) _isLoading.value = false
             }
         }
     }
