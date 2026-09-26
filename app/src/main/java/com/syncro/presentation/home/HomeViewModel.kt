@@ -18,7 +18,9 @@ import com.syncro.domain.usecase.SyncGoogleTasksUseCase
 import com.syncro.domain.usecase.ToggleEventCompletionUseCase
 import com.syncro.domain.usecase.ToggleSubtaskCompletionUseCase
 import com.syncro.domain.usecase.ToggleTaskCompletionUseCase
-import com.syncro.domain.repository.NoteRepository
+import com.syncro.domain.usecase.DeleteNoteUseCase
+import com.syncro.domain.usecase.GetNotesUseCase
+import com.syncro.domain.usecase.SaveNoteUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
@@ -58,7 +60,9 @@ class HomeViewModel @Inject constructor(
     private val syncGoogleTasksUseCase: SyncGoogleTasksUseCase,
     private val syncGoogleCalendarUseCase: SyncGoogleCalendarUseCase,
     private val pushPendingChangesUseCase: com.syncro.domain.usecase.PushPendingChangesUseCase,
-    private val noteRepository: NoteRepository
+    getNotesUseCase: GetNotesUseCase,
+    private val saveNoteUseCase: SaveNoteUseCase,
+    private val deleteNoteUseCase: DeleteNoteUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HomeUiState())
@@ -93,7 +97,7 @@ class HomeViewModel @Inject constructor(
             }
             .launchIn(viewModelScope)
 
-        noteRepository.getAllNotes()
+        getNotesUseCase()
             .onEach { notes ->
                 _uiState.update { it.copy(notes = notes) }
             }
@@ -223,21 +227,18 @@ class HomeViewModel @Inject constructor(
 
     fun saveNote(id: String? = null, title: String, content: String, color: Color) {
         viewModelScope.launch {
-            val note = SyncroItem.Note(
-                id = id ?: java.util.UUID.randomUUID().toString(),
-                title = title,
-                content = content,
-                color = color.toArgbColor(),
-                createdAt = java.time.LocalDateTime.now()
+            val result = saveNoteUseCase(id = id, title = title, content = content, color = color.toArgbColor())
+            val msg = result.fold(
+                onSuccess = { if (id == null) "Nota guardada" else "Nota actualizada" },
+                onFailure = { it.message ?: "No se pudo guardar la nota" }
             )
-            noteRepository.insertNote(note)
-            _effect.send(HomeEffect.ShowSnackbar(if (id == null) "Nota guardada" else "Nota actualizada"))
+            _effect.send(HomeEffect.ShowSnackbar(msg))
         }
     }
 
     fun deleteNote(note: SyncroItem.Note) {
         viewModelScope.launch {
-            noteRepository.deleteNote(note)
+            deleteNoteUseCase(note.id)
             _effect.send(HomeEffect.ShowSnackbar("Nota eliminada"))
         }
     }

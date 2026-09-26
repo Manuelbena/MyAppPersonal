@@ -3,6 +3,7 @@ package com.syncro.testutil
 import com.syncro.domain.model.SyncroItem
 import com.syncro.domain.repository.EventRepository
 import com.syncro.domain.repository.GoogleSyncRepository
+import com.syncro.domain.repository.NoteRepository
 import com.syncro.domain.repository.TaskRepository
 import com.syncro.domain.repository.UserRepository
 import com.syncro.domain.model.User
@@ -129,4 +130,21 @@ class FakeUserRepository : UserRepository {
     override suspend fun clearUser() {
         user.value = null
     }
+}
+
+class FakeNoteRepository : NoteRepository {
+    val notes = MutableStateFlow<Map<String, SyncroItem.Note>>(emptyMap())
+
+    override fun getAllNotes(): Flow<List<SyncroItem.Note>> =
+        notes.map { all -> all.values.sortedByDescending { it.createdAt } }
+
+    override suspend fun insertNote(note: SyncroItem.Note) {
+        notes.update { it + (note.id to note) }
+    }
+
+    override suspend fun deleteNote(id: String) {
+        notes.update { it - id }
+    }
+
+    override suspend fun getNoteById(id: String): SyncroItem.Note? = notes.value[id]
 }

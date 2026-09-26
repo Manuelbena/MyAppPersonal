@@ -84,7 +84,7 @@ class NoteRepositoryImplTest {
         repository.insertNote(aNote(id = "n1"))
         repository.insertNote(aNote(id = "n2"))
 
-        repository.deleteNote(aNote(id = "n1"))
+        repository.deleteNote("n1")
 
         assertNull(repository.getNoteById("n1"))
         assertEquals(listOf("n2"), repository.getAllNotes().first().map { it.id })
@@ -92,7 +92,7 @@ class NoteRepositoryImplTest {
 
     @Test
     fun `borrar una nota inexistente no falla`() = runTest {
-        repository.deleteNote(aNote(id = "no-existe"))
+        repository.deleteNote("no-existe")
 
         assertEquals(0, repository.getAllNotes().first().size)
     }
