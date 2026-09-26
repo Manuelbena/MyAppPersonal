@@ -413,6 +413,11 @@ fun Day(day: CalendarDay, items: List<SyncroItem>, onClick: () -> Unit) {
         }
     }
 
+    // Un evento de todo el día marca la casilla entera con un borde de su color: se ve de un vistazo
+    val allDayEventColor = remember(items) {
+        items.filterIsInstance<SyncroItem.Event>().firstOrNull { it.isAllDay }?.categoryColor?.toColor()
+    }
+
     Box(
         modifier = Modifier
             .aspectRatio(0.6f)
@@ -424,6 +429,10 @@ fun Day(day: CalendarDay, items: List<SyncroItem>, onClick: () -> Unit) {
                     isToday -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
                     else -> Color.Transparent
                 }
+            )
+            .then(
+                if (allDayEventColor != null) Modifier.border(2.dp, allDayEventColor, RoundedCornerShape(8.dp))
+                else Modifier
             )
             .clickable(onClick = onClick),
         contentAlignment = Alignment.TopCenter
@@ -474,12 +483,12 @@ fun Day(day: CalendarDay, items: List<SyncroItem>, onClick: () -> Unit) {
 
 @Composable
 fun EventSnippet(event: SyncroItem.Event) {
-    ItemSnippet(title = event.title, color = event.categoryColor.toColor(), isAllDay = event.isAllDay)
+    ItemSnippet(title = event.title, color = event.categoryColor.toColor())
 }
 
 /**
  * Las tareas tienen su propio aspecto (círculo de check delante), tengan hora o no, para que no se
- * confundan con los eventos (los de todo el día van solo con borde).
+ * confundan con los eventos.
  */
 @Composable
 fun TaskSnippet(task: SyncroItem.Task) {
@@ -513,38 +522,32 @@ fun TaskSnippet(task: SyncroItem.Task) {
 }
 
 /**
- * Etiqueta de un evento dentro de la celda del día. Los de todo el día van solo con un borde de
- * color; los que tienen hora, con fondo suave y una marca de color, para distinguirlos de un vistazo.
+ * Etiqueta de un evento dentro de la celda del día: fondo suave y una marca de color. Los de todo
+ * el día se señalan con el borde de la casilla entera (ver [Day]).
  */
 @Composable
-private fun ItemSnippet(title: String, color: Color, isAllDay: Boolean) {
+private fun ItemSnippet(title: String, color: Color) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(4.dp))
-            .then(
-                if (isAllDay) Modifier.border(1.dp, color, RoundedCornerShape(4.dp))
-                else Modifier.background(color.copy(alpha = 0.2f))
-            )
+            .background(color.copy(alpha = 0.2f))
             .padding(horizontal = 4.dp, vertical = 2.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            if (!isAllDay) {
-                Box(
-                    modifier = Modifier
-                        .size(4.dp, 12.dp)
-                        .clip(RoundedCornerShape(2.dp))
-                        .background(color)
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-            }
+            Box(
+                modifier = Modifier
+                    .size(4.dp, 12.dp)
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(color)
+            )
+            Spacer(modifier = Modifier.width(4.dp))
             Text(
                 text = title,
                 fontSize = 8.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 color = MaterialTheme.colorScheme.onSurface,
-                fontWeight = if (isAllDay) FontWeight.Bold else FontWeight.Normal,
                 lineHeight = 10.sp
             )
         }
