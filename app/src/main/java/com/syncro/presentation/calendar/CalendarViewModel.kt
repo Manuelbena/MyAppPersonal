@@ -3,6 +3,7 @@ package com.syncro.presentation.calendar
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.syncro.domain.model.SyncroItem
+import com.syncro.domain.model.sortedForDay
 import com.syncro.domain.usecase.GetEventsInRangeUseCase
 import com.syncro.domain.usecase.GetTasksInRangeUseCase
 import com.syncro.domain.usecase.SyncGoogleCalendarUseCase
@@ -58,7 +59,10 @@ class CalendarViewModel @Inject constructor(
             val eventsByDay = events.flatMap { event -> event.days.map { day -> day to event } }
             val tasksByDay = tasks.map { it.date to it }
             CalendarUiState(
-                events = (eventsByDay + tasksByDay).groupBy({ it.first }, { it.second }),
+                // Dentro de cada día, el mismo orden que en Inicio: primero lo de todo el día
+                events = (eventsByDay + tasksByDay)
+                    .groupBy({ it.first }, { it.second })
+                    .mapValues { (day, items) -> items.sortedForDay(day) },
                 selectedMonth = month,
                 selectedDate = selectedDate,
                 isLoading = isLoading

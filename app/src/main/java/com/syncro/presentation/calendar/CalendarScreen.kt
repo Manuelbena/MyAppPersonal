@@ -21,7 +21,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -150,36 +149,6 @@ fun CalendarScreen(
                     monthHeader = { _ ->
                         MonthHeader(daysOfWeek = daysOfWeek)
                     }
-                )
-
-                // Degradados
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(24.dp)
-                        .align(Alignment.TopCenter)
-                        .background(
-                            brush = Brush.verticalGradient(
-                                listOf(MaterialTheme.colorScheme.background, Color.Transparent)
-                            )
-                        )
-                )
-
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(140.dp)
-                        .align(Alignment.BottomCenter)
-                        .background(
-                            brush = Brush.verticalGradient(
-                                listOf(
-                                    Color.Transparent,
-                                    MaterialTheme.colorScheme.background.copy(alpha = 0.7f),
-                                    MaterialTheme.colorScheme.background.copy(alpha = 0.95f),
-                                    MaterialTheme.colorScheme.background
-                                )
-                            )
-                        )
                 )
             }
         }
@@ -501,56 +470,49 @@ fun Day(day: CalendarDay, items: List<SyncroItem>, onClick: () -> Unit) {
 
 @Composable
 fun EventSnippet(event: SyncroItem.Event) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(4.dp))
-            .background(event.categoryColor.toColor().copy(alpha = 0.2f))
-            .padding(horizontal = 4.dp, vertical = 2.dp)
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                modifier = Modifier
-                    .size(4.dp, 12.dp)
-                    .clip(RoundedCornerShape(2.dp))
-                    .background(event.categoryColor.toColor())
-            )
-            Spacer(modifier = Modifier.width(4.dp))
-            Text(
-                text = event.title,
-                fontSize = 8.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                color = MaterialTheme.colorScheme.onSurface,
-                lineHeight = 10.sp
-            )
-        }
-    }
+    ItemSnippet(title = event.title, color = event.categoryColor.toColor(), isAllDay = event.isAllDay)
 }
 
 @Composable
 fun TaskSnippet(task: SyncroItem.Task) {
+    ItemSnippet(
+        title = task.title,
+        color = task.categoryColor?.toColor() ?: MaterialTheme.colorScheme.secondary,
+        isAllDay = task.isAllDay
+    )
+}
+
+/**
+ * Etiqueta de un elemento dentro de la celda del día. Los de todo el día van como una barra de
+ * color sólido con texto blanco (como en Google Calendar); los que tienen hora, con fondo suave
+ * y una marca de color, para distinguirlos de un vistazo.
+ */
+@Composable
+private fun ItemSnippet(title: String, color: Color, isAllDay: Boolean) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(4.dp))
-            .background(MaterialTheme.colorScheme.secondary.copy(alpha = 0.1f))
+            .background(if (isAllDay) color else color.copy(alpha = 0.2f))
             .padding(horizontal = 4.dp, vertical = 2.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                modifier = Modifier
-                    .size(4.dp, 12.dp)
-                    .clip(RoundedCornerShape(2.dp))
-                    .background(MaterialTheme.colorScheme.secondary)
-            )
-            Spacer(modifier = Modifier.width(4.dp))
+            if (!isAllDay) {
+                Box(
+                    modifier = Modifier
+                        .size(4.dp, 12.dp)
+                        .clip(RoundedCornerShape(2.dp))
+                        .background(color)
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+            }
             Text(
-                text = task.title,
+                text = title,
                 fontSize = 8.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                color = MaterialTheme.colorScheme.onSurface,
+                color = if (isAllDay) Color.White else MaterialTheme.colorScheme.onSurface,
+                fontWeight = if (isAllDay) FontWeight.Bold else FontWeight.Normal,
                 lineHeight = 10.sp
             )
         }

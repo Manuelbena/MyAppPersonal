@@ -80,6 +80,23 @@ class CalendarViewModelTest {
     }
 
     @Test
+    fun `dentro de cada dia lo de todo el dia va primero, como en Inicio`() = runTest {
+        tasks.insertTask(aTask(title = "Gimnasio", date = day, time = at("07:00")))
+        events.insertEvent(anEvent(title = "Festivo", date = day, startTime = at("00:00"), endTime = at("00:00")))
+        val viewModel = createViewModel()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect() }
+
+        val titles = viewModel.uiState.value.events.getValue(day).map {
+            when (it) {
+                is com.syncro.domain.model.SyncroItem.Task -> it.title
+                is com.syncro.domain.model.SyncroItem.Event -> it.title
+                is com.syncro.domain.model.SyncroItem.Note -> it.title
+            }
+        }
+        assertEquals(listOf("Festivo", "Gimnasio"), titles)
+    }
+
+    @Test
     fun `completar una tarea desde el calendario la marca y la sube`() = runTest {
         // Regresión: en el calendario el check de las tareas no hacía nada
         tasks.insertTask(aTask(id = "t1", date = day))
