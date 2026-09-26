@@ -2,6 +2,7 @@ package com.syncro.domain.usecase
 
 import com.syncro.domain.model.SyncroItem
 import com.syncro.testutil.DAY
+import com.syncro.testutil.at
 import com.syncro.testutil.FakeEventRepository
 import com.syncro.testutil.FakeTaskRepository
 import com.syncro.testutil.aTask
@@ -37,10 +38,10 @@ class GetTimelineUseCaseTest {
 
     @Test
     fun `mezcla tareas y eventos ordenados por hora`() = runTest {
-        tasks.insertTask(aTask(title = "Tarea 18:00", time = "18:00"))
-        tasks.insertTask(aTask(title = "Tarea 08:00", time = "08:00"))
-        events.insertEvent(anEvent(title = "Evento 12:30", startTime = "12:30", endTime = "13:00"))
-        events.insertEvent(anEvent(title = "Evento 09:15", startTime = "09:15", endTime = "10:00"))
+        tasks.insertTask(aTask(title = "Tarea 18:00", time = at("18:00")))
+        tasks.insertTask(aTask(title = "Tarea 08:00", time = at("08:00")))
+        events.insertEvent(anEvent(title = "Evento 12:30", startTime = at("12:30"), endTime = at("13:00")))
+        events.insertEvent(anEvent(title = "Evento 09:15", startTime = at("09:15"), endTime = at("10:00")))
 
         val titles = getTimeline(DAY).first().map { it.title() }
 

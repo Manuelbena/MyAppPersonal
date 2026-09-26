@@ -32,18 +32,15 @@ class SaveEventUseCase @Inject constructor(
         description: String?,
         location: String?,
         date: LocalDate,
-        startTime: String,
-        endTime: String,
+        startTime: LocalTime,
+        endTime: LocalTime,
         categoryText: String,
         categoryColor: ArgbColor,
         priority: Priority?,
         subtasks: List<String>
     ): Result<Unit> {
         if (title.isBlank()) return Result.failure(BlankTitleException())
-        // Una hora mal formada es un error de datos, no un fallo de la app: se devuelve, no se lanza
-        val start = runCatching { LocalTime.parse(startTime) }.getOrElse { return Result.failure(it) }
-        val end = runCatching { LocalTime.parse(endTime) }.getOrElse { return Result.failure(it) }
-        if (!isValidEventTimeRange(start, end)) {
+        if (!isValidEventTimeRange(startTime, endTime)) {
             return Result.failure(InvalidEventTimeRangeException())
         }
 

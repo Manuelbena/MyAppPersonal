@@ -1,5 +1,6 @@
 package com.syncro.presentation.home.components
 
+import com.syncro.presentation.components.toDisplayTime
 import com.syncro.presentation.theme.color
 import com.syncro.presentation.theme.label
 import com.syncro.presentation.theme.toColor
@@ -54,7 +55,7 @@ fun EventCard(
                 .padding(top = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            if (event.startTime == "00:00" && event.endTime == "00:00") {
+            if (event.isAllDay) {
                 Text(
                     text = "Todo el",
                     fontWeight = FontWeight.Bold,
@@ -69,13 +70,13 @@ fun EventCard(
                 )
             } else {
                 Text(
-                    text = event.startTime,
+                    text = event.startTime.toDisplayTime(),
                     fontWeight = FontWeight.Bold,
                     fontSize = 14.sp,
                     color = MaterialTheme.colorScheme.onBackground
                 )
                 Text(
-                    text = event.endTime,
+                    text = event.endTime.toDisplayTime(),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 12.sp
                 )
@@ -284,7 +285,7 @@ fun TaskRow(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
-            text = task.time,
+            text = task.time.toDisplayTime(),
             modifier = Modifier.width(70.dp),
             fontWeight = FontWeight.Bold,
             fontSize = 14.sp,
@@ -405,7 +406,7 @@ fun TaskDetailDialog(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = task.time,
+                            text = task.time.toDisplayTime(),
                             fontSize = 14.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )

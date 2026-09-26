@@ -28,7 +28,6 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.LocalTime
-import java.time.format.DateTimeFormatter
 import javax.inject.Inject
 
 data class HomeUiState(
@@ -155,12 +154,11 @@ class HomeViewModel @Inject constructor(
         time: LocalTime
     ) {
         viewModelScope.launch {
-            val timeString = time.format(DateTimeFormatter.ofPattern("HH:mm"))
             val result = saveTaskUseCase(
                 title = title, 
                 description = description, 
                 date = date, 
-                time = timeString
+                time = time
             )
             val msg = result.fold(
                 onSuccess = { "Tarea creada correctamente" },
@@ -190,8 +188,8 @@ class HomeViewModel @Inject constructor(
                 description = description,
                 location = location,
                 date = date,
-                startTime = startTime.format(DateTimeFormatter.ofPattern("HH:mm")),
-                endTime = endTime.format(DateTimeFormatter.ofPattern("HH:mm")),
+                startTime = startTime,
+                endTime = endTime,
                 categoryText = categoryText,
                 categoryColor = categoryColor.toArgbColor(),
                 priority = priority,

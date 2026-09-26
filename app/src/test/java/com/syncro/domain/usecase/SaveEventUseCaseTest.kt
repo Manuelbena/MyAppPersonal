@@ -7,6 +7,7 @@ import com.syncro.domain.model.Priority
 import com.syncro.domain.model.Subtask
 import com.syncro.testutil.CallLog
 import com.syncro.testutil.DAY
+import com.syncro.testutil.at
 import com.syncro.testutil.FakeEventRepository
 import com.syncro.testutil.FakeGoogleSyncRepository
 import com.syncro.testutil.anEvent
@@ -17,7 +18,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import java.time.LocalDate
-import java.time.format.DateTimeParseException
+import java.time.LocalTime
 
 /**
  * Plan de pruebas de [SaveEventUseCase]
@@ -99,17 +100,12 @@ class SaveEventUseCaseTest {
 
     @Test
     fun `fin anterior al inicio se rechaza`() = runTest {
-        assertRejected(save(startTime = "21:30", endTime = "01:00"), InvalidEventTimeRangeException::class.java)
-    }
-
-    @Test
-    fun `hora mal formada devuelve error en lugar de lanzar una excepcion`() = runTest {
-        assertRejected(save(startTime = "25:00"), DateTimeParseException::class.java)
+        assertRejected(save(startTime = at("21:30"), endTime = at("01:00")), InvalidEventTimeRangeException::class.java)
     }
 
     @Test
     fun `evento de dia completo 00-00 a 00-00 se acepta`() = runTest {
-        assertTrue(save(startTime = "00:00", endTime = "00:00").isSuccess)
+        assertTrue(save(startTime = at("00:00"), endTime = at("00:00")).isSuccess)
     }
 
     // endregion
@@ -162,8 +158,8 @@ class SaveEventUseCaseTest {
         title: String = "Evento",
         location: String? = null,
         date: LocalDate = DAY,
-        startTime: String = "10:00",
-        endTime: String = "11:00",
+        startTime: LocalTime = at("10:00"),
+        endTime: LocalTime = at("11:00"),
         priority: Priority? = Priority.MEDIUM,
         subtasks: List<String> = emptyList()
     ) = saveEvent(

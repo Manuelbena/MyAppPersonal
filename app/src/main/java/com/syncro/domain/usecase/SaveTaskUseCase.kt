@@ -6,6 +6,7 @@ import com.syncro.domain.model.SyncroItem
 import com.syncro.domain.repository.GoogleSyncRepository
 import com.syncro.domain.repository.TaskRepository
 import java.time.LocalDate
+import java.time.LocalTime
 import java.util.UUID
 import javax.inject.Inject
 
@@ -22,7 +23,7 @@ class SaveTaskUseCase @Inject constructor(
         title: String,
         description: String,
         date: LocalDate,
-        time: String,
+        time: LocalTime,
         categoryText: String? = null,
         categoryColor: ArgbColor? = null
     ): Result<Unit> {

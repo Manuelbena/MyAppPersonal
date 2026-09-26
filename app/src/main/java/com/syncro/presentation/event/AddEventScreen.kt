@@ -87,7 +87,7 @@ fun AddEventContent(
     var location by remember { mutableStateOf(eventToEdit?.location ?: "") }
     var selectedCategory by remember { mutableStateOf(eventToEdit?.categoryText ?: "Personal") }
     var selectedPriority by remember { mutableStateOf(eventToEdit?.priority ?: Priority.MEDIUM) }
-    var isAllDay by remember { mutableStateOf(eventToEdit?.startTime == "00:00" && eventToEdit.endTime == "00:00") }
+    var isAllDay by remember { mutableStateOf(eventToEdit?.isAllDay == true) }
     var isRecurring by remember { mutableStateOf(false) }
     var notificationEnabled by remember { mutableStateOf(true) }
 
@@ -97,14 +97,9 @@ fun AddEventContent(
 
     var startDate by remember { mutableStateOf(eventToEdit?.date ?: LocalDate.now()) }
     
-    // Parse times
-    val parsedStartTime = try { 
-        eventToEdit?.startTime?.let { LocalTime.parse(it) } ?: LocalTime.now().withMinute(0).plusHours(1)
-    } catch (e: Exception) { LocalTime.now().withMinute(0).plusHours(1) }
-    
-    val parsedEndTime = try { 
-        eventToEdit?.endTime?.let { LocalTime.parse(it) } ?: LocalTime.now().withMinute(0).plusHours(2)
-    } catch (e: Exception) { LocalTime.now().withMinute(0).plusHours(2) }
+    // Evento nuevo: por defecto de la próxima hora en punto a la siguiente
+    val parsedStartTime = eventToEdit?.startTime ?: LocalTime.now().withMinute(0).plusHours(1)
+    val parsedEndTime = eventToEdit?.endTime ?: LocalTime.now().withMinute(0).plusHours(2)
 
     var startTime by remember { mutableStateOf(parsedStartTime) }
     var endDate by remember { mutableStateOf(eventToEdit?.date ?: LocalDate.now()) }

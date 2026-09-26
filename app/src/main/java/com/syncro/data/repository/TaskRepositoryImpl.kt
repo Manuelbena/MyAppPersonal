@@ -1,5 +1,7 @@
 package com.syncro.data.repository
 
+import com.syncro.data.local.toLocalTimeOrMidnight
+import com.syncro.data.local.toStoredTime
 import com.syncro.domain.model.ArgbColor
 import com.syncro.data.local.dao.TaskDao
 import com.syncro.data.local.entity.TaskEntity
@@ -36,7 +38,7 @@ class TaskRepositoryImpl @Inject constructor(
                 title = task.title,
                 description = task.description ?: "",
                 date = task.date.toEpochDay(),
-                time = task.time,
+                time = task.time.toStoredTime(),
                 isCompleted = task.isCompleted,
                 categoryText = task.categoryText,
                 categoryColor = task.categoryColor?.argb,
@@ -60,7 +62,7 @@ class TaskRepositoryImpl @Inject constructor(
             title = title,
             description = description,
             date = LocalDate.ofEpochDay(date),
-            time = time,
+            time = time.toLocalTimeOrMidnight(),
             isCompleted = isCompleted,
             categoryText = categoryText,
             categoryColor = categoryColor?.let { ArgbColor(it) }

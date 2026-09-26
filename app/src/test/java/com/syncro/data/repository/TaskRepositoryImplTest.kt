@@ -4,6 +4,7 @@ import com.syncro.domain.model.ArgbColor
 import com.syncro.data.local.SyncroDatabase
 import com.syncro.data.local.dao.TaskDao
 import com.syncro.testutil.DAY
+import com.syncro.testutil.at
 import com.syncro.testutil.aSyncedTaskEntity
 import com.syncro.testutil.aTask
 import com.syncro.testutil.createInMemoryDatabase
@@ -22,6 +23,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import com.syncro.domain.model.SyncroItem
 import kotlinx.coroutines.runBlocking
+import java.time.LocalTime
 
 /**
  * Plan de pruebas de [TaskRepositoryImpl]
@@ -88,7 +90,7 @@ class TaskRepositoryImplTest {
         val task = aTask(
             title = "Gimnasio",
             description = "Pierna",
-            time = "18:30",
+            time = at("18:30"),
             categoryText = "Salud",
             categoryColor = ArgbColor(0xFFFF5252)
         )
@@ -99,7 +101,7 @@ class TaskRepositoryImplTest {
         assertEquals("Gimnasio", saved.title)
         assertEquals("Pierna", saved.description)
         assertEquals(DAY, saved.date)
-        assertEquals("18:30", saved.time)
+        assertEquals(at("18:30"), saved.time)
         assertEquals("Salud", saved.categoryText)
         assertEquals(ArgbColor(0xFFFF5252), saved.categoryColor)
         assertFalse(saved.isCompleted)
@@ -128,13 +130,31 @@ class TaskRepositoryImplTest {
 
     // endregion
 
+    // region Formato de la hora en Room (contrato con la sync y con los datos ya guardados)
+
+    @Test
+    fun `la hora se guarda en Room como HH-mm con ceros a la izquierda`() = runTest {
+        val id = save(aTask(time = at("09:05")))
+
+        assertEquals("09:05", dao.getTaskById(id)!!.time)
+    }
+
+    @Test
+    fun `una hora corrupta en la base de datos se lee como medianoche en lugar de fallar`() = runTest {
+        dao.insertTask(aSyncedTaskEntity(id = "t1").copy(time = "no-es-una-hora"))
+
+        assertEquals(LocalTime.MIDNIGHT, repository.getTaskById("t1")!!.time)
+    }
+
+    // endregion
+
     // region Consultas por fecha: valores límite (día anterior, extremos del rango, día siguiente)
 
     @Test
     fun `tareas del dia excluye otros dias y ordena por hora`() = runTest {
         save(aTask(title = "Ayer", date = DAY.minusDays(1)))
-        save(aTask(title = "Tarde", time = "18:00"))
-        save(aTask(title = "Temprano", time = "08:00"))
+        save(aTask(title = "Tarde", time = at("18:00")))
+        save(aTask(title = "Temprano", time = at("08:00")))
         save(aTask(title = "Día siguiente", date = DAY.plusDays(1)))
 
         val titles = repository.getTasksByDate(DAY).first().map { it.title }

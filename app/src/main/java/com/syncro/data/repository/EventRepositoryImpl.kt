@@ -1,5 +1,7 @@
 package com.syncro.data.repository
 
+import com.syncro.data.local.toLocalTimeOrMidnight
+import com.syncro.data.local.toStoredTime
 import com.syncro.domain.model.ArgbColor
 import com.syncro.data.local.dao.EventDao
 import com.syncro.data.local.entity.EventEntity
@@ -40,8 +42,8 @@ class EventRepositoryImpl @Inject constructor(
             title = event.title,
             description = event.description,
             date = event.date.toEpochDay(),
-            startTime = event.startTime,
-            endTime = event.endTime,
+            startTime = event.startTime.toStoredTime(),
+            endTime = event.endTime.toStoredTime(),
             categoryText = event.categoryText,
             categoryColor = event.categoryColor.argb,
             priority = event.priority?.name,
@@ -73,8 +75,8 @@ class EventRepositoryImpl @Inject constructor(
             title = event.title,
             description = event.description,
             date = LocalDate.ofEpochDay(event.date),
-            startTime = event.startTime,
-            endTime = event.endTime,
+            startTime = event.startTime.toLocalTimeOrMidnight(),
+            endTime = event.endTime.toLocalTimeOrMidnight(),
             categoryText = event.categoryText,
             categoryColor = ArgbColor(event.categoryColor),
             priority = event.priority?.let { Priority.valueOf(it) },

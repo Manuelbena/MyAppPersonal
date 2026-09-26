@@ -12,6 +12,7 @@ import com.syncro.domain.model.Subtask
 import com.syncro.domain.model.SyncroItem
 import java.time.LocalDate
 import java.time.LocalDateTime
+import java.time.LocalTime
 import java.util.UUID
 
 /**
@@ -26,6 +27,9 @@ fun createInMemoryDatabase(): SyncroDatabase =
 // Fecha fija: un test que depende de LocalDate.now() puede fallar según el día en que se ejecute
 val DAY: LocalDate = LocalDate.of(2026, 9, 26)
 
+/** Hora corta para los tests: `at("09:30")`. */
+fun at(hhmm: String): LocalTime = LocalTime.parse(hhmm)
+
 // region Constructores de datos de prueba (Test Data Builders)
 // Cada test solo indica los campos que le importan; el resto toma valores válidos por defecto.
 
@@ -34,7 +38,7 @@ fun aTask(
     title: String = "Tarea",
     description: String? = "Descripción",
     date: LocalDate = DAY,
-    time: String = "10:00",
+    time: LocalTime = at("10:00"),
     isCompleted: Boolean = false,
     categoryText: String? = "Personal",
     categoryColor: ArgbColor? = ArgbColor(0xFF10B981)
@@ -55,8 +59,8 @@ fun anEvent(
     title: String = "Evento",
     description: String? = "Descripción",
     date: LocalDate = DAY,
-    startTime: String = "10:00",
-    endTime: String = "11:00",
+    startTime: LocalTime = at("10:00"),
+    endTime: LocalTime = at("11:00"),
     categoryText: String = "Trabajo",
     categoryColor: ArgbColor = ArgbColor(0xFF6366F1),
     priority: Priority? = Priority.MEDIUM,

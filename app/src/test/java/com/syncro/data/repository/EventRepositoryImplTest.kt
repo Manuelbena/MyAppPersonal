@@ -7,6 +7,7 @@ import com.syncro.data.local.entity.SubtaskEntity
 import com.syncro.domain.model.Priority
 import com.syncro.domain.model.Subtask
 import com.syncro.testutil.DAY
+import com.syncro.testutil.at
 import com.syncro.testutil.aSyncedEventEntity
 import com.syncro.testutil.anEvent
 import com.syncro.testutil.createInMemoryDatabase
@@ -72,8 +73,8 @@ class EventRepositoryImplTest {
         val event = anEvent(
             title = "Reunión",
             description = "Sprint",
-            startTime = "09:30",
-            endTime = "10:15",
+            startTime = at("09:30"),
+            endTime = at("10:15"),
             categoryText = "Trabajo",
             categoryColor = ArgbColor(0xFF6366F1),
             priority = Priority.HIGH,
@@ -86,8 +87,8 @@ class EventRepositoryImplTest {
         assertEquals("Reunión", saved.title)
         assertEquals("Sprint", saved.description)
         assertEquals(DAY, saved.date)
-        assertEquals("09:30", saved.startTime)
-        assertEquals("10:15", saved.endTime)
+        assertEquals(at("09:30"), saved.startTime)
+        assertEquals(at("10:15"), saved.endTime)
         assertEquals(ArgbColor(0xFF6366F1), saved.categoryColor)
         assertEquals(Priority.HIGH, saved.priority)
         assertEquals(listOf(Subtask("Preparar slides", true), Subtask("Enviar acta", false)), saved.subtasks)
