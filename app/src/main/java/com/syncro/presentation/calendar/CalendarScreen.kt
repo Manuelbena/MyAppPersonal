@@ -479,8 +479,7 @@ fun EventSnippet(event: SyncroItem.Event) {
 
 /**
  * Las tareas tienen su propio aspecto (círculo de check delante), tengan hora o no, para que no se
- * confundan con los eventos: el estilo sólido es solo para eventos de todo el día. Las tareas de
- * todo el día van solo con borde.
+ * confundan con los eventos (los de todo el día van solo con borde).
  */
 @Composable
 fun TaskSnippet(task: SyncroItem.Task) {
@@ -489,11 +488,7 @@ fun TaskSnippet(task: SyncroItem.Task) {
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(4.dp))
-            // Las de todo el día solo llevan borde; las que tienen hora, fondo suave
-            .then(
-                if (task.isAllDay) Modifier.border(1.dp, color, RoundedCornerShape(4.dp))
-                else Modifier.background(color.copy(alpha = 0.12f))
-            )
+            .background(color.copy(alpha = 0.12f))
             .padding(horizontal = 3.dp, vertical = 2.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -518,9 +513,8 @@ fun TaskSnippet(task: SyncroItem.Task) {
 }
 
 /**
- * Etiqueta de un evento dentro de la celda del día. Los de todo el día van como una barra de
- * color sólido con texto blanco (como en Google Calendar); los que tienen hora, con fondo suave
- * y una marca de color, para distinguirlos de un vistazo.
+ * Etiqueta de un evento dentro de la celda del día. Los de todo el día van solo con un borde de
+ * color; los que tienen hora, con fondo suave y una marca de color, para distinguirlos de un vistazo.
  */
 @Composable
 private fun ItemSnippet(title: String, color: Color, isAllDay: Boolean) {
@@ -528,7 +522,10 @@ private fun ItemSnippet(title: String, color: Color, isAllDay: Boolean) {
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(4.dp))
-            .background(if (isAllDay) color else color.copy(alpha = 0.2f))
+            .then(
+                if (isAllDay) Modifier.border(1.dp, color, RoundedCornerShape(4.dp))
+                else Modifier.background(color.copy(alpha = 0.2f))
+            )
             .padding(horizontal = 4.dp, vertical = 2.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -546,7 +543,7 @@ private fun ItemSnippet(title: String, color: Color, isAllDay: Boolean) {
                 fontSize = 8.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                color = if (isAllDay) Color.White else MaterialTheme.colorScheme.onSurface,
+                color = MaterialTheme.colorScheme.onSurface,
                 fontWeight = if (isAllDay) FontWeight.Bold else FontWeight.Normal,
                 lineHeight = 10.sp
             )
