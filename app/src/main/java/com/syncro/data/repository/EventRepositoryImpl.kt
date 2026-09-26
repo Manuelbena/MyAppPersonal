@@ -1,7 +1,6 @@
 package com.syncro.data.repository
 
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.toArgb
+import com.syncro.domain.model.ArgbColor
 import com.syncro.data.local.dao.EventDao
 import com.syncro.data.local.entity.EventEntity
 import com.syncro.data.local.entity.EventWithSubtasks
@@ -13,7 +12,6 @@ import com.syncro.domain.repository.EventRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import java.time.LocalDate
-import java.util.UUID
 import javax.inject.Inject
 
 class EventRepositoryImpl @Inject constructor(
@@ -32,26 +30,22 @@ class EventRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun insertEvent(event: SyncroItem.Event, date: LocalDate, location: String?): String {
-        val dateEpoch = date.toEpochDay()
-        val eventId = if (event.id != "0" && event.id.isNotEmpty()) {
-            event.id
-        } else {
-            UUID.randomUUID().toString()
-        }
+    override suspend fun insertEvent(event: SyncroItem.Event) {
+        require(event.id.isNotBlank()) { "El id del evento lo asigna el dominio" }
+        val eventId = event.id
         val existing = dao.getEventById(eventId)
         val entity = EventEntity(
             id = eventId,
             remoteId = event.remoteId ?: existing?.remoteId,
             title = event.title,
             description = event.description,
-            date = dateEpoch,
+            date = event.date.toEpochDay(),
             startTime = event.startTime,
             endTime = event.endTime,
             categoryText = event.categoryText,
-            categoryColor = event.categoryColor.toArgb(),
+            categoryColor = event.categoryColor.argb,
             priority = event.priority?.name,
-            location = location,
+            location = event.location,
             isCompleted = event.isCompleted,
             pendingChanges = (existing?.pendingChanges ?: 0) + 1
         )
@@ -62,7 +56,6 @@ class EventRepositoryImpl @Inject constructor(
             SubtaskEntity(eventId = eventId, title = it.title, isCompleted = it.isCompleted)
         }
         dao.insertEventWithSubtasks(entity, subtaskEntities)
-        return eventId
     }
 
     override suspend fun getEventById(eventId: String): SyncroItem.Event? {
@@ -83,10 +76,11 @@ class EventRepositoryImpl @Inject constructor(
             startTime = event.startTime,
             endTime = event.endTime,
             categoryText = event.categoryText,
-            categoryColor = Color(event.categoryColor),
+            categoryColor = ArgbColor(event.categoryColor),
             priority = event.priority?.let { Priority.valueOf(it) },
             subtasks = subtasks,
-            isCompleted = event.isCompleted
+            isCompleted = event.isCompleted,
+            location = event.location
         )
     }
 

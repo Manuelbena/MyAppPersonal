@@ -14,21 +14,26 @@ Windows shell (this repo is developed on Windows) — use `gradlew.bat` when run
 ./gradlew assembleDebug              # build debug APK
 ./gradlew installDebug                # build and install on connected device/emulator
 ./gradlew test                        # run JVM unit tests (app/src/test)
-./gradlew testDebugUnitTest --tests "com.syncro.ExampleUnitTest"   # run a single unit test class
+./gradlew testDebugUnitTest --tests "com.syncro.data.repository.TaskRepositoryImplTest"   # run a single unit test class
 ./gradlew connectedAndroidTest        # run instrumented tests (app/src/androidTest), needs a device/emulator
 ./gradlew lint                        # Android Lint
 ```
 
-There is no ktlint/detekt config in this repo — Android Lint is the only configured static check. There is currently only placeholder test coverage (`ExampleUnitTest`, `ExampleInstrumentedTest`); don't assume existing tests describe real behavior.
+There is no ktlint/detekt config in this repo — Android Lint is the only configured static check.
+
+### Tests
+
+JVM unit tests in `app/src/test` run on Robolectric (`src/test/resources/robolectric.properties`: SDK 35, plain `Application` so Hilt/SyncroApp don't start) against a **real in-memory Room DB** (`testutil/TestData.kt`: `createInMemoryDatabase()`, fixed `DAY` date, `aTask`/`anEvent`/`aNote`/`aSynced*Entity` builders). Don't mock DAOs: most data-layer bugs so far were in SQL behavior (REPLACE cascades, pending counters). Each repository test class opens with a KDoc test plan (responsibilities + risks); bug fixes get a regression test commented `// Regresión: …`. `data/local/dao/SyncContractTest` pins the DAO queries `GoogleSyncRepositoryImpl` relies on for offline sync — `GoogleSyncRepositoryImpl` itself is untested because it builds Google clients internally. Domain use cases are tested as plain JUnit (no Robolectric) with in-memory fakes in `testutil/Fakes.kt`; fakes share a `CallLog` so tests can assert ordering (local write before Google push). `ExampleInstrumentedTest` in `androidTest` is still a placeholder.
 
 ## Architecture
 
 Standard Clean Architecture layering under `app/src/main/java/com/syncro/`:
 
-- **`domain/`** — pure Kotlin, no Android framework deps besides Compose `Color` in models.
+- **`domain/`** — pure Kotlin: no Android or Compose imports (enforced by `architecture/DomainLayerDependenciesTest`, whose `knownExceptions` lists the remaining debt: the `Context` in Google sign-in). Colors are `ArgbColor` (value class over the ARGB Int Room stores); `Priority` is a plain enum. Conversion to Compose `Color` and priority label/color live in `presentation/theme/ColorMapping.kt` (`toColor()`, `toArgbColor()`, `Priority.label`, `Priority.color`).
   - `model/SyncroItem.kt` defines the app's core sealed type: `SyncroItem` is `Event`, `Task`, or `Note`. Most of the UI operates on `SyncroItem`, not on Room entities directly.
   - `repository/` — interfaces only (`TaskRepository`, `EventRepository`, `NoteRepository`, `UserRepository`, `GoogleSyncRepository`).
   - `usecase/` — one class per operation (e.g. `SaveEventUseCase`, `SyncGoogleCalendarUseCase`, `ToggleTaskCompletionUseCase`). Use cases are the only things ViewModels call; they compose repositories and are the natural place for cross-cutting logic like "save locally, then push to Google."
+  - IDs for new tasks/events are generated in the save use cases (UUID); repositories `require` a non-blank id and never invent one. Validation rules live in `model/Validation.kt` and use cases return `Result.failure` (never throw) for invalid input, so the UI can show the message.
 - **`data/`** — implementations.
   - `local/dao/` + `local/entity/` — Room DAOs/entities, wired together in `local/SyncroDatabase.kt` (version-bumped manually). Migrations live in `local/Migrations.kt` and are registered in `AppModule` via `addMigrations`; `fallbackToDestructiveMigration` is still on, so any schema bump without a matching migration wipes local data (including unsynced items) — always add a migration when changing an entity.
   - `repository/*Impl.kt` — implement the domain repository interfaces, map between Room entities and `SyncroItem`/domain models.

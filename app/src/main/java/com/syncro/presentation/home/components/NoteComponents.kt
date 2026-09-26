@@ -1,5 +1,6 @@
 package com.syncro.presentation.home.components
 
+import com.syncro.presentation.theme.toColor
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -86,7 +87,7 @@ fun NoteCard(
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(
-            containerColor = note.color.copy(alpha = 0.15f)
+            containerColor = note.color.toColor().copy(alpha = 0.15f)
         )
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
@@ -95,7 +96,7 @@ fun NoteCard(
                 modifier = Modifier
                     .fillMaxHeight()
                     .width(4.dp)
-                    .background(note.color)
+                    .background(note.color.toColor())
             )
 
             Column(
@@ -148,7 +149,7 @@ fun NoteDetailDialog(
                 .padding(16.dp),
             shape = RoundedCornerShape(32.dp),
             colors = CardDefaults.cardColors(
-                containerColor = note.color // Usamos el color de la nota directamente como fondo sólido
+                containerColor = note.color.toColor() // Usamos el color de la nota directamente como fondo sólido
             )
         ) {
             Box(modifier = Modifier.fillMaxWidth().heightIn(max = 500.dp)) {

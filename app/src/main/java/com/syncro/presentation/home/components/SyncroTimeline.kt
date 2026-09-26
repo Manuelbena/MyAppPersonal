@@ -1,5 +1,8 @@
 package com.syncro.presentation.home.components
 
+import com.syncro.presentation.theme.color
+import com.syncro.presentation.theme.label
+import com.syncro.presentation.theme.toColor
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -93,7 +96,7 @@ fun EventCard(
                     modifier = Modifier
                         .width(6.dp)
                         .fillMaxHeight()
-                        .background(if (event.isCompleted) Emerald500 else event.categoryColor)
+                        .background(if (event.isCompleted) Emerald500 else event.categoryColor.toColor())
                 )
 
                 Column(
@@ -109,7 +112,7 @@ fun EventCard(
                         Icon(
                             imageVector = if (event.isCompleted) Icons.Rounded.CheckCircle else Icons.Rounded.RadioButtonUnchecked,
                             contentDescription = "Completar evento",
-                            tint = if (event.isCompleted) Emerald500 else event.categoryColor.copy(alpha = 0.5f),
+                            tint = if (event.isCompleted) Emerald500 else event.categoryColor.toColor().copy(alpha = 0.5f),
                             modifier = Modifier
                                 .size(22.dp)
                                 .clickable(
@@ -176,7 +179,7 @@ fun EventCard(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        TagChip(text = event.categoryText, color = event.categoryColor)
+                        TagChip(text = event.categoryText, color = event.categoryColor.toColor())
                         
                         if (event.priority != null) {
                             TagChip(text = event.priority.label, color = event.priority.color)
@@ -199,14 +202,14 @@ fun EventCard(
                             Icon(
                                 imageVector = if (isSubtasksExpanded) Icons.Rounded.KeyboardArrowUp else Icons.Rounded.KeyboardArrowDown,
                                 contentDescription = "Expandir subtareas",
-                                tint = event.categoryColor,
+                                tint = event.categoryColor.toColor(),
                                 modifier = Modifier.size(20.dp)
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
                                 text = "SUBTAREAS ($completedCount/${event.subtasks.size})",
                                 fontSize = 11.sp,
-                                color = event.categoryColor,
+                                color = event.categoryColor.toColor(),
                                 fontWeight = FontWeight.Bold,
                                 letterSpacing = 0.5.sp
                             )
@@ -221,7 +224,7 @@ fun EventCard(
                             event.subtasks.forEach { subtask ->
                                 SubtaskRow(
                                     subtask = subtask, 
-                                    color = event.categoryColor,
+                                    color = event.categoryColor.toColor(),
                                     onClick = { onSubtaskToggle(subtask.title) }
                                 )
                             }

@@ -1,6 +1,7 @@
 package com.syncro.domain.usecase
 
-import androidx.compose.ui.graphics.Color
+import com.syncro.domain.model.ArgbColor
+import com.syncro.domain.model.BlankTitleException
 import com.syncro.domain.model.InvalidEventTimeRangeException
 import com.syncro.domain.model.Priority
 import com.syncro.domain.model.Subtask
@@ -10,6 +11,7 @@ import com.syncro.domain.repository.EventRepository
 import com.syncro.domain.repository.GoogleSyncRepository
 import java.time.LocalDate
 import java.time.LocalTime
+import java.util.UUID
 import javax.inject.Inject
 
 class SaveEventUseCase @Inject constructor(
@@ -17,9 +19,12 @@ class SaveEventUseCase @Inject constructor(
     private val googleSyncRepository: GoogleSyncRepository
 ) {
     /**
-     * Crea o actualiza un evento. Falla con [InvalidEventTimeRangeException] si la hora de fin es
-     * anterior a la de inicio. Un fallo al subir a Google no hace fallar el guardado: el evento
-     * queda pendiente en local y se sube automáticamente cuando haya conexión.
+     * Crea (sin [id]) o actualiza un evento.
+     *
+     * Falla sin guardar nada con [BlankTitleException] si el título está vacío o con
+     * [InvalidEventTimeRangeException] si la hora de fin es anterior a la de inicio.
+     * Un fallo al subir a Google no hace fallar el guardado: el evento queda pendiente en local
+     * y se sube automáticamente cuando haya conexión.
      */
     suspend operator fun invoke(
         id: String? = null,
@@ -30,11 +35,15 @@ class SaveEventUseCase @Inject constructor(
         startTime: String,
         endTime: String,
         categoryText: String,
-        categoryColor: Color,
+        categoryColor: ArgbColor,
         priority: Priority?,
         subtasks: List<String>
     ): Result<Unit> {
-        if (!isValidEventTimeRange(LocalTime.parse(startTime), LocalTime.parse(endTime))) {
+        if (title.isBlank()) return Result.failure(BlankTitleException())
+        // Una hora mal formada es un error de datos, no un fallo de la app: se devuelve, no se lanza
+        val start = runCatching { LocalTime.parse(startTime) }.getOrElse { return Result.failure(it) }
+        val end = runCatching { LocalTime.parse(endTime) }.getOrElse { return Result.failure(it) }
+        if (!isValidEventTimeRange(start, end)) {
             return Result.failure(InvalidEventTimeRangeException())
         }
 
@@ -44,9 +53,9 @@ class SaveEventUseCase @Inject constructor(
         val completedSubtasks = existing?.subtasks.orEmpty().filter { it.isCompleted }.map { it.title }.toSet()
 
         val event = SyncroItem.Event(
-            id = id ?: "0", // Generated in repository if "0"
+            id = id ?: UUID.randomUUID().toString(),
             remoteId = existing?.remoteId,
-            title = title,
+            title = title.trim(),
             description = description,
             date = date,
             startTime = startTime,
@@ -55,11 +64,12 @@ class SaveEventUseCase @Inject constructor(
             categoryColor = categoryColor,
             priority = priority,
             subtasks = subtasks.map { Subtask(it, it in completedSubtasks) },
-            isCompleted = existing?.isCompleted ?: false
+            isCompleted = existing?.isCompleted ?: false,
+            location = location
         )
-        val eventId = repository.insertEvent(event, date, location)
+        repository.insertEvent(event)
 
-        googleSyncRepository.pushEvent(eventId)
+        googleSyncRepository.pushEvent(event.id)
         return Result.success(Unit)
     }
 }

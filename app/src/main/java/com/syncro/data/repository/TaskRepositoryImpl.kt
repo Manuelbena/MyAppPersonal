@@ -1,7 +1,6 @@
 package com.syncro.data.repository
 
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.toArgb
+import com.syncro.domain.model.ArgbColor
 import com.syncro.data.local.dao.TaskDao
 import com.syncro.data.local.entity.TaskEntity
 import com.syncro.domain.model.SyncroItem
@@ -9,7 +8,6 @@ import com.syncro.domain.repository.TaskRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import java.time.LocalDate
-import java.util.UUID
 import javax.inject.Inject
 
 class TaskRepositoryImpl @Inject constructor(
@@ -29,28 +27,22 @@ class TaskRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun insertTask(task: SyncroItem.Task, date: LocalDate): String {
-        val dateEpoch = date.toEpochDay()
-        val taskId = if (task.id != "0" && task.id.isNotEmpty()) {
-            task.id
-        } else {
-            UUID.randomUUID().toString()
-        }
+    override suspend fun insertTask(task: SyncroItem.Task) {
+        require(task.id.isNotBlank()) { "El id de la tarea lo asigna el dominio" }
         dao.insertTask(
             TaskEntity(
-                id = taskId,
+                id = task.id,
                 remoteId = null,
                 title = task.title,
                 description = task.description ?: "",
-                date = dateEpoch,
+                date = task.date.toEpochDay(),
                 time = task.time,
                 isCompleted = task.isCompleted,
                 categoryText = task.categoryText,
-                categoryColor = task.categoryColor?.toArgb(),
+                categoryColor = task.categoryColor?.argb,
                 pendingChanges = 1
             )
         )
-        return taskId
     }
 
     override suspend fun getTaskById(taskId: String): SyncroItem.Task? {
@@ -71,7 +63,7 @@ class TaskRepositoryImpl @Inject constructor(
             time = time,
             isCompleted = isCompleted,
             categoryText = categoryText,
-            categoryColor = categoryColor?.let { Color(it) }
+            categoryColor = categoryColor?.let { ArgbColor(it) }
         )
     }
 }

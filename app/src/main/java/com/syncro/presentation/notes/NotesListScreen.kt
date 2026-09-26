@@ -1,5 +1,6 @@
 package com.syncro.presentation.notes
 
+import com.syncro.presentation.theme.toColor
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -119,7 +120,7 @@ fun NoteGridItem(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
-            containerColor = note.color.copy(alpha = 0.15f)
+            containerColor = note.color.toColor().copy(alpha = 0.15f)
         )
     ) {
         Column(

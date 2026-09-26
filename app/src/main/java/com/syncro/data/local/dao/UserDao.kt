@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 import com.syncro.data.local.entity.UserEntity
 import kotlinx.coroutines.flow.Flow
 
@@ -17,4 +18,11 @@ interface UserDao {
 
     @Query("DELETE FROM user_profile")
     suspend fun deleteUser()
+
+    /** Solo puede haber una sesión: la cuenta nueva sustituye a la anterior en vez de convivir con ella. */
+    @Transaction
+    suspend fun replaceUser(user: UserEntity) {
+        deleteUser()
+        saveUser(user)
+    }
 }

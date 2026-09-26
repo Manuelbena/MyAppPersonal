@@ -1,5 +1,6 @@
 package com.syncro.presentation.home
 
+import com.syncro.presentation.theme.toArgbColor
 import android.content.Intent
 import android.util.Log
 import androidx.lifecycle.ViewModel
@@ -155,13 +156,17 @@ class HomeViewModel @Inject constructor(
     ) {
         viewModelScope.launch {
             val timeString = time.format(DateTimeFormatter.ofPattern("HH:mm"))
-            saveTaskUseCase(
+            val result = saveTaskUseCase(
                 title = title, 
                 description = description, 
                 date = date, 
                 time = timeString
             )
-            _effect.send(HomeEffect.ShowSnackbar("Tarea creada correctamente"))
+            val msg = result.fold(
+                onSuccess = { "Tarea creada correctamente" },
+                onFailure = { it.message ?: "No se pudo guardar la tarea" }
+            )
+            _effect.send(HomeEffect.ShowSnackbar(msg))
         }
     }
 
@@ -188,7 +193,7 @@ class HomeViewModel @Inject constructor(
                 startTime = startTime.format(DateTimeFormatter.ofPattern("HH:mm")),
                 endTime = endTime.format(DateTimeFormatter.ofPattern("HH:mm")),
                 categoryText = categoryText,
-                categoryColor = categoryColor,
+                categoryColor = categoryColor.toArgbColor(),
                 priority = priority,
                 subtasks = subtasks
             )
@@ -224,7 +229,7 @@ class HomeViewModel @Inject constructor(
                 id = id ?: java.util.UUID.randomUUID().toString(),
                 title = title,
                 content = content,
-                color = color,
+                color = color.toArgbColor(),
                 createdAt = java.time.LocalDateTime.now()
             )
             noteRepository.insertNote(note)

@@ -1,5 +1,6 @@
 package com.syncro.presentation.calendar
 
+import com.syncro.presentation.theme.toColor
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -414,8 +415,8 @@ fun Day(day: CalendarDay, items: List<SyncroItem>, onClick: () -> Unit) {
     val dayColor = remember(items) {
         items.firstOrNull { it is SyncroItem.Event || it is SyncroItem.Task }?.let { item ->
             when (item) {
-                is SyncroItem.Event -> item.categoryColor
-                is SyncroItem.Task -> item.categoryColor ?: Color(0xFF64748B) // Slate500 por defecto
+                is SyncroItem.Event -> item.categoryColor.toColor()
+                is SyncroItem.Task -> item.categoryColor?.toColor() ?: Color(0xFF64748B) // Slate500 por defecto
                 else -> null
             }
         }
@@ -486,7 +487,7 @@ fun EventSnippet(event: SyncroItem.Event) {
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(4.dp))
-            .background(event.categoryColor.copy(alpha = 0.2f))
+            .background(event.categoryColor.toColor().copy(alpha = 0.2f))
             .padding(horizontal = 4.dp, vertical = 2.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -494,7 +495,7 @@ fun EventSnippet(event: SyncroItem.Event) {
                 modifier = Modifier
                     .size(4.dp, 12.dp)
                     .clip(RoundedCornerShape(2.dp))
-                    .background(event.categoryColor)
+                    .background(event.categoryColor.toColor())
             )
             Spacer(modifier = Modifier.width(4.dp))
             Text(

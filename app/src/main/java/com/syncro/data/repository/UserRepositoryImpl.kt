@@ -24,7 +24,7 @@ class UserRepositoryImpl @Inject constructor(
     }
 
     override suspend fun saveUser(user: User) {
-        userDao.saveUser(
+        userDao.replaceUser(
             UserEntity(
                 email = user.email,
                 name = user.name,

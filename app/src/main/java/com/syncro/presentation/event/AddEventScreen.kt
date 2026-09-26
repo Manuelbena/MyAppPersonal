@@ -84,7 +84,7 @@ fun AddEventContent(
 ) {
     var title by remember { mutableStateOf(eventToEdit?.title ?: "") }
     var description by remember { mutableStateOf(eventToEdit?.description ?: "") }
-    var location by remember { mutableStateOf("") }
+    var location by remember { mutableStateOf(eventToEdit?.location ?: "") }
     var selectedCategory by remember { mutableStateOf(eventToEdit?.categoryText ?: "Personal") }
     var selectedPriority by remember { mutableStateOf(eventToEdit?.priority ?: Priority.MEDIUM) }
     var isAllDay by remember { mutableStateOf(eventToEdit?.startTime == "00:00" && eventToEdit.endTime == "00:00") }
@@ -117,6 +117,7 @@ fun AddEventContent(
     val dateFormatter = DateTimeFormatter.ofPattern("EEE, d MMM.", Locale("es", "ES"))
     val timeFormatter = DateTimeFormatter.ofPattern("HH:mm")
     val isTimeRangeValid = isValidEventTimeRange(startTime, endTime)
+    val canSave = title.isNotBlank() && isTimeRangeValid
 
     val categories = listOf(
         CategoryItem("Personal", Icons.Rounded.Person, Emerald500),
@@ -165,7 +166,7 @@ fun AddEventContent(
                     contentColor = Cyan400
                 ),
                 shape = RoundedCornerShape(12.dp),
-                enabled = isTimeRangeValid,
+                enabled = canSave,
                 contentPadding = PaddingValues(horizontal = 20.dp, vertical = 10.dp)
             ) {
                 Text("Guardar", fontWeight = FontWeight.Bold)

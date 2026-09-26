@@ -1,5 +1,6 @@
 package com.syncro.presentation.home.components
 
+import com.syncro.presentation.theme.toColor
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -34,7 +35,7 @@ fun AddNoteSheet(
         Color(0xFFBA68C8), // Violeta
         Color(0xFFFF8A65)  // Coral
     )
-    var selectedColor by remember { mutableStateOf(initialNote?.color ?: noteColors[0]) }
+    var selectedColor by remember { mutableStateOf(initialNote?.color?.toColor() ?: noteColors[0]) }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,

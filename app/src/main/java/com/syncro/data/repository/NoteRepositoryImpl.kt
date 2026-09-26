@@ -1,7 +1,6 @@
 package com.syncro.data.repository
 
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.toArgb
+import com.syncro.domain.model.ArgbColor
 import com.syncro.data.local.dao.NoteDao
 import com.syncro.data.local.entity.NoteEntity
 import com.syncro.domain.model.SyncroItem
@@ -29,7 +28,7 @@ class NoteRepositoryImpl @Inject constructor(
                 id = note.id,
                 title = note.title,
                 content = note.content,
-                color = note.color.toArgb(),
+                color = note.color.argb,
                 createdAt = note.createdAt.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
             )
         )
@@ -48,7 +47,7 @@ class NoteRepositoryImpl @Inject constructor(
             id = id,
             title = title,
             content = content,
-            color = Color(color),
+            color = ArgbColor(color),
             createdAt = LocalDateTime.ofInstant(Instant.ofEpochMilli(createdAt), ZoneId.systemDefault())
         )
     }

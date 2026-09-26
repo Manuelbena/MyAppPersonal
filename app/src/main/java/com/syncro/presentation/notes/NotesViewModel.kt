@@ -1,5 +1,6 @@
 package com.syncro.presentation.notes
 
+import com.syncro.presentation.theme.toArgbColor
 import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -29,7 +30,7 @@ class NotesViewModel @Inject constructor(
                 id = id ?: UUID.randomUUID().toString(),
                 title = title,
                 content = content,
-                color = color,
+                color = color.toArgbColor(),
                 createdAt = LocalDateTime.now()
             )
             noteRepository.insertNote(note)

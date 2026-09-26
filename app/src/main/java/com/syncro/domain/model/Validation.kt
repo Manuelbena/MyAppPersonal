@@ -10,3 +10,6 @@ fun isValidEventTimeRange(start: LocalTime, end: LocalTime): Boolean = !end.isBe
 
 class InvalidEventTimeRangeException :
     IllegalArgumentException("La hora de fin no puede ser anterior a la de inicio")
+
+class BlankTitleException :
+    IllegalArgumentException("El título no puede estar vacío")

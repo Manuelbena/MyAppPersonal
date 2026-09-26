@@ -1,12 +1,7 @@
 package com.syncro.domain.model
 
-import androidx.compose.ui.graphics.Color
-
-enum class Priority(val label: String, val color: Color) {
-    HIGH("ALTA", Color(0xFFFF5252)),
-    MEDIUM("MEDIA", Color(0xFFFFB74D)),
-    LOW("BAJA", Color(0xFF81C784))
-}
+/** Prioridad de un evento. Su texto y color en pantalla se definen en la capa de presentación. */
+enum class Priority { HIGH, MEDIUM, LOW }
 
 data class Subtask(
     val title: String, 
@@ -23,10 +18,11 @@ sealed class SyncroItem {
         val startTime: String, 
         val endTime: String,
         val categoryText: String,
-        val categoryColor: Color,
+        val categoryColor: ArgbColor,
         val priority: Priority? = null,
         val subtasks: List<Subtask> = emptyList(),
-        val isCompleted: Boolean = false
+        val isCompleted: Boolean = false,
+        val location: String? = null
     ) : SyncroItem()
 
     data class Task(
@@ -38,14 +34,14 @@ sealed class SyncroItem {
         val time: String,
         val isCompleted: Boolean,
         val categoryText: String? = null,
-        val categoryColor: Color? = null
+        val categoryColor: ArgbColor? = null
     ) : SyncroItem()
 
     data class Note(
         val id: String,
         val title: String,
         val content: String,
-        val color: Color,
+        val color: ArgbColor,
         val createdAt: java.time.LocalDateTime
     ) : SyncroItem()
 }
