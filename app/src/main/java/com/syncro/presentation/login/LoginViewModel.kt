@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.syncro.data.auth.GoogleSignInClient
 import com.syncro.domain.usecase.SignInWithGoogleUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -20,6 +21,9 @@ data class LoginUiState(
 
 @HiltViewModel
 class LoginViewModel @Inject constructor(
+    // El selector de cuentas es UI del sistema y necesita el Context de la pantalla: por eso el
+    // ViewModel lo usa directamente y pasa la cuenta elegida al caso de uso, que no sabe de Android
+    private val googleSignInClient: GoogleSignInClient,
     private val signInWithGoogleUseCase: SignInWithGoogleUseCase
 ) : ViewModel() {
 
@@ -31,7 +35,8 @@ class LoginViewModel @Inject constructor(
         Log.d(tag, "Initiating sign-in")
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
-            val result = signInWithGoogleUseCase(context)
+            val result = googleSignInClient.requestAccount(context)
+                .fold(onSuccess = { account -> signInWithGoogleUseCase(account) }, onFailure = { Result.failure(it) })
             result.onSuccess {
                 Log.d(tag, "Sign-in successful")
                 _uiState.update { it.copy(isLoading = false, isSuccess = true) }

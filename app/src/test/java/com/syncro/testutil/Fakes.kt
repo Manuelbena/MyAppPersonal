@@ -4,6 +4,8 @@ import com.syncro.domain.model.SyncroItem
 import com.syncro.domain.repository.EventRepository
 import com.syncro.domain.repository.GoogleSyncRepository
 import com.syncro.domain.repository.TaskRepository
+import com.syncro.domain.repository.UserRepository
+import com.syncro.domain.model.User
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
@@ -113,4 +115,18 @@ class FakeGoogleSyncRepository(private val log: CallLog = CallLog()) : GoogleSyn
     }
 
     override suspend fun pushPendingChanges(): Result<Unit> = result()
+}
+
+class FakeUserRepository : UserRepository {
+    val user = MutableStateFlow<User?>(null)
+
+    override fun getUser(): Flow<User?> = user
+
+    override suspend fun saveUser(user: User) {
+        this.user.value = user
+    }
+
+    override suspend fun clearUser() {
+        user.value = null
+    }
 }

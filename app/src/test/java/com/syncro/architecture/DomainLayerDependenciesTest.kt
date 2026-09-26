@@ -23,10 +23,7 @@ class DomainLayerDependenciesTest {
      * Deuda técnica conocida. Cada entrada debe desaparecer cuando se arregle: el test avisa si
      * una excepción ya no hace falta, para que la lista no se quede desactualizada.
      */
-    private val knownExceptions = setOf(
-        "repository/UserRepository.kt", // signInWithGoogle(context): Credential Manager necesita un Context
-        "usecase/SignInWithGoogleUseCase.kt"
-    )
+    private val knownExceptions = emptySet<String>() // El Context del login salió del dominio: deuda pagada
 
     @Test
     fun `el dominio no depende de Android ni de Compose`() {

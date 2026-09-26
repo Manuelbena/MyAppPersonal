@@ -29,7 +29,7 @@ JVM unit tests in `app/src/test` run on Robolectric (`src/test/resources/robolec
 
 Standard Clean Architecture layering under `app/src/main/java/com/syncro/`:
 
-- **`domain/`** — pure Kotlin: no Android or Compose imports (enforced by `architecture/DomainLayerDependenciesTest`, whose `knownExceptions` lists the remaining debt: the `Context` in Google sign-in). Colors are `ArgbColor` (value class over the ARGB Int Room stores); `Priority` is a plain enum. Conversion to Compose `Color` and priority label/color live in `presentation/theme/ColorMapping.kt` (`toColor()`, `toArgbColor()`, `Priority.label`, `Priority.color`).
+- **`domain/`** — pure Kotlin: no Android or Compose imports (enforced by `architecture/DomainLayerDependenciesTest`; its `knownExceptions` list is empty — keep it that way). Colors are `ArgbColor` (value class over the ARGB Int Room stores); `Priority` is a plain enum. Conversion to Compose `Color` and priority label/color live in `presentation/theme/ColorMapping.kt` (`toColor()`, `toArgbColor()`, `Priority.label`, `Priority.color`).
   - `model/SyncroItem.kt` defines the app's core sealed type: `SyncroItem` is `Event`, `Task`, or `Note`. Most of the UI operates on `SyncroItem`, not on Room entities directly.
   - `repository/` — interfaces only (`TaskRepository`, `EventRepository`, `NoteRepository`, `UserRepository`, `GoogleSyncRepository`).
   - `usecase/` — one class per operation (e.g. `SaveEventUseCase`, `SyncGoogleCalendarUseCase`, `ToggleTaskCompletionUseCase`). Use cases are the only things ViewModels call; they compose repositories and are the natural place for cross-cutting logic like "save locally, then push to Google."
@@ -43,6 +43,7 @@ Standard Clean Architecture layering under `app/src/main/java/com/syncro/`:
 - **`presentation/`** — one package per screen (`home`, `calendar`, `event`, `notes`, `login`, `assistant`), each typically with a `XyzScreen.kt` (Compose UI) and `XyzViewModel.kt` (`@HiltViewModel`, exposes `StateFlow`/Compose state, calls use cases). Shared widgets live in `presentation/components/` and per-feature subcomponents in `presentation/<feature>/components/`.
   - `presentation/navigation/` — `Navigation.kt` defines the sealed `AppScreen` route list; `MainScaffold.kt` hosts the `NavHost` plus the floating bottom nav (`FloatingBottomNav.kt`).
   - `presentation/theme/` is the theme actually used by `MainActivity`. **`com.syncro.ui.theme.*` is dead/duplicate code left over from project scaffolding — do not add to it, and prefer deleting it outright if you touch theming.**
+- Google sign-in is split: `data/auth/GoogleSignInClient` shows the Credential Manager account picker (needs an Activity `Context`) and returns a `User`; `SignInWithGoogleUseCase(account)` validates and saves it. `LoginViewModel` is the one ViewModel that calls a non-use-case class directly, because the picker is system UI.
 - Dependency injection is Hilt throughout: `SyncroApp` is `@HiltAndroidApp`, `MainActivity` is `@AndroidEntryPoint`, ViewModels use `@HiltViewModel` + `@Inject constructor`.
 
 ### Known legacy/dead code
