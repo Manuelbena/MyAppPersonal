@@ -84,6 +84,20 @@ class GetTimelineUseCaseTest {
         assertTrue(getTimeline(DAY).first().isEmpty())
     }
 
+    @Test
+    fun `lo que es de todo el dia va siempre primero`() = runTest {
+        tasks.insertTask(aTask(title = "Temprano", time = at("06:00")))
+        events.insertEvent(anEvent(title = "Viene de ayer", date = DAY.minusDays(1), endDate = DAY, startTime = at("22:00"), endTime = at("02:00")))
+        events.insertEvent(anEvent(title = "Festivo", startTime = at("00:00"), endTime = at("00:00")))
+        tasks.insertTask(aTask(title = "Tomar creatina", time = at("00:00")))
+
+        val titles = getTimeline(DAY).first().map { it.title() }
+
+        // Primero todo el día (tarea y evento), luego lo que viene de ayer y luego por hora
+        assertEquals(setOf("Festivo", "Tomar creatina"), titles.take(2).toSet())
+        assertEquals(listOf("Viene de ayer", "Temprano"), titles.drop(2))
+    }
+
     private fun SyncroItem.title() = when (this) {
         is SyncroItem.Task -> title
         is SyncroItem.Event -> title

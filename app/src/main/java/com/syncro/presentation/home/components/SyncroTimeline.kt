@@ -48,40 +48,13 @@ fun EventCard(
             .fillMaxWidth()
             .padding(vertical = 8.dp)
     ) {
-        // Columna de Horas
-        Column(
-            modifier = Modifier
-                .width(70.dp)
-                .padding(top = 16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            if (event.isAllDay) {
-                Text(
-                    text = "Todo el",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onBackground
-                )
-                Text(
-                    text = "día",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onBackground
-                )
-            } else {
-                Text(
-                    text = event.startTime.toDisplayTime(),
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp,
-                    color = MaterialTheme.colorScheme.onBackground
-                )
-                Text(
-                    text = event.endTime.toDisplayTime() + event.extraDaysSuffix(),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontSize = 12.sp
-                )
-            }
-        }
+        TimeColumn(
+            isAllDay = event.isAllDay,
+            start = event.startTime,
+            end = event.endTime,
+            extraDays = java.time.temporal.ChronoUnit.DAYS.between(event.date, event.endDate),
+            modifier = Modifier.padding(top = 16.dp)
+        )
 
         // Tarjeta
         Surface(
@@ -284,14 +257,7 @@ fun TaskRow(
             .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(
-            text = task.time.toDisplayTime(),
-            modifier = Modifier.width(70.dp),
-            fontWeight = FontWeight.Bold,
-            fontSize = 14.sp,
-            color = MaterialTheme.colorScheme.onBackground,
-            textAlign = TextAlign.Center
-        )
+        TimeColumn(isAllDay = task.isAllDay, start = task.time)
 
         Surface(
             modifier = Modifier
@@ -406,7 +372,7 @@ fun TaskDetailDialog(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = task.time.toDisplayTime(),
+                            text = if (task.isAllDay) "Todo el día" else task.time.toDisplayTime(),
                             fontSize = 14.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -498,8 +464,39 @@ fun TagChip(text: String, color: Color) {
     }
 }
 
-/** " (+1)" si el evento termina al día siguiente (o "+N" días después); vacío si termina el mismo día. */
-private fun SyncroItem.Event.extraDaysSuffix(): String {
-    val extraDays = java.time.temporal.ChronoUnit.DAYS.between(date, endDate)
-    return if (extraDays > 0) " (+$extraDays)" else ""
+
+/**
+ * Columna de la izquierda del timeline, común a tareas y eventos: "Todo el día" o la hora de
+ * inicio y, si la hay, la de fin. Si el evento termina otro día se indica debajo ("+1 día").
+ */
+@Composable
+private fun TimeColumn(
+    isAllDay: Boolean,
+    start: java.time.LocalTime,
+    end: java.time.LocalTime? = null,
+    extraDays: Long = 0,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier.width(70.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        if (isAllDay) {
+            Text("Todo el", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = MaterialTheme.colorScheme.onBackground)
+            Text("día", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = MaterialTheme.colorScheme.onBackground)
+        } else {
+            Text(start.toDisplayTime(), fontWeight = FontWeight.Bold, fontSize = 14.sp, color = MaterialTheme.colorScheme.onBackground)
+            end?.let {
+                Text(it.toDisplayTime(), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            if (extraDays > 0) {
+                Text(
+                    text = if (extraDays == 1L) "+1 día" else "+$extraDays días",
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+        }
+    }
 }

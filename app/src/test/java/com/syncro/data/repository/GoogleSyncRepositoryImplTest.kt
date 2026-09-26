@@ -128,6 +128,17 @@ class GoogleSyncRepositoryImplTest {
         assertEquals("Versión local", taskDao.getTaskById("t1")!!.title)
     }
 
+    @Test
+    fun `una tarea nueva de Google es de todo el dia porque Google no guarda la hora`() = runTest {
+        google.addTask(googleTask("g-1", "Con fecha", due = DAY))
+        google.addTask(googleTask("g-2", "Sin fecha"))
+
+        repository.syncTasks(force = true)
+
+        assertEquals("00:00", taskDao.getTaskByRemoteId("g-1")!!.time)
+        assertEquals("00:00", taskDao.getTaskByRemoteId("g-2")!!.time)
+    }
+
     // endregion
 
     // region Borrados

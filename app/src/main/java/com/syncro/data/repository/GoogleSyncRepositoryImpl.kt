@@ -114,8 +114,8 @@ class GoogleSyncRepositoryImpl @Inject constructor(
         val title = googleTask.title.orEmpty()
         val description = googleTask.notes.orEmpty()
         val dateEpoch = resolveTaskDate(googleTask).toEpochDay()
-        // Google Tasks no guarda la hora (due siempre llega a las 00:00): se respeta la local
-        val time = existing?.time ?: if (googleTask.due != null) "00:00" else DEFAULT_TASK_TIME
+        // Google Tasks no guarda la hora: se respeta la local y, si es nueva, es de todo el día (00:00)
+        val time = existing?.time ?: ALL_DAY_TIME
         val isCompleted = googleTask.status == TASK_STATUS_COMPLETED
 
         val entity = existing?.copy(
@@ -432,7 +432,6 @@ class GoogleSyncRepositoryImpl @Inject constructor(
         const val TASK_STATUS_COMPLETED = "completed"
         const val TASK_STATUS_NEEDS_ACTION = "needsAction"
         const val TASKS_SYNC_MIN_INTERVAL_MS = 60_000L
-        const val DEFAULT_TASK_TIME = "09:00"
         const val ALL_DAY_TIME = "00:00" // Los eventos de día completo se guardan como 00:00–00:00
         const val SQLITE_MAX_VARIABLES = 500
         const val COMPLETED_MARK = "✅"

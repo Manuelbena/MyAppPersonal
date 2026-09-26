@@ -44,6 +44,8 @@ fun QuickTaskSheet(
     var description by remember { mutableStateOf("") }
     var selectedDate by remember { mutableStateOf(LocalDate.now()) }
     var selectedTime by remember { mutableStateOf(LocalTime.now()) }
+    // Sin hora concreta: se guarda a las 00:00, igual que las tareas de Google Tasks
+    var isAllDay by remember { mutableStateOf(false) }
     
     var showDatePicker by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
@@ -115,7 +117,7 @@ fun QuickTaskSheet(
                     onClick = { showDatePicker = true },
                     label = { 
                         val dateText = if (selectedDate == LocalDate.now()) "Hoy" else selectedDate.format(dateFormatter)
-                        Text("$dateText, ${selectedTime.format(timeFormatter)}") 
+                        Text(if (isAllDay) dateText else "$dateText, ${selectedTime.format(timeFormatter)}")
                     },
                     leadingIcon = {
                         Icon(
@@ -130,6 +132,13 @@ fun QuickTaskSheet(
                         labelColor = MaterialTheme.colorScheme.onSurface
                     ),
                     border = null
+                )
+
+                FilterChip(
+                    selected = isAllDay,
+                    onClick = { isAllDay = !isAllDay },
+                    label = { Text("Todo el día") },
+                    shape = RoundedCornerShape(12.dp)
                 )
 
                 if (!showDescriptionField) {
@@ -171,7 +180,7 @@ fun QuickTaskSheet(
                 Button(
                     onClick = { 
                         if (title.isNotBlank()) {
-                            onSave(title, description, selectedDate, selectedTime)
+                            onSave(title, description, selectedDate, if (isAllDay) LocalTime.MIDNIGHT else selectedTime)
                         }
                     },
                     shape = RoundedCornerShape(12.dp),
@@ -202,7 +211,7 @@ fun QuickTaskSheet(
                             .toLocalDate()
                     }
                     showDatePicker = false
-                    showTimePicker = true
+                    if (!isAllDay) showTimePicker = true
                 }) { Text("Siguiente") }
             }
         ) {

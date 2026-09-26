@@ -1,0 +1,70 @@
+package com.syncro.presentation.home
+
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasSetTextAction
+import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextInput
+import com.syncro.presentation.home.components.EventCard
+import com.syncro.presentation.home.components.QuickTaskSheet
+import com.syncro.presentation.home.components.TaskRow
+import com.syncro.testutil.DAY
+import com.syncro.testutil.aTask
+import com.syncro.testutil.anEvent
+import com.syncro.testutil.at
+import org.junit.Assert.assertEquals
+import org.junit.Rule
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import java.time.LocalTime
+
+/** Cómo se ven las horas en el timeline y el formulario de tarea rápida. */
+@RunWith(RobolectricTestRunner::class)
+class TimelineComponentsTest {
+
+    @get:Rule
+    val compose = createComposeRule()
+
+    @Test
+    fun `una tarea de todo el dia muestra Todo el dia en lugar de 00-00`() {
+        compose.setContent { TaskRow(task = aTask(title = "Tomar creatina", time = at("00:00")), onToggle = {}, onClick = {}) }
+
+        compose.onNodeWithText("Todo el").assertIsDisplayed()
+        compose.onNodeWithText("00:00").assertDoesNotExist()
+    }
+
+    @Test
+    fun `una tarea con hora muestra su hora`() {
+        compose.setContent { TaskRow(task = aTask(title = "Gimnasio", time = at("18:30")), onToggle = {}, onClick = {}) }
+
+        compose.onNodeWithText("18:30").assertIsDisplayed()
+    }
+
+    @Test
+    fun `un evento que termina al dia siguiente lo indica debajo de la hora`() {
+        compose.setContent {
+            EventCard(
+                event = anEvent(title = "Cena", date = DAY, endDate = DAY.plusDays(1), startTime = at("21:30"), endTime = at("01:00")),
+                onSubtaskToggle = {}
+            )
+        }
+
+        compose.onNodeWithText("01:00").assertIsDisplayed()
+        compose.onNodeWithText("+1 día").assertIsDisplayed()
+    }
+
+    @Test
+    fun `en tarea rapida el chip Todo el dia guarda la tarea a las 00-00`() {
+        var savedTime: LocalTime? = null
+        compose.setContent { QuickTaskSheet(onDismiss = {}, onSave = { _, _, _, time -> savedTime = time }) }
+
+        // El título es el único campo editable visible (la descripción se abre con "Detalles")
+        compose.onNode(hasSetTextAction()).performTextInput("Tomar creatina")
+        compose.onNodeWithText("Todo el día").performClick()
+        compose.onNodeWithText("Guardar").performClick()
+
+        assertEquals(LocalTime.MIDNIGHT, savedTime)
+    }
+}

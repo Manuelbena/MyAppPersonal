@@ -63,7 +63,13 @@ sealed class SyncroItem {
         val isCompleted: Boolean,
         val categoryText: String? = null,
         val categoryColor: ArgbColor? = null
-    ) : SyncroItem()
+    ) : SyncroItem() {
+        /**
+         * Tarea sin hora concreta. Se guarda a las 00:00 (misma convención que los eventos de día
+         * completo): así llegan las de Google Tasks, que solo guarda la fecha.
+         */
+        val isAllDay: Boolean get() = time == LocalTime.MIDNIGHT
+    }
 
     data class Note(
         val id: String,
