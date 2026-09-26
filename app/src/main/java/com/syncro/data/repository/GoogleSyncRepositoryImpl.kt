@@ -4,8 +4,10 @@ import android.accounts.Account
 import android.content.Context
 import android.util.Log
 import com.google.api.client.googleapis.extensions.android.gms.auth.GoogleAccountCredential
+import com.google.api.client.googleapis.json.GoogleJsonResponseException
 import com.google.api.client.http.javanet.NetHttpTransport
 import com.google.api.client.json.gson.GsonFactory
+import com.google.api.client.util.Data
 import com.google.api.client.util.DateTime
 import com.google.api.services.calendar.Calendar
 import com.google.api.services.calendar.model.Event
@@ -18,6 +20,8 @@ import com.syncro.data.local.dao.UserDao
 import com.syncro.data.local.entity.EventEntity
 import com.syncro.data.local.entity.SubtaskEntity
 import com.syncro.data.local.entity.TaskEntity
+import com.syncro.data.sync.SyncScheduler
+import com.syncro.domain.model.isValidEventTimeRange
 import com.syncro.domain.repository.GoogleSyncRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -39,6 +43,7 @@ class GoogleSyncRepositoryImpl @Inject constructor(
     private val userDao: UserDao,
     private val taskDao: TaskDao,
     private val eventDao: EventDao,
+    private val syncScheduler: SyncScheduler,
 ) : GoogleSyncRepository {
 
     private val jsonFactory = GsonFactory.getDefaultInstance()
@@ -62,7 +67,7 @@ class GoogleSyncRepositoryImpl @Inject constructor(
 
     private suspend fun downloadAllTasks() {
         // Foto local tomada antes de descargar: una tarea subida durante la sync no se borra
-        val localRemoteIds = taskDao.getAllRemoteIds()
+        val localRemoteIds = taskDao.getSyncedRemoteIds()
         val service = tasksService()
         val remoteIds = mutableSetOf<String>()
 
@@ -92,7 +97,7 @@ class GoogleSyncRepositoryImpl @Inject constructor(
     ): Result<Unit> = runGoogleCall("syncCalendar") {
         require(!endDate.isBefore(startDate)) { "endDate ($endDate) is before startDate ($startDate)" }
         // Solo se comparan para borrado los eventos locales que empiezan dentro del rango
-        val localRemoteIds = eventDao.getRemoteIdsInRange(startDate.toEpochDay(), endDate.toEpochDay())
+        val localRemoteIds = eventDao.getSyncedRemoteIdsInRange(startDate.toEpochDay(), endDate.toEpochDay())
         val service = calendarService()
         val timeMin = DateTime(startDate.atStartOfDay(zone).toInstant().toEpochMilli())
         val timeMax = DateTime(endDate.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli())
@@ -135,6 +140,8 @@ class GoogleSyncRepositoryImpl @Inject constructor(
 
     private suspend fun saveRemoteTask(googleTask: Task, taskListId: String) {
         val existing = taskDao.getTaskByRemoteId(googleTask.id)
+        // Cambios locales sin subir: gana la versión local, que se subirá en el próximo push
+        if (existing != null && existing.pendingChanges > 0) return
         val title = googleTask.title.orEmpty()
         val description = googleTask.notes.orEmpty()
         val dateEpoch = resolveTaskDate(googleTask).toEpochDay()
@@ -166,8 +173,11 @@ class GoogleSyncRepositoryImpl @Inject constructor(
 
     private suspend fun saveRemoteEvent(googleEvent: Event) {
         val title = googleEvent.summary.orEmpty()
+        val existing = eventDao.getEventByRemoteId(googleEvent.id)
+        // Cambios locales sin subir: gana la versión local, que se subirá en el próximo push
+        if (existing != null && existing.pendingChanges > 0) return
         // Reutilizar el id local si ya existe para no duplicar el evento si cambió el título
-        val eventId = eventDao.getEventByRemoteId(googleEvent.id)?.id ?: UUID.randomUUID().toString()
+        val eventId = existing?.id ?: UUID.randomUUID().toString()
         val (description, subtasks) = parseDescription(googleEvent.description.orEmpty(), eventId)
         val (categoryName, categoryColor) = resolveCategory(title, googleEvent.colorId)
 
@@ -193,118 +203,130 @@ class GoogleSyncRepositoryImpl @Inject constructor(
 
     // region Subida local -> Google
 
-    override suspend fun uploadUnsyncedItems(date: LocalDate): Result<Unit> = runGoogleCall("uploadUnsyncedItems") {
-        val dateEpoch = date.toEpochDay()
+    // Serializa las subidas: la inmediata de un caso de uso y la del worker podrían crear el
+    // mismo elemento dos veces en Google
+    private val pushMutex = Mutex()
 
-        // Los fallos individuales ya se registran en cada upload; se continúa con el resto
-        taskDao.getUnsyncedTasksByDate(dateEpoch).forEach { task ->
-            uploadTaskToGoogle(task.id, task.title, task.description, date)
-        }
+    override suspend fun pushTask(taskId: String): Result<Unit> =
+        pushMutex.withLock { runGoogleCall("pushTask") { pushTaskInternal(taskId) } }
+            .onFailure { syncScheduler.schedulePendingPush() }
 
-        eventDao.getUnsyncedEventsByDate(dateEpoch).forEach { (event, subtasks) ->
-            uploadEventToGoogle(
-                eventId = event.id,
-                title = event.title,
-                description = event.description,
-                location = event.location,
-                startDate = date,
-                startTime = event.startTime,
-                endTime = event.endTime,
-                category = event.categoryText,
-                subtasks = subtasks.map { it.title }
+    override suspend fun pushEvent(eventId: String): Result<Unit> =
+        pushMutex.withLock { runGoogleCall("pushEvent") { pushEventInternal(eventId) } }
+            .onFailure { syncScheduler.schedulePendingPush() }
+
+    override suspend fun pushPendingChanges(): Result<Unit> =
+        pushMutex.withLock {
+            runGoogleCall("pushPendingChanges") {
+                // Se intenta subir todo aunque falle algún elemento; al final se propaga el primer error
+                var firstError: Exception? = null
+                suspend fun attempt(push: suspend () -> Unit) {
+                    try {
+                        push()
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Pending item upload failed", e)
+                        if (firstError == null) firstError = e
+                    }
+                }
+                taskDao.getPendingTaskIds().forEach { attempt { pushTaskInternal(it) } }
+                eventDao.getPendingEventIds().forEach { attempt { pushEventInternal(it) } }
+                firstError?.let { throw it }
+            }
+        }.onFailure { syncScheduler.schedulePendingPush() }
+
+    private suspend fun pushTaskInternal(taskId: String) {
+        val task = taskDao.getTaskById(taskId) ?: return
+        if (task.remoteId != null && task.pendingChanges == 0) return
+
+        val body = Task().apply {
+            setTitle(task.title)
+            setNotes(task.description)
+            setStatus(if (task.isCompleted) TASK_STATUS_COMPLETED else TASK_STATUS_NEEDS_ACTION)
+            // En un patch, null significa "no tocar"; NULL_STRING borra la fecha de completado
+            setCompleted(
+                if (task.isCompleted) DateTime(System.currentTimeMillis()).toStringRfc3339() else Data.NULL_STRING
             )
         }
-    }
-
-    override suspend fun uploadTaskToGoogle(
-        taskId: String,
-        title: String,
-        notes: String?,
-        date: LocalDate
-    ): Result<Unit> = runGoogleCall("uploadTaskToGoogle") {
-        val googleTask = Task().apply {
-            setTitle(title)
-            setNotes(notes)
-            // Google Tasks solo guarda la fecha de vencimiento; la hora se descarta
-            setDue("${date}T00:00:00.000Z")
-        }
-        val inserted = tasksService().tasks().insert(DEFAULT_TASK_LIST, googleTask).execute()
-        taskDao.updateRemoteId(taskId, inserted.id)
-    }
-
-    override suspend fun updateTaskInGoogle(
-        remoteId: String,
-        title: String,
-        notes: String?,
-        isCompleted: Boolean
-    ): Result<Unit> = runGoogleCall("updateTaskInGoogle") {
         val service = tasksService()
-        // Las tareas sin lista conocida (creadas desde la app o previas a la migración) están en @default
-        val taskListId = taskDao.getTaskByRemoteId(remoteId)?.taskListId ?: DEFAULT_TASK_LIST
-        val task = service.tasks().get(taskListId, remoteId).execute().apply {
-            setTitle(title)
-            setNotes(notes)
-            setStatus(if (isCompleted) TASK_STATUS_COMPLETED else TASK_STATUS_NEEDS_ACTION)
-            setCompleted(if (isCompleted) DateTime(System.currentTimeMillis()).toStringRfc3339() else null)
-        }
-        service.tasks().update(taskListId, remoteId, task).execute()
-    }
-
-    override suspend fun uploadEventToGoogle(
-        eventId: String,
-        title: String,
-        description: String?,
-        location: String?,
-        startDate: LocalDate,
-        startTime: String,
-        endTime: String,
-        category: String?,
-        subtasks: List<String>
-    ): Result<Unit> = runGoogleCall("uploadEventToGoogle") {
-        val local = eventDao.getEventById(eventId)
-        val completedSubtasks = eventDao.getSubtasksForEvent(eventId).filter { it.isCompleted }.map { it.title }.toSet()
-        val event = Event().apply {
-            summary = if (local?.isCompleted == true) "$COMPLETED_MARK $title" else title
-            this.description = buildDescription(description, subtasks, completedSubtasks)
-            this.location = location
-            colorId = category?.let { CATEGORY_TO_GOOGLE_COLOR[it] }
-            if (isAllDayRange(startTime, endTime)) {
-                // En Google el fin de un evento de día completo es exclusivo: el día siguiente
-                start = EventDateTime().setDate(DateTime(startDate.toString()))
-                end = EventDateTime().setDate(DateTime(startDate.plusDays(1).toString()))
-            } else {
-                start = eventDateTime(startDate, startTime)
-                end = eventDateTime(startDate, endTime)
+        val remoteId = task.remoteId
+        val syncedRemoteId = if (remoteId == null) {
+            // La fecha solo se envía al crear: así un patch no añade fecha a tareas que no la tienen.
+            // Google Tasks solo guarda la fecha de vencimiento; la hora se descarta
+            body.setDue("${LocalDate.ofEpochDay(task.date)}T00:00:00.000Z")
+            service.tasks().insert(DEFAULT_TASK_LIST, body).execute().id
+        } else {
+            try {
+                // Las tareas sin lista conocida (creadas desde la app o previas a la migración) están en @default
+                service.tasks().patch(task.taskListId ?: DEFAULT_TASK_LIST, remoteId, body).execute()
+                remoteId
+            } catch (e: GoogleJsonResponseException) {
+                if (!e.isNotFound()) throw e
+                // Se borró en Google mientras había cambios locales: gana el borrado
+                taskDao.deleteTaskById(task.id)
+                return
             }
         }
+        taskDao.markSynced(task.id, syncedRemoteId, task.pendingChanges)
+    }
 
+    private suspend fun pushEventInternal(eventId: String) {
+        val local = eventDao.getEventById(eventId) ?: return
+        if (local.remoteId != null && local.pendingChanges == 0) return
+        if (!isValidEventTimeRange(LocalTime.parse(local.startTime), LocalTime.parse(local.endTime))) {
+            // Evento guardado antes de existir la validación: Google lo rechazaría siempre (400).
+            // Se queda pendiente hasta que el usuario lo edite y corrija la hora
+            Log.w(TAG, "Skipping event with end before start: '${local.title}' on ${LocalDate.ofEpochDay(local.date)}")
+            return
+        }
+
+        val body = local.toGoogleEvent(eventDao.getSubtasksForEvent(eventId))
         val service = calendarService()
-        val remoteId = local?.remoteId
-        if (remoteId != null) {
-            // Evento ya sincronizado (edición): patch para no duplicarlo en Google
-            service.events().patch(PRIMARY_CALENDAR, remoteId, event).execute()
+        val remoteId = local.remoteId
+        val syncedRemoteId = if (remoteId == null) {
+            service.events().insert(PRIMARY_CALENDAR, body).execute().id
         } else {
-            val inserted = service.events().insert(PRIMARY_CALENDAR, event).execute()
-            eventDao.updateRemoteId(eventId, inserted.id)
+            try {
+                // Patch y no update: conserva en Google lo que la app no gestiona (invitados, avisos…)
+                service.events().patch(PRIMARY_CALENDAR, remoteId, body).execute()
+                remoteId
+            } catch (e: GoogleJsonResponseException) {
+                if (!e.isNotFound()) throw e
+                // Se borró en Google mientras había cambios locales: gana el borrado
+                eventDao.deleteEventById(local.id)
+                return
+            }
+        }
+        eventDao.markSynced(local.id, syncedRemoteId, local.pendingChanges)
+    }
+
+    private fun EventEntity.toGoogleEvent(subtasks: List<SubtaskEntity>): Event {
+        val eventDate = LocalDate.ofEpochDay(date)
+        val googleTitle = if (isCompleted) "$COMPLETED_MARK $title" else title
+        val googleDescription = buildDescription(description, subtasks)
+        val googleLocation = location
+        val googleColorId = CATEGORY_TO_GOOGLE_COLOR[categoryText]
+        val allDay = isAllDayRange(startTime, endTime)
+        val start = startTime
+        val end = endTime
+        return Event().apply {
+            summary = googleTitle
+            description = googleDescription
+            location = googleLocation
+            colorId = googleColorId
+            if (allDay) {
+                // En Google el fin de un evento de día completo es exclusivo: el día siguiente
+                setStart(EventDateTime().setDate(DateTime(eventDate.toString())))
+                setEnd(EventDateTime().setDate(DateTime(eventDate.plusDays(1).toString())))
+            } else {
+                setStart(eventDateTime(eventDate, start))
+                setEnd(eventDateTime(eventDate, end))
+            }
         }
     }
 
-    override suspend fun updateEventInGoogle(eventId: String): Result<Unit> {
-        val event = eventDao.getEventById(eventId) ?: return Result.success(Unit)
-        // Sin remoteId aún no está en Google: lo subirá uploadUnsyncedItems con el estado actual
-        if (event.remoteId == null) return Result.success(Unit)
-        return uploadEventToGoogle(
-            eventId = eventId,
-            title = event.title,
-            description = event.description,
-            location = event.location,
-            startDate = LocalDate.ofEpochDay(event.date),
-            startTime = event.startTime,
-            endTime = event.endTime,
-            category = event.categoryText,
-            subtasks = eventDao.getSubtasksForEvent(eventId).map { it.title }
-        )
-    }
+    private fun GoogleJsonResponseException.isNotFound() = statusCode == 404 || statusCode == 410
 
     // endregion
 
@@ -404,15 +426,11 @@ class GoogleSyncRepositoryImpl @Inject constructor(
         return parts[0].trim() to subtasks
     }
 
-    private fun buildDescription(
-        description: String?,
-        subtasks: List<String>,
-        completedSubtasks: Set<String>
-    ): String = buildString {
+    private fun buildDescription(description: String?, subtasks: List<SubtaskEntity>): String = buildString {
         description?.let { append(it).append("\n\n") }
         if (subtasks.isNotEmpty()) {
             append("Subtareas:\n")
-            subtasks.forEach { append(if (it in completedSubtasks) "- [x] " else "- [ ] ").append(it).append('\n') }
+            subtasks.forEach { append(if (it.isCompleted) "- [x] " else "- [ ] ").append(it.title).append('\n') }
         }
     }.trim()
 

@@ -31,7 +31,7 @@ class SaveTaskUseCase @Inject constructor(
         )
         val taskId = repository.insertTask(task, date)
         
-        // Sincronizar con Google en segundo plano
-        googleSyncRepository.uploadTaskToGoogle(taskId, title, description, date)
+        // Si no hay conexión queda pendiente y se sube automáticamente al recuperarla
+        googleSyncRepository.pushTask(taskId)
     }
 }

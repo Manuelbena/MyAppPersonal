@@ -46,7 +46,7 @@ Standard Clean Architecture layering under `app/src/main/java/com/syncro/`:
 
 ### Sync model
 
-Local Room entities carry a `remoteId` (nullable) alongside their local `id`. The general pattern used by use cases like `SaveEventUseCase` is: write to the local Room DB first (source of truth for the UI), then call `GoogleSyncRepository` to push/pull against Google Calendar/Tasks and reconcile `remoteId`. `UploadUnsyncedItemsUseCase` handles pushing anything created while offline/unsynced.
+Offline-first. Room is the UI's source of truth; tasks/events carry a nullable `remoteId` (Google id) and a `pendingChanges` counter. Every local write (create/edit/toggle) increments `pendingChanges` in the DAO/repository, then the use case calls `GoogleSyncRepository.pushTask`/`pushEvent`, which read the *local* state and insert or patch in Google. `markSynced` only zeroes the counter if it didn't change during the upload. A failed push schedules `data/sync/PushPendingChangesWorker` (WorkManager, network constraint, `KEEP`), which calls `pushPendingChanges()` for everything pending on any date. Downloads (`syncTasks`, `syncCalendar(range)`) never overwrite or delete items with pending changes (local wins), and delete local items whose `remoteId` disappeared from Google. If a push gets 404/410 the Google deletion wins and the local item is removed. Subtask state is stored in the Google event description (`Subtareas:` + `- [x]`/`- [ ]`); Google Tasks stores no time, so local task time is kept.
 
 ## Key third-party dependencies
 

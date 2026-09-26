@@ -9,3 +9,11 @@ val MIGRATION_7_8 = object : Migration(7, 8) {
         db.execSQL("ALTER TABLE tasks ADD COLUMN taskListId TEXT")
     }
 }
+
+/** Cambios locales pendientes de subir a Google, para no perderlos sin conexión. */
+val MIGRATION_8_9 = object : Migration(8, 9) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE tasks ADD COLUMN pendingChanges INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE events ADD COLUMN pendingChanges INTEGER NOT NULL DEFAULT 0")
+    }
+}

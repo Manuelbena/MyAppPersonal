@@ -10,6 +10,6 @@ class ToggleEventCompletionUseCase @Inject constructor(
 ) {
     suspend operator fun invoke(eventId: String) {
         repository.toggleEventCompletion(eventId)
-        googleSyncRepository.updateEventInGoogle(eventId)
+        googleSyncRepository.pushEvent(eventId)
     }
 }

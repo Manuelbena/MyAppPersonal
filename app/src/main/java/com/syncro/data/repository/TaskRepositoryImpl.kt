@@ -46,7 +46,8 @@ class TaskRepositoryImpl @Inject constructor(
                 time = task.time,
                 isCompleted = task.isCompleted,
                 categoryText = task.categoryText,
-                categoryColor = task.categoryColor?.toArgb()
+                categoryColor = task.categoryColor?.toArgb(),
+                pendingChanges = 1
             )
         )
         return taskId

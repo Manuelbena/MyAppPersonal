@@ -20,10 +20,6 @@ interface EventDao {
     @Query("SELECT * FROM events WHERE date >= :startEpoch AND date <= :endEpoch")
     fun getEventsInRange(startEpoch: Long, endEpoch: Long): Flow<List<EventWithSubtasks>>
 
-    @Transaction
-    @Query("SELECT * FROM events WHERE remoteId IS NULL AND date = :dateEpoch")
-    suspend fun getUnsyncedEventsByDate(dateEpoch: Long): List<EventWithSubtasks>
-
     @Query("SELECT * FROM events WHERE id = :id")
     suspend fun getEventById(id: String): EventEntity?
 
@@ -50,18 +46,48 @@ interface EventDao {
         insertSubtasks(subtasks.map { it.copy(eventId = event.id) })
     }
 
-    @Query("SELECT remoteId FROM events WHERE date >= :startEpoch AND date <= :endEpoch AND remoteId IS NOT NULL")
-    suspend fun getRemoteIdsInRange(startEpoch: Long, endEpoch: Long): List<String>
+    @Query("UPDATE events SET isCompleted = NOT isCompleted, pendingChanges = pendingChanges + 1 WHERE id = :eventId")
+    suspend fun toggleEventCompletion(eventId: String)
+
+    @Query("UPDATE subtasks SET isCompleted = NOT isCompleted WHERE eventId = :eventId AND title = :subtaskTitle")
+    suspend fun toggleSubtaskRow(eventId: String, subtaskTitle: String)
+
+    @Query("UPDATE events SET pendingChanges = pendingChanges + 1 WHERE id = :eventId")
+    suspend fun markEventChanged(eventId: String)
+
+    /** Las subtareas se sincronizan dentro de la descripción del evento: cambiar una marca el evento. */
+    @Transaction
+    suspend fun toggleSubtaskCompletion(eventId: String, subtaskTitle: String) {
+        toggleSubtaskRow(eventId, subtaskTitle)
+        markEventChanged(eventId)
+    }
+
+    // region Sincronización
+
+    /** Eventos con cambios locales sin subir o que nunca llegaron a Google. */
+    @Query("SELECT id FROM events WHERE pendingChanges > 0 OR remoteId IS NULL")
+    suspend fun getPendingEventIds(): List<String>
+
+    /** remoteIds sin cambios pendientes que empiezan en el rango: los únicos que puede borrar la sync. */
+    @Query(
+        "SELECT remoteId FROM events WHERE date >= :startEpoch AND date <= :endEpoch " +
+            "AND remoteId IS NOT NULL AND pendingChanges = 0"
+    )
+    suspend fun getSyncedRemoteIdsInRange(startEpoch: Long, endEpoch: Long): List<String>
+
+    /** Ver [TaskDao.markSynced]. */
+    @Query(
+        "UPDATE events SET remoteId = :remoteId, " +
+            "pendingChanges = CASE WHEN pendingChanges = :expectedPending THEN 0 ELSE pendingChanges END " +
+            "WHERE id = :id"
+    )
+    suspend fun markSynced(id: String, remoteId: String, expectedPending: Int)
+
+    @Query("DELETE FROM events WHERE id = :id")
+    suspend fun deleteEventById(id: String)
 
     @Query("DELETE FROM events WHERE remoteId IN (:remoteIds)")
     suspend fun deleteByRemoteIds(remoteIds: List<String>)
 
-    @Query("UPDATE events SET remoteId = :remoteId WHERE id = :id")
-    suspend fun updateRemoteId(id: String, remoteId: String)
-
-    @Query("UPDATE events SET isCompleted = NOT isCompleted WHERE id = :eventId")
-    suspend fun toggleEventCompletion(eventId: String)
-
-    @Query("UPDATE subtasks SET isCompleted = NOT isCompleted WHERE eventId = :eventId AND title = :subtaskTitle")
-    suspend fun toggleSubtaskCompletion(eventId: String, subtaskTitle: String)
+    // endregion
 }

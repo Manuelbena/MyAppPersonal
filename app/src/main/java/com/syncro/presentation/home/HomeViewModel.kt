@@ -57,7 +57,7 @@ class HomeViewModel @Inject constructor(
     private val toggleEventCompletionUseCase: ToggleEventCompletionUseCase,
     private val syncGoogleTasksUseCase: SyncGoogleTasksUseCase,
     private val syncGoogleCalendarUseCase: SyncGoogleCalendarUseCase,
-    private val uploadUnsyncedItemsUseCase: com.syncro.domain.usecase.UploadUnsyncedItemsUseCase,
+    private val pushPendingChangesUseCase: com.syncro.domain.usecase.PushPendingChangesUseCase,
     private val noteRepository: NoteRepository
 ) : ViewModel() {
 
@@ -106,8 +106,8 @@ class HomeViewModel @Inject constructor(
         syncJob = viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
             try {
-                // 1. Primero subimos lo que esté en local y no en Google
-                uploadUnsyncedItemsUseCase(date)
+                // 1. Primero subimos los cambios locales pendientes (de cualquier día) para que la descarga no los pise
+                pushPendingChangesUseCase()
 
                 // 2. Sincronizamos Calendar y Tasks en paralelo
                 val tasksDeferred = async { syncGoogleTasksUseCase(force) }

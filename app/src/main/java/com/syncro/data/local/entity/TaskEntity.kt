@@ -1,5 +1,6 @@
 package com.syncro.data.local.entity
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
@@ -14,5 +15,8 @@ data class TaskEntity(
     val time: String, // HH:mm
     val isCompleted: Boolean = false,
     val categoryText: String? = null,
-    val categoryColor: Int? = null
+    val categoryColor: Int? = null,
+    // Cambios locales aún no confirmados por Google (0 = sincronizada). Contador y no booleano
+    // para no perder un cambio hecho mientras se subía el anterior
+    @ColumnInfo(defaultValue = "0") val pendingChanges: Int = 0
 )

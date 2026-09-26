@@ -19,7 +19,7 @@ class SaveEventUseCase @Inject constructor(
     /**
      * Crea o actualiza un evento. Falla con [InvalidEventTimeRangeException] si la hora de fin es
      * anterior a la de inicio. Un fallo al subir a Google no hace fallar el guardado: el evento
-     * queda en local y se reintentará en la siguiente sincronización.
+     * queda pendiente en local y se sube automáticamente cuando haya conexión.
      */
     suspend operator fun invoke(
         id: String? = null,
@@ -59,17 +59,7 @@ class SaveEventUseCase @Inject constructor(
         )
         val eventId = repository.insertEvent(event, date, location)
 
-        googleSyncRepository.uploadEventToGoogle(
-            eventId = eventId,
-            title = title,
-            description = description,
-            location = location,
-            startDate = date,
-            startTime = startTime,
-            endTime = endTime,
-            category = categoryText,
-            subtasks = subtasks
-        )
+        googleSyncRepository.pushEvent(eventId)
         return Result.success(Unit)
     }
 }

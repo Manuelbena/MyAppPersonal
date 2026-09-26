@@ -11,6 +11,6 @@ class ToggleSubtaskCompletionUseCase @Inject constructor(
     suspend operator fun invoke(eventId: String, subtaskTitle: String) {
         repository.toggleSubtaskCompletion(eventId, subtaskTitle)
         // El estado de las subtareas vive en la descripción del evento en Google ([x] / [ ])
-        googleSyncRepository.updateEventInGoogle(eventId)
+        googleSyncRepository.pushEvent(eventId)
     }
 }

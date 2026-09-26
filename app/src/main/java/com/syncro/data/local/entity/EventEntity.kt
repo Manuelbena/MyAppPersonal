@@ -1,5 +1,6 @@
 package com.syncro.data.local.entity
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
@@ -18,5 +19,7 @@ data class EventEntity(
     val isAllDay: Boolean = false,
     val location: String? = null,
     val notificationEnabled: Boolean = true,
-    val isCompleted: Boolean = false
+    val isCompleted: Boolean = false,
+    // Cambios locales aún no confirmados por Google (0 = sincronizado)
+    @ColumnInfo(defaultValue = "0") val pendingChanges: Int = 0
 )

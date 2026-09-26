@@ -39,9 +39,10 @@ class EventRepositoryImpl @Inject constructor(
         } else {
             UUID.randomUUID().toString()
         }
+        val existing = dao.getEventById(eventId)
         val entity = EventEntity(
             id = eventId,
-            remoteId = event.remoteId,
+            remoteId = event.remoteId ?: existing?.remoteId,
             title = event.title,
             description = event.description,
             date = dateEpoch,
@@ -51,7 +52,8 @@ class EventRepositoryImpl @Inject constructor(
             categoryColor = event.categoryColor.toArgb(),
             priority = event.priority?.name,
             location = location,
-            isCompleted = event.isCompleted
+            isCompleted = event.isCompleted,
+            pendingChanges = (existing?.pendingChanges ?: 0) + 1
         )
 
         // insertEventWithSubtasks siempre limpia las subtareas previas antes de reinsertar,
