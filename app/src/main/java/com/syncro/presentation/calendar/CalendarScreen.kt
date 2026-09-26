@@ -5,6 +5,7 @@ import com.syncro.presentation.components.shareEvent
 import com.syncro.presentation.home.components.TaskDetailDialog
 import com.syncro.presentation.theme.toColor
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -478,7 +479,8 @@ fun EventSnippet(event: SyncroItem.Event) {
 
 /**
  * Las tareas tienen su propio aspecto (círculo de check delante), tengan hora o no, para que no se
- * confundan con los eventos: el estilo sólido es solo para eventos de todo el día.
+ * confundan con los eventos: el estilo sólido es solo para eventos de todo el día. Las tareas de
+ * todo el día van solo con borde.
  */
 @Composable
 fun TaskSnippet(task: SyncroItem.Task) {
@@ -487,7 +489,11 @@ fun TaskSnippet(task: SyncroItem.Task) {
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(4.dp))
-            .background(color.copy(alpha = 0.12f))
+            // Las de todo el día solo llevan borde; las que tienen hora, fondo suave
+            .then(
+                if (task.isAllDay) Modifier.border(1.dp, color, RoundedCornerShape(4.dp))
+                else Modifier.background(color.copy(alpha = 0.12f))
+            )
             .padding(horizontal = 3.dp, vertical = 2.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
