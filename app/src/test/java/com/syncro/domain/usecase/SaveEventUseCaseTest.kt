@@ -108,6 +108,22 @@ class SaveEventUseCaseTest {
         assertTrue(save(startTime = at("00:00"), endTime = at("00:00")).isSuccess)
     }
 
+    @Test
+    fun `un evento que termina al dia siguiente se acepta y guarda su fecha de fin`() = runTest {
+        val result = save(title = "Cena", startTime = at("21:30"), endTime = at("01:00"), endDate = DAY.plusDays(1))
+
+        assertTrue(result.isSuccess)
+        assertEquals(DAY.plusDays(1), events.events.value.values.single().endDate)
+    }
+
+    @Test
+    fun `terminar un dia antes de empezar se rechaza aunque la hora sea posterior`() = runTest {
+        assertRejected(
+            save(startTime = at("09:00"), endTime = at("18:00"), endDate = DAY.minusDays(1)),
+            InvalidEventTimeRangeException::class.java
+        )
+    }
+
     // endregion
 
     // region Editar
@@ -160,6 +176,7 @@ class SaveEventUseCaseTest {
         date: LocalDate = DAY,
         startTime: LocalTime = at("10:00"),
         endTime: LocalTime = at("11:00"),
+        endDate: LocalDate = date,
         priority: Priority? = Priority.MEDIUM,
         subtasks: List<String> = emptyList()
     ) = saveEvent(
@@ -170,6 +187,7 @@ class SaveEventUseCaseTest {
         date = date,
         startTime = startTime,
         endTime = endTime,
+        endDate = endDate,
         categoryText = "Trabajo",
         categoryColor = ArgbColor(0xFF6366F1),
         priority = priority,

@@ -441,6 +441,69 @@ class GoogleSyncRepositoryImplTest {
 
     // endregion
 
+    // region Eventos que cruzan la medianoche o duran varios días
+
+    @Test
+    fun `un evento de Google que cruza la medianoche se importa con su fecha de fin`() = runTest {
+        google.addEvent(timedEvent("g-1", "Cena", DAY, at("21:30"), at("01:00"), endDate = DAY.plusDays(1)))
+
+        repository.syncCalendar(DAY)
+
+        val local = eventDao.getEventByRemoteId("g-1")!!
+        assertEquals(DAY.toEpochDay(), local.date)
+        assertEquals(DAY.plusDays(1).toEpochDay(), local.endDate)
+        assertEquals("01:00", local.endTime)
+    }
+
+    @Test
+    fun `sincronizar el dia siguiente no duplica ni borra un evento que empezo el dia anterior`() = runTest {
+        google.addEvent(timedEvent("g-1", "Cena", DAY, at("21:30"), at("01:00"), endDate = DAY.plusDays(1)))
+        repository.syncCalendar(DAY)
+        val localId = eventDao.getEventByRemoteId("g-1")!!.id
+
+        // Google devuelve el evento también al pedir el día 27, porque lo ocupa en parte
+        repository.syncCalendar(DAY.plusDays(1))
+
+        assertEquals(localId, eventDao.getEventByRemoteId("g-1")!!.id)
+        assertEquals(1, eventDao.getEventsByDate(DAY.plusDays(1).toEpochDay()).first().size)
+    }
+
+    @Test
+    fun `un evento de dia completo de varios dias se importa con su ultimo dia incluido`() = runTest {
+        google.addEvent(allDayEvent("g-1", "Vacaciones", DAY, lastDay = DAY.plusDays(4)))
+
+        repository.syncCalendar(DAY)
+
+        assertEquals(DAY.plusDays(4).toEpochDay(), eventDao.getEventByRemoteId("g-1")!!.endDate)
+    }
+
+    @Test
+    fun `un evento que cruza la medianoche se sube terminando al dia siguiente`() = runTest {
+        eventDao.insertEvent(
+            aSyncedEventEntity(id = "e1", remoteId = null, endDate = DAY.plusDays(1), pendingChanges = 1)
+                .copy(startTime = "21:30", endTime = "01:00")
+        )
+
+        assertTrue(repository.pushEvent("e1").isSuccess)
+
+        val remote = google.events.values.single()
+        assertEquals(DAY.plusDays(1).atTime(1, 0).toInstant(ZoneOffset.UTC).toEpochMilli(), remote.end.dateTime.value)
+    }
+
+    @Test
+    fun `un evento de dia completo de varios dias se sube con fin exclusivo`() = runTest {
+        eventDao.insertEvent(
+            aSyncedEventEntity(id = "e1", remoteId = null, endDate = DAY.plusDays(2), pendingChanges = 1)
+                .copy(startTime = "00:00", endTime = "00:00")
+        )
+
+        repository.pushEvent("e1")
+
+        assertEquals(DAY.plusDays(3).toString(), google.events.values.single().end.date.toStringRfc3339())
+    }
+
+    // endregion
+
     // region Ida y vuelta
 
     @Test

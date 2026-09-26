@@ -59,6 +59,7 @@ fun anEvent(
     title: String = "Evento",
     description: String? = "Descripción",
     date: LocalDate = DAY,
+    endDate: LocalDate = date,
     startTime: LocalTime = at("10:00"),
     endTime: LocalTime = at("11:00"),
     categoryText: String = "Trabajo",
@@ -73,6 +74,7 @@ fun anEvent(
     title = title,
     description = description,
     date = date,
+    endDate = endDate,
     startTime = startTime,
     endTime = endTime,
     categoryText = categoryText,
@@ -114,6 +116,7 @@ fun aSyncedEventEntity(
     id: String = "evento-1",
     remoteId: String? = "google-evento-1",
     date: LocalDate = DAY,
+    endDate: LocalDate = date,
     pendingChanges: Int = 0
 ) = EventEntity(
     id = id,
@@ -121,6 +124,7 @@ fun aSyncedEventEntity(
     title = "Evento sincronizado",
     description = null,
     date = date.toEpochDay(),
+    endDate = endDate.toEpochDay(),
     startTime = "10:00",
     endTime = "11:00",
     categoryText = "Trabajo",

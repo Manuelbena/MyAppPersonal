@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Room
 import com.syncro.data.local.MIGRATION_7_8
 import com.syncro.data.local.MIGRATION_8_9
+import com.syncro.data.local.MIGRATION_9_10
 import com.syncro.data.local.SyncroDatabase
 import com.syncro.data.local.dao.EventDao
 import com.syncro.data.local.dao.NoteDao
@@ -43,7 +44,7 @@ object AppModule {
             SyncroDatabase::class.java,
             "syncro_db"
         )
-            .addMigrations(MIGRATION_7_8, MIGRATION_8_9)
+            .addMigrations(MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10)
             .fallbackToDestructiveMigration(true)
             .build()
     }

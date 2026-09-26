@@ -11,6 +11,8 @@ data class EventEntity(
     val title: String,
     val description: String?,
     val date: Long, // LocalDate.toEpochDay()
+    // Día en que termina (toEpochDay). Distinto de [date] en eventos que cruzan la medianoche
+    @ColumnInfo(defaultValue = "0") val endDate: Long,
     val startTime: String, // HH:mm
     val endTime: String, // HH:mm
     val categoryText: String,

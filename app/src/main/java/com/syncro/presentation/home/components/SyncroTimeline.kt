@@ -76,7 +76,7 @@ fun EventCard(
                     color = MaterialTheme.colorScheme.onBackground
                 )
                 Text(
-                    text = event.endTime.toDisplayTime(),
+                    text = event.endTime.toDisplayTime() + event.extraDaysSuffix(),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 12.sp
                 )
@@ -496,4 +496,10 @@ fun TagChip(text: String, color: Color) {
             )
         }
     }
+}
+
+/** " (+1)" si el evento termina al día siguiente (o "+N" días después); vacío si termina el mismo día. */
+private fun SyncroItem.Event.extraDaysSuffix(): String {
+    val extraDays = java.time.temporal.ChronoUnit.DAYS.between(date, endDate)
+    return if (extraDays > 0) " (+$extraDays)" else ""
 }

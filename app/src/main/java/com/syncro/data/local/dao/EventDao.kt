@@ -13,11 +13,12 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface EventDao {
     @Transaction
-    @Query("SELECT * FROM events WHERE date = :dateEpoch")
+    // Todos los que tocan el día (incluidos los que empezaron antes); la regla exacta está en el dominio
+    @Query("SELECT * FROM events WHERE date <= :dateEpoch AND endDate >= :dateEpoch")
     fun getEventsByDate(dateEpoch: Long): Flow<List<EventWithSubtasks>>
 
     @Transaction
-    @Query("SELECT * FROM events WHERE date >= :startEpoch AND date <= :endEpoch")
+    @Query("SELECT * FROM events WHERE date <= :endEpoch AND endDate >= :startEpoch")
     fun getEventsInRange(startEpoch: Long, endEpoch: Long): Flow<List<EventWithSubtasks>>
 
     @Query("SELECT * FROM events WHERE id = :id")

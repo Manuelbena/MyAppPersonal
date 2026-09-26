@@ -52,15 +52,11 @@ class CalendarViewModel @Inject constructor(
             getEventsInRangeUseCase(start, end),
             getTasksInRangeUseCase(start, end)
         ) { events, tasks ->
-            val allItems = events + tasks
+            // Un evento de varios días aparece en cada uno de ellos (21:30 → 01:00 en ambos días)
+            val eventsByDay = events.flatMap { event -> event.days.map { day -> day to event } }
+            val tasksByDay = tasks.map { it.date to it }
             CalendarUiState(
-                events = allItems.groupBy { item ->
-                    when (item) {
-                        is SyncroItem.Event -> item.date
-                        is SyncroItem.Task -> item.date
-                        is SyncroItem.Note -> item.createdAt.toLocalDate()
-                    }
-                },
+                events = (eventsByDay + tasksByDay).groupBy({ it.first }, { it.second }),
                 selectedMonth = month,
                 selectedDate = selectedDate,
                 isLoading = isLoading

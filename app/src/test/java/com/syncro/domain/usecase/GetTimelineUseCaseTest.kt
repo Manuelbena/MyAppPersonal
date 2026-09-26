@@ -69,6 +69,21 @@ class GetTimelineUseCaseTest {
         assertEquals(2, timeline.first().size)
     }
 
+    @Test
+    fun `un evento que viene del dia anterior aparece el primero del dia siguiente`() = runTest {
+        events.insertEvent(anEvent(title = "Cena", date = DAY.minusDays(1), endDate = DAY, startTime = at("21:30"), endTime = at("01:00")))
+        tasks.insertTask(aTask(title = "Desayuno", time = at("08:00")))
+
+        assertEquals(listOf("Cena", "Desayuno"), getTimeline(DAY).first().map { it.title() })
+    }
+
+    @Test
+    fun `un evento que termina justo a medianoche no aparece al dia siguiente`() = runTest {
+        events.insertEvent(anEvent(title = "Hasta las 00:00", date = DAY.minusDays(1), endDate = DAY, startTime = at("22:00"), endTime = at("00:00")))
+
+        assertTrue(getTimeline(DAY).first().isEmpty())
+    }
+
     private fun SyncroItem.title() = when (this) {
         is SyncroItem.Task -> title
         is SyncroItem.Event -> title

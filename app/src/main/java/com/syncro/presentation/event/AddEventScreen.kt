@@ -27,12 +27,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.syncro.domain.model.Priority
-import com.syncro.domain.model.isValidEventTimeRange
+import com.syncro.domain.model.isValidEventRange
 import com.syncro.presentation.theme.*
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
+import java.time.ZoneOffset
+import java.time.temporal.ChronoUnit
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
@@ -55,13 +57,14 @@ fun AddEventScreen(
         AddEventContent(
             eventToEdit = eventToEdit,
             onDismiss = onDismiss,
-            onSave = { title, desc, loc, date, start, end, catText, catCol, priority, subs ->
+            onSave = { title, desc, loc, date, endDate, start, end, catText, catCol, priority, subs ->
                 viewModel.saveDetailedEvent(
                     id = eventToEdit?.id,
                     title = title, 
                     description = desc, 
                     location = loc, 
                     date = date, 
+                    endDate = endDate,
                     startTime = start, 
                     endTime = end, 
                     categoryText = catText, 
@@ -80,7 +83,7 @@ fun AddEventScreen(
 fun AddEventContent(
     eventToEdit: com.syncro.domain.model.SyncroItem.Event? = null,
     onDismiss: () -> Unit,
-    onSave: (String, String?, String?, LocalDate, LocalTime, LocalTime, String, Color, Priority?, List<String>) -> Unit
+    onSave: (String, String?, String?, LocalDate, LocalDate, LocalTime, LocalTime, String, Color, Priority?, List<String>) -> Unit
 ) {
     var title by remember { mutableStateOf(eventToEdit?.title ?: "") }
     var description by remember { mutableStateOf(eventToEdit?.description ?: "") }
@@ -102,7 +105,7 @@ fun AddEventContent(
     val parsedEndTime = eventToEdit?.endTime ?: LocalTime.now().withMinute(0).plusHours(2)
 
     var startTime by remember { mutableStateOf(parsedStartTime) }
-    var endDate by remember { mutableStateOf(eventToEdit?.date ?: LocalDate.now()) }
+    var endDate by remember { mutableStateOf(eventToEdit?.endDate ?: LocalDate.now()) }
     var endTime by remember { mutableStateOf(parsedEndTime) }
 
     var showDatePicker by remember { mutableStateOf(false) }
@@ -111,7 +114,8 @@ fun AddEventContent(
 
     val dateFormatter = DateTimeFormatter.ofPattern("EEE, d MMM.", Locale("es", "ES"))
     val timeFormatter = DateTimeFormatter.ofPattern("HH:mm")
-    val isTimeRangeValid = isValidEventTimeRange(startTime, endTime)
+    // Se comparan fecha y hora: 21:30 → 01:00 del día siguiente es válido
+    val isTimeRangeValid = isValidEventRange(startDate.atTime(startTime), endDate.atTime(endTime))
     val canSave = title.isNotBlank() && isTimeRangeValid
 
     val categories = listOf(
@@ -148,6 +152,7 @@ fun AddEventContent(
                         description.ifBlank { null }, 
                         location.ifBlank { null }, 
                         startDate, 
+                        endDate,
                         startTime, 
                         endTime, 
                         selectedCategory, 
@@ -223,7 +228,7 @@ fun AddEventContent(
                 )
                 if (!isTimeRangeValid) {
                     Text(
-                        "La hora de fin no puede ser anterior a la de inicio",
+                        if (endDate == startDate) "El evento termina antes de empezar. Si acaba al día siguiente, cambia la fecha de fin" else "El evento no puede terminar antes de empezar",
                         color = MaterialTheme.colorScheme.error,
                         fontSize = 13.sp
                     )
@@ -508,7 +513,8 @@ fun AddEventContent(
     if (showDatePicker) {
         val initialDate = if (pickingStart) startDate else endDate
         val datePickerState = rememberDatePickerState(
-            initialSelectedDateMillis = initialDate.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+            // El DatePicker trabaja en UTC: con la zona local podía preseleccionar el día anterior
+            initialSelectedDateMillis = initialDate.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
         )
         DatePickerDialog(
             onDismissRequest = { showDatePicker = false },
@@ -516,7 +522,13 @@ fun AddEventContent(
                 TextButton(onClick = {
                     datePickerState.selectedDateMillis?.let {
                         val date = Instant.ofEpochMilli(it).atZone(ZoneId.of("UTC")).toLocalDate()
-                        if (pickingStart) startDate = date else endDate = date
+                        if (pickingStart) {
+                            // Mover el inicio arrastra el fin: se conserva la duración, como en Google Calendar
+                            endDate = endDate.plusDays(ChronoUnit.DAYS.between(startDate, date))
+                            startDate = date
+                        } else {
+                            endDate = date
+                        }
                     }
                     showDatePicker = false
                     if (!isAllDay) showTimePicker = true

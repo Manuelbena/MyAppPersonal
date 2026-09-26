@@ -230,6 +230,20 @@ class EventRepositoryImplTest {
         assertEquals(listOf(start.toString(), end.toString()), titles)
     }
 
+    @Test
+    fun `la fecha de fin se conserva al guardar y leer`() = runTest {
+        val id = save(anEvent(date = DAY, endDate = DAY.plusDays(1), startTime = at("21:30"), endTime = at("01:00")))
+
+        assertEquals(DAY.plusDays(1), repository.getEventById(id)!!.endDate)
+    }
+
+    @Test
+    fun `los eventos del dia incluyen los que empezaron el dia anterior`() = runTest {
+        save(anEvent(title = "Cena de ayer", date = DAY.minusDays(1), endDate = DAY, startTime = at("21:30"), endTime = at("01:00")))
+
+        assertEquals(listOf("Cena de ayer"), repository.getEventsByDate(DAY).first().map { it.title })
+    }
+
     // endregion
 
     private suspend fun save(event: SyncroItem.Event): String {

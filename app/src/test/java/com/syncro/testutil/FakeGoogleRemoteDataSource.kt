@@ -144,6 +144,7 @@ class FakeGoogleRemoteDataSource : GoogleRemoteDataSource {
             date: LocalDate,
             start: LocalTime,
             end: LocalTime,
+            endDate: LocalDate = date,
             description: String? = null,
             colorId: String? = null,
             location: String? = null
@@ -154,14 +155,14 @@ class FakeGoogleRemoteDataSource : GoogleRemoteDataSource {
             .setColorId(colorId)
             .setLocation(location)
             .setStart(EventDateTime().setDateTime(DateTime(date.atTime(start).toInstant(ZoneOffset.UTC).toEpochMilli())))
-            .setEnd(EventDateTime().setDateTime(DateTime(date.atTime(end).toInstant(ZoneOffset.UTC).toEpochMilli())))
+            .setEnd(EventDateTime().setDateTime(DateTime(endDate.atTime(end).toInstant(ZoneOffset.UTC).toEpochMilli())))
 
-        /** Evento de día completo: en Google el fin es exclusivo (el día siguiente). */
-        fun allDayEvent(id: String, title: String, date: LocalDate): Event = Event()
+        /** Evento de día completo de [date] a [lastDay]: en Google el fin es exclusivo (el día siguiente). */
+        fun allDayEvent(id: String, title: String, date: LocalDate, lastDay: LocalDate = date): Event = Event()
             .setId(id)
             .setSummary(title)
             .setStart(EventDateTime().setDate(DateTime(date.toString())))
-            .setEnd(EventDateTime().setDate(DateTime(date.plusDays(1).toString())))
+            .setEnd(EventDateTime().setDate(DateTime(lastDay.plusDays(1).toString())))
     }
 }
 

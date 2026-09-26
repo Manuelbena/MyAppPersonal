@@ -57,11 +57,12 @@ class FakeTaskRepository(private val log: CallLog = CallLog()) : TaskRepository 
 class FakeEventRepository(private val log: CallLog = CallLog()) : EventRepository {
     val events = MutableStateFlow<Map<String, SyncroItem.Event>>(emptyMap())
 
+    // Mismo contrato que el repositorio real: los eventos que tocan el día, no solo los que empiezan
     override fun getEventsByDate(date: LocalDate): Flow<List<SyncroItem.Event>> =
-        events.map { all -> all.values.filter { it.date == date } }
+        events.map { all -> all.values.filter { !it.date.isAfter(date) && !it.endDate.isBefore(date) } }
 
     override fun getEventsInRange(startDate: LocalDate, endDate: LocalDate): Flow<List<SyncroItem.Event>> =
-        events.map { all -> all.values.filter { it.date in startDate..endDate } }
+        events.map { all -> all.values.filter { !it.date.isAfter(endDate) && !it.endDate.isBefore(startDate) } }
 
     override suspend fun insertEvent(event: SyncroItem.Event) {
         log.calls += "insertEvent(${event.id})"

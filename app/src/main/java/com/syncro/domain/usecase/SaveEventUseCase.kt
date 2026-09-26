@@ -6,7 +6,7 @@ import com.syncro.domain.model.InvalidEventTimeRangeException
 import com.syncro.domain.model.Priority
 import com.syncro.domain.model.Subtask
 import com.syncro.domain.model.SyncroItem
-import com.syncro.domain.model.isValidEventTimeRange
+import com.syncro.domain.model.isValidEventRange
 import com.syncro.domain.repository.EventRepository
 import com.syncro.domain.repository.GoogleSyncRepository
 import java.time.LocalDate
@@ -22,7 +22,7 @@ class SaveEventUseCase @Inject constructor(
      * Crea (sin [id]) o actualiza un evento.
      *
      * Falla sin guardar nada con [BlankTitleException] si el título está vacío o con
-     * [InvalidEventTimeRangeException] si la hora de fin es anterior a la de inicio.
+     * [InvalidEventTimeRangeException] si termina antes de empezar (se comparan fecha y hora).
      * Un fallo al subir a Google no hace fallar el guardado: el evento queda pendiente en local
      * y se sube automáticamente cuando haya conexión.
      */
@@ -34,13 +34,15 @@ class SaveEventUseCase @Inject constructor(
         date: LocalDate,
         startTime: LocalTime,
         endTime: LocalTime,
+        // Por defecto el mismo día; distinto en eventos que cruzan la medianoche
+        endDate: LocalDate = date,
         categoryText: String,
         categoryColor: ArgbColor,
         priority: Priority?,
         subtasks: List<String>
     ): Result<Unit> {
         if (title.isBlank()) return Result.failure(BlankTitleException())
-        if (!isValidEventTimeRange(startTime, endTime)) {
+        if (!isValidEventRange(date.atTime(startTime), endDate.atTime(endTime))) {
             return Result.failure(InvalidEventTimeRangeException())
         }
 
@@ -55,6 +57,7 @@ class SaveEventUseCase @Inject constructor(
             title = title.trim(),
             description = description,
             date = date,
+            endDate = endDate,
             startTime = startTime,
             endTime = endTime,
             categoryText = categoryText,

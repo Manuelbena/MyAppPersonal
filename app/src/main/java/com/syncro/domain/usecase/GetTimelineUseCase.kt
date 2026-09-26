@@ -9,7 +9,10 @@ import java.time.LocalDate
 import java.time.LocalTime
 import javax.inject.Inject
 
-/** Tareas y eventos de un día en una sola lista, ordenados por hora de inicio. */
+/**
+ * Tareas y eventos de un día en una sola lista, ordenados por la hora a la que empiezan ese día.
+ * Un evento que viene del día anterior (21:30 → 01:00) aparece al principio del día siguiente.
+ */
 class GetTimelineUseCase @Inject constructor(
     private val taskRepository: TaskRepository,
     private val eventRepository: EventRepository
@@ -19,13 +22,14 @@ class GetTimelineUseCase @Inject constructor(
             taskRepository.getTasksByDate(date),
             eventRepository.getEventsByDate(date)
         ) { tasks, events ->
-            (tasks + events).sortedBy { item ->
-                when (item) {
-                    is SyncroItem.Task -> item.time
-                    is SyncroItem.Event -> item.startTime
-                    is SyncroItem.Note -> LocalTime.MIDNIGHT // No llegan aquí: el timeline solo combina tareas y eventos
-                }
-            }
+            // El repositorio devuelve los eventos que tocan el día; la regla exacta es del dominio
+            (tasks + events.filter { it.occursOn(date) }).sortedBy { item -> item.startOn(date) }
         }
+    }
+
+    private fun SyncroItem.startOn(day: LocalDate): LocalTime = when (this) {
+        is SyncroItem.Task -> time
+        is SyncroItem.Event -> if (date.isBefore(day)) LocalTime.MIDNIGHT else startTime
+        is SyncroItem.Note -> LocalTime.MIDNIGHT // No llegan aquí: el timeline solo combina tareas y eventos
     }
 }

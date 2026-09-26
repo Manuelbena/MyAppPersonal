@@ -14,7 +14,7 @@ import com.syncro.data.local.entity.SubtaskEntity
 import com.syncro.data.local.entity.TaskEntity
 import com.syncro.data.remote.GoogleRemoteDataSource
 import com.syncro.data.sync.SyncScheduler
-import com.syncro.domain.model.isValidEventTimeRange
+import com.syncro.domain.model.isValidEventRange
 import com.syncro.domain.repository.GoogleSyncRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -149,19 +149,24 @@ class GoogleSyncRepositoryImpl @Inject constructor(
         val eventId = existing?.id ?: UUID.randomUUID().toString()
         val (description, subtasks) = parseDescription(googleEvent.description.orEmpty(), eventId)
         val (categoryName, categoryColor) = resolveCategory(title, googleEvent.colorId)
+        val isAllDay = googleEvent.start.dateTime == null
+        val startDate = googleEvent.start.toLocalDate()
+        // En los de día completo Google da el fin como exclusivo (el día siguiente al último)
+        val endDate = if (isAllDay) maxOf(startDate, googleEvent.end.toLocalDate().minusDays(1)) else googleEvent.end.toLocalDate()
 
         val entity = EventEntity(
             id = eventId,
             remoteId = googleEvent.id,
             title = cleanTitle(title),
             description = description,
-            date = googleEvent.start.toLocalDate().toEpochDay(),
+            date = startDate.toEpochDay(),
+            endDate = endDate.toEpochDay(),
             startTime = formatTime(googleEvent.start.dateTime),
             endTime = formatTime(googleEvent.end.dateTime),
             categoryText = categoryName,
             categoryColor = categoryColor,
             priority = "MEDIUM",
-            isAllDay = googleEvent.start.dateTime == null,
+            isAllDay = isAllDay,
             location = googleEvent.location,
             isCompleted = isCompletedTitle(title)
         )
@@ -242,9 +247,10 @@ class GoogleSyncRepositoryImpl @Inject constructor(
     private suspend fun pushEventInternal(eventId: String) {
         val local = eventDao.getEventById(eventId) ?: return
         if (local.remoteId != null && local.pendingChanges == 0) return
-        if (!isValidEventTimeRange(LocalTime.parse(local.startTime), LocalTime.parse(local.endTime))) {
-            // Evento guardado antes de existir la validación: Google lo rechazaría siempre (400).
-            // Se queda pendiente hasta que el usuario lo edite y corrija la hora
+        val start = LocalDate.ofEpochDay(local.date).atTime(LocalTime.parse(local.startTime))
+        val end = LocalDate.ofEpochDay(local.endDate).atTime(LocalTime.parse(local.endTime))
+        if (!isValidEventRange(start, end)) {
+            // Google lo rechazaría siempre (400): se queda pendiente hasta que el usuario lo corrija
             Log.w(TAG, "Skipping event with end before start: '${local.title}' on ${LocalDate.ofEpochDay(local.date)}")
             return
         }
@@ -269,6 +275,7 @@ class GoogleSyncRepositoryImpl @Inject constructor(
 
     private fun EventEntity.toGoogleEvent(subtasks: List<SubtaskEntity>): Event {
         val eventDate = LocalDate.ofEpochDay(date)
+        val eventEndDate = LocalDate.ofEpochDay(endDate)
         val googleTitle = if (isCompleted) "$COMPLETED_MARK $title" else title
         val googleDescription = buildDescription(description, subtasks)
         val googleLocation = location
@@ -284,10 +291,10 @@ class GoogleSyncRepositoryImpl @Inject constructor(
             if (allDay) {
                 // En Google el fin de un evento de día completo es exclusivo: el día siguiente
                 setStart(EventDateTime().setDate(DateTime(eventDate.toString())))
-                setEnd(EventDateTime().setDate(DateTime(eventDate.plusDays(1).toString())))
+                setEnd(EventDateTime().setDate(DateTime(eventEndDate.plusDays(1).toString())))
             } else {
                 setStart(eventDateTime(eventDate, start))
-                setEnd(eventDateTime(eventDate, end))
+                setEnd(eventDateTime(eventEndDate, end))
             }
         }
     }

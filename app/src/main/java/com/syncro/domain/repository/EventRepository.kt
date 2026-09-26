@@ -5,6 +5,7 @@ import kotlinx.coroutines.flow.Flow
 import java.time.LocalDate
 
 interface EventRepository {
+    /** Eventos que tocan [date], incluidos los que empezaron antes (filtrar con Event.occursOn). */
     fun getEventsByDate(date: LocalDate): Flow<List<SyncroItem.Event>>
     fun getEventsInRange(startDate: LocalDate, endDate: LocalDate): Flow<List<SyncroItem.Event>>
     /** Crea o sustituye el evento con ese id (el id lo asigna el dominio) y sus subtareas. */

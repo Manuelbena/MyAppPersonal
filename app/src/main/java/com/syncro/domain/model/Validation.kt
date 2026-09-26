@@ -1,15 +1,16 @@
 package com.syncro.domain.model
 
-import java.time.LocalTime
+import java.time.LocalDateTime
 
 /**
- * Un evento ocupa un único día, así que la hora de fin no puede ser anterior a la de inicio.
- * Se admite que sean iguales: los eventos de día completo se guardan como 00:00–00:00.
+ * Un evento no puede terminar antes de empezar. Se compara fecha y hora, así que un evento de
+ * 21:30 a 01:00 del día siguiente es válido. Se admite que coincidan: los eventos de día completo
+ * se guardan como 00:00–00:00.
  */
-fun isValidEventTimeRange(start: LocalTime, end: LocalTime): Boolean = !end.isBefore(start)
+fun isValidEventRange(start: LocalDateTime, end: LocalDateTime): Boolean = !end.isBefore(start)
 
 class InvalidEventTimeRangeException :
-    IllegalArgumentException("La hora de fin no puede ser anterior a la de inicio")
+    IllegalArgumentException("El evento no puede terminar antes de empezar")
 
 class BlankTitleException :
     IllegalArgumentException("El título no puede estar vacío")
