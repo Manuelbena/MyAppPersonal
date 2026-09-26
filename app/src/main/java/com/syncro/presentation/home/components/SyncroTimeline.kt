@@ -33,7 +33,9 @@ import com.syncro.presentation.theme.Slate800
 fun EventCard(
     event: SyncroItem.Event,
     onSubtaskToggle: (String) -> Unit,
-    onToggleEvent: () -> Unit = {}
+    onToggleEvent: () -> Unit = {},
+    onEditClick: () -> Unit = {},
+    onShareClick: () -> Unit = {}
 ) {
     var isSubtasksExpanded by remember { mutableStateOf(true) }
 
@@ -127,6 +129,34 @@ fun EventCard(
                             textDecoration = if (event.isCompleted) TextDecoration.LineThrough else TextDecoration.None,
                             modifier = Modifier.weight(1f)
                         )
+                        
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Rounded.Share,
+                                contentDescription = "Compartir",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier
+                                    .size(20.dp)
+                                    .clickable(
+                                        interactionSource = remember { MutableInteractionSource() },
+                                        indication = null,
+                                        onClick = onShareClick
+                                    )
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Icon(
+                                imageVector = Icons.Rounded.Edit,
+                                contentDescription = "Editar",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier
+                                    .size(20.dp)
+                                    .clickable(
+                                        interactionSource = remember { MutableInteractionSource() },
+                                        indication = null,
+                                        onClick = onEditClick
+                                    )
+                            )
+                        }
                     }
                     
                     if (!event.description.isNullOrEmpty()) {

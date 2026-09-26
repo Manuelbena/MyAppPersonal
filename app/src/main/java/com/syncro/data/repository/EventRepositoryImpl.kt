@@ -72,7 +72,11 @@ class EventRepositoryImpl @Inject constructor(
 
     override suspend fun insertEvent(event: SyncroItem.Event, date: LocalDate, location: String?): String {
         val dateEpoch = date.toEpochDay()
-        val eventId = "${dateEpoch}_${event.title}_${event.startTime}"
+        val eventId = if (event.id != "0" && event.id.isNotEmpty()) {
+            event.id
+        } else {
+            "${dateEpoch}_${event.title}_${event.startTime}_${System.currentTimeMillis()}"
+        }
         val entity = EventEntity(
             id = eventId,
             remoteId = null,

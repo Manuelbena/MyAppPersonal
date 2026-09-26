@@ -46,6 +46,7 @@ fun HomeScreen(
     var showAddItemSheet by remember { mutableStateOf(false) }
     var showQuickTaskSheet by remember { mutableStateOf(false) }
     var showDetailedEventSheet by remember { mutableStateOf(false) }
+    var selectedEventForEdit by remember { mutableStateOf<com.syncro.domain.model.SyncroItem.Event?>(null) }
     var showAddNoteSheet by remember { mutableStateOf(false) }
     var selectedTaskForDetail by remember { mutableStateOf<SyncroItem.Task?>(null) }
     var selectedNoteForDetail by remember { mutableStateOf<SyncroItem.Note?>(null) }
@@ -177,6 +178,12 @@ fun HomeScreen(
                                         },
                                         onToggleEvent = {
                                             viewModel.toggleEventCompletion(item.id)
+                                        },
+                                        onEditClick = {
+                                            selectedEventForEdit = item
+                                        },
+                                        onShareClick = {
+                                            // TODO: Share event
                                         }
                                     )
                                     is SyncroItem.Task -> TaskRow(
@@ -276,9 +283,13 @@ fun HomeScreen(
         )
     }
 
-    if (showDetailedEventSheet) {
+    if (showDetailedEventSheet || selectedEventForEdit != null) {
         AddEventScreen(
-            onDismiss = { showDetailedEventSheet = false }
+            eventToEdit = selectedEventForEdit,
+            onDismiss = { 
+                showDetailedEventSheet = false 
+                selectedEventForEdit = null
+            }
         )
     }
 

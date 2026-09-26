@@ -67,6 +67,7 @@ fun CalendarScreen(
     // Estados para las hojas modales
     var showAddItemSheet by remember { mutableStateOf(false) }
     var showDetailedEventSheet by remember { mutableStateOf(false) }
+    var selectedEventForEdit by remember { mutableStateOf<com.syncro.domain.model.SyncroItem.Event?>(null) }
     var showQuickTaskSheet by remember { mutableStateOf(false) }
     var showAddNoteSheet by remember { mutableStateOf(false) }
 
@@ -183,6 +184,10 @@ fun CalendarScreen(
             date = date,
             items = uiState.events[date] ?: emptyList(),
             onDismiss = { viewModel.onDateSelected(null) },
+            onEditEvent = {
+                viewModel.onDateSelected(null)
+                selectedEventForEdit = it
+            },
             viewModel = viewModel
         )
     }
@@ -215,9 +220,13 @@ fun CalendarScreen(
         )
     }
 
-    if (showDetailedEventSheet) {
+    if (showDetailedEventSheet || selectedEventForEdit != null) {
         AddEventScreen(
-            onDismiss = { showDetailedEventSheet = false }
+            eventToEdit = selectedEventForEdit,
+            onDismiss = { 
+                showDetailedEventSheet = false 
+                selectedEventForEdit = null
+            }
         )
     }
 
@@ -239,6 +248,7 @@ fun DayDetailsDialog(
     date: LocalDate,
     items: List<SyncroItem>,
     onDismiss: () -> Unit,
+    onEditEvent: (SyncroItem.Event) -> Unit,
     viewModel: CalendarViewModel
 ) {
     BasicAlertDialog(
@@ -317,7 +327,9 @@ fun DayDetailsDialog(
                                             },
                                             onToggleEvent = {
                                                 viewModel.toggleEventCompletion(item.id)
-                                            }
+                                            },
+                                            onEditClick = { onEditEvent(item) },
+                                            onShareClick = { /* TODO */ }
                                         )
                                     }
                                     is SyncroItem.Task -> {

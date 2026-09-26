@@ -14,6 +14,7 @@ class SaveEventUseCase @Inject constructor(
     private val googleSyncRepository: GoogleSyncRepository
 ) {
     suspend operator fun invoke(
+        id: String? = null,
         title: String,
         description: String?,
         location: String?,
@@ -26,7 +27,7 @@ class SaveEventUseCase @Inject constructor(
         subtasks: List<String>
     ) {
         val event = SyncroItem.Event(
-            id = "0", // Generated in repository
+            id = id ?: "0", // Generated in repository if "0"
             title = title,
             description = description,
             date = date,

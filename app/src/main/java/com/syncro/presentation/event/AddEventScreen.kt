@@ -38,6 +38,7 @@ import java.util.Locale
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddEventScreen(
+    eventToEdit: com.syncro.domain.model.SyncroItem.Event? = null,
     onDismiss: () -> Unit,
     viewModel: com.syncro.presentation.home.HomeViewModel = hiltViewModel()
 ) {
@@ -51,9 +52,22 @@ fun AddEventScreen(
         shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
     ) {
         AddEventContent(
+            eventToEdit = eventToEdit,
             onDismiss = onDismiss,
             onSave = { title, desc, loc, date, start, end, catText, catCol, priority, subs ->
-                viewModel.saveDetailedEvent(title, desc, loc, date, start, end, catText, catCol, priority, subs)
+                viewModel.saveDetailedEvent(
+                    id = eventToEdit?.id,
+                    title = title, 
+                    description = desc, 
+                    location = loc, 
+                    date = date, 
+                    startTime = start, 
+                    endTime = end, 
+                    categoryText = catText, 
+                    categoryColor = catCol, 
+                    priority = priority, 
+                    subtasks = subs
+                )
                 onDismiss()
             }
         )
@@ -63,26 +77,37 @@ fun AddEventScreen(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddEventContent(
+    eventToEdit: com.syncro.domain.model.SyncroItem.Event? = null,
     onDismiss: () -> Unit,
     onSave: (String, String?, String?, LocalDate, LocalTime, LocalTime, String, Color, Priority?, List<String>) -> Unit
 ) {
-    var title by remember { mutableStateOf("") }
-    var description by remember { mutableStateOf("") }
+    var title by remember { mutableStateOf(eventToEdit?.title ?: "") }
+    var description by remember { mutableStateOf(eventToEdit?.description ?: "") }
     var location by remember { mutableStateOf("") }
-    var selectedCategory by remember { mutableStateOf("Personal") }
-    var selectedPriority by remember { mutableStateOf(Priority.MEDIUM) }
-    var isAllDay by remember { mutableStateOf(false) }
+    var selectedCategory by remember { mutableStateOf(eventToEdit?.categoryText ?: "Personal") }
+    var selectedPriority by remember { mutableStateOf(eventToEdit?.priority ?: Priority.MEDIUM) }
+    var isAllDay by remember { mutableStateOf(eventToEdit?.startTime == "00:00" && eventToEdit.endTime == "00:00") }
     var isRecurring by remember { mutableStateOf(false) }
     var notificationEnabled by remember { mutableStateOf(true) }
 
     // Subtareas
     var subtaskInput by remember { mutableStateOf("") }
-    val subtasks = remember { mutableStateListOf<String>() }
+    val subtasks = remember { mutableStateListOf(*eventToEdit?.subtasks?.map { it.title }?.toTypedArray() ?: arrayOf()) }
 
-    var startDate by remember { mutableStateOf(LocalDate.now()) }
-    var startTime by remember { mutableStateOf(LocalTime.now().withMinute(0).plusHours(1)) }
-    var endDate by remember { mutableStateOf(LocalDate.now()) }
-    var endTime by remember { mutableStateOf(LocalTime.now().withMinute(0).plusHours(2)) }
+    var startDate by remember { mutableStateOf(eventToEdit?.date ?: LocalDate.now()) }
+    
+    // Parse times
+    val parsedStartTime = try { 
+        eventToEdit?.startTime?.let { LocalTime.parse(it) } ?: LocalTime.now().withMinute(0).plusHours(1)
+    } catch (e: Exception) { LocalTime.now().withMinute(0).plusHours(1) }
+    
+    val parsedEndTime = try { 
+        eventToEdit?.endTime?.let { LocalTime.parse(it) } ?: LocalTime.now().withMinute(0).plusHours(2)
+    } catch (e: Exception) { LocalTime.now().withMinute(0).plusHours(2) }
+
+    var startTime by remember { mutableStateOf(parsedStartTime) }
+    var endDate by remember { mutableStateOf(eventToEdit?.date ?: LocalDate.now()) }
+    var endTime by remember { mutableStateOf(parsedEndTime) }
 
     var showDatePicker by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
@@ -113,7 +138,7 @@ fun AddEventContent(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                "Nuevo evento",
+                if (eventToEdit != null) "Editar evento" else "Nuevo evento",
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface

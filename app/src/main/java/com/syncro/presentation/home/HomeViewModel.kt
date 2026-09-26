@@ -166,6 +166,7 @@ class HomeViewModel @Inject constructor(
     }
 
     fun saveDetailedEvent(
+        id: String? = null,
         title: String,
         description: String?,
         location: String?,
@@ -179,6 +180,7 @@ class HomeViewModel @Inject constructor(
     ) {
         viewModelScope.launch {
             saveEventUseCase(
+                id = id,
                 title = title,
                 description = description,
                 location = location,
@@ -190,7 +192,8 @@ class HomeViewModel @Inject constructor(
                 priority = priority,
                 subtasks = subtasks
             )
-            _effect.send(HomeEffect.ShowSnackbar("Evento creado correctamente"))
+            val msg = if (id == null) "Evento creado correctamente" else "Evento actualizado correctamente"
+            _effect.send(HomeEffect.ShowSnackbar(msg))
         }
     }
 
