@@ -14,7 +14,10 @@ import com.syncro.data.repository.GoogleSyncRepositoryImpl
 import com.syncro.data.repository.NoteRepositoryImpl
 import com.syncro.data.repository.TaskRepositoryImpl
 import com.syncro.data.repository.UserRepositoryImpl
+import com.syncro.data.remote.GoogleApiRemoteDataSource
+import com.syncro.data.remote.GoogleRemoteDataSource
 import com.syncro.data.sync.SyncScheduler
+import com.syncro.data.sync.WorkManagerSyncScheduler
 import com.syncro.domain.repository.EventRepository
 import com.syncro.domain.repository.GoogleSyncRepository
 import com.syncro.domain.repository.NoteRepository
@@ -96,13 +99,25 @@ object AppModule {
 
     @Provides
     @Singleton
+    fun provideGoogleRemoteDataSource(@ApplicationContext context: Context, userDao: UserDao): GoogleRemoteDataSource {
+        return GoogleApiRemoteDataSource(context, userDao)
+    }
+
+    @Provides
+    @Singleton
+    fun provideSyncScheduler(@ApplicationContext context: Context): SyncScheduler {
+        return WorkManagerSyncScheduler(context)
+    }
+
+    @Provides
+    @Singleton
     fun provideGoogleSyncRepository(
-        @ApplicationContext context: Context,
-        userDao: UserDao,
+        remote: GoogleRemoteDataSource,
         taskDao: TaskDao,
         eventDao: EventDao,
-        syncScheduler: SyncScheduler
+        syncScheduler: SyncScheduler,
+        clock: Clock
     ): GoogleSyncRepository {
-        return GoogleSyncRepositoryImpl(context, userDao, taskDao, eventDao, syncScheduler)
+        return GoogleSyncRepositoryImpl(remote, taskDao, eventDao, syncScheduler, clock)
     }
 }

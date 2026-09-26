@@ -1,34 +1,27 @@
 package com.syncro.data.repository
 
-import android.accounts.Account
-import android.content.Context
 import android.util.Log
-import com.google.api.client.googleapis.extensions.android.gms.auth.GoogleAccountCredential
 import com.google.api.client.googleapis.json.GoogleJsonResponseException
-import com.google.api.client.http.javanet.NetHttpTransport
-import com.google.api.client.json.gson.GsonFactory
 import com.google.api.client.util.Data
 import com.google.api.client.util.DateTime
-import com.google.api.services.calendar.Calendar
 import com.google.api.services.calendar.model.Event
 import com.google.api.services.calendar.model.EventDateTime
-import com.google.api.services.tasks.Tasks
 import com.google.api.services.tasks.model.Task
 import com.syncro.data.local.dao.EventDao
 import com.syncro.data.local.dao.TaskDao
-import com.syncro.data.local.dao.UserDao
 import com.syncro.data.local.entity.EventEntity
 import com.syncro.data.local.entity.SubtaskEntity
 import com.syncro.data.local.entity.TaskEntity
+import com.syncro.data.remote.GoogleRemoteDataSource
 import com.syncro.data.sync.SyncScheduler
 import com.syncro.domain.model.isValidEventTimeRange
 import com.syncro.domain.repository.GoogleSyncRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
@@ -39,16 +32,15 @@ import java.util.UUID
 import javax.inject.Inject
 
 class GoogleSyncRepositoryImpl @Inject constructor(
-    private val context: Context,
-    private val userDao: UserDao,
+    private val remote: GoogleRemoteDataSource,
     private val taskDao: TaskDao,
     private val eventDao: EventDao,
     private val syncScheduler: SyncScheduler,
+    // Fuente de "ahora" y de la zona horaria: en los tests es un reloj fijo
+    private val clock: Clock,
 ) : GoogleSyncRepository {
 
-    private val jsonFactory = GsonFactory.getDefaultInstance()
-    private val transport = NetHttpTransport()
-    private val zone: ZoneId get() = ZoneId.systemDefault()
+    private val zone: ZoneId get() = clock.zone
 
     // Home y Calendario piden la sync de tareas a la vez y en cada cambio de día/mes, pero siempre
     // descarga lo mismo: se serializa y se omite si la última terminó hace menos de TASKS_SYNC_MIN_INTERVAL_MS
@@ -58,34 +50,23 @@ class GoogleSyncRepositoryImpl @Inject constructor(
     // region Sincronización Google -> local
 
     override suspend fun syncTasks(force: Boolean): Result<Unit> = tasksSyncMutex.withLock {
-        if (!force && System.currentTimeMillis() - lastTasksSyncAt < TASKS_SYNC_MIN_INTERVAL_MS) {
+        if (!force && clock.millis() - lastTasksSyncAt < TASKS_SYNC_MIN_INTERVAL_MS) {
             return@withLock Result.success(Unit)
         }
         runGoogleCall("syncTasks") { downloadAllTasks() }
-            .onSuccess { lastTasksSyncAt = System.currentTimeMillis() }
+            .onSuccess { lastTasksSyncAt = clock.millis() }
     }
 
     private suspend fun downloadAllTasks() {
         // Foto local tomada antes de descargar: una tarea subida durante la sync no se borra
         val localRemoteIds = taskDao.getSyncedRemoteIds()
-        val service = tasksService()
         val remoteIds = mutableSetOf<String>()
 
-        for (taskList in service.tasklists().list().execute().items.orEmpty()) {
-            var pageToken: String? = null
-            do {
-                val response = service.tasks().list(taskList.id)
-                    // Las apps de Google ocultan las tareas completadas; sin esto se darían por borradas
-                    .setShowHidden(true)
-                    .setMaxResults(MAX_TASKS_PER_PAGE)
-                    .setPageToken(pageToken)
-                    .execute()
-                response.items.orEmpty().forEach {
-                    remoteIds += it.id
-                    saveRemoteTask(it, taskList.id)
-                }
-                pageToken = response.nextPageToken
-            } while (pageToken != null)
+        for (taskListId in remote.listTaskListIds()) {
+            remote.listTasks(taskListId).forEach {
+                remoteIds += it.id
+                saveRemoteTask(it, taskListId)
+            }
         }
 
         deleteStale(localRemoteIds, remoteIds, taskDao::deleteByRemoteIds)
@@ -98,26 +79,14 @@ class GoogleSyncRepositoryImpl @Inject constructor(
         require(!endDate.isBefore(startDate)) { "endDate ($endDate) is before startDate ($startDate)" }
         // Solo se comparan para borrado los eventos locales que empiezan dentro del rango
         val localRemoteIds = eventDao.getSyncedRemoteIdsInRange(startDate.toEpochDay(), endDate.toEpochDay())
-        val service = calendarService()
         val timeMin = DateTime(startDate.atStartOfDay(zone).toInstant().toEpochMilli())
         val timeMax = DateTime(endDate.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli())
         val remoteIds = mutableSetOf<String>()
 
-        var pageToken: String? = null
-        do {
-            val response = service.events().list(PRIMARY_CALENDAR)
-                .setTimeMin(timeMin)
-                .setTimeMax(timeMax)
-                .setOrderBy("startTime")
-                .setSingleEvents(true)
-                .setPageToken(pageToken)
-                .execute()
-            response.items.orEmpty().forEach {
-                remoteIds += it.id
-                saveRemoteEvent(it)
-            }
-            pageToken = response.nextPageToken
-        } while (pageToken != null)
+        remote.listEvents(timeMin, timeMax).forEach {
+            remoteIds += it.id
+            saveRemoteEvent(it)
+        }
 
         deleteStale(localRemoteIds, remoteIds, eventDao::deleteByRemoteIds)
     }
@@ -246,20 +215,19 @@ class GoogleSyncRepositoryImpl @Inject constructor(
             setStatus(if (task.isCompleted) TASK_STATUS_COMPLETED else TASK_STATUS_NEEDS_ACTION)
             // En un patch, null significa "no tocar"; NULL_STRING borra la fecha de completado
             setCompleted(
-                if (task.isCompleted) DateTime(System.currentTimeMillis()).toStringRfc3339() else Data.NULL_STRING
+                if (task.isCompleted) DateTime(clock.millis()).toStringRfc3339() else Data.NULL_STRING
             )
         }
-        val service = tasksService()
         val remoteId = task.remoteId
         val syncedRemoteId = if (remoteId == null) {
             // La fecha solo se envía al crear: así un patch no añade fecha a tareas que no la tienen.
             // Google Tasks solo guarda la fecha de vencimiento; la hora se descarta
             body.setDue("${LocalDate.ofEpochDay(task.date)}T00:00:00.000Z")
-            service.tasks().insert(DEFAULT_TASK_LIST, body).execute().id
+            remote.insertTask(DEFAULT_TASK_LIST, body).id
         } else {
             try {
                 // Las tareas sin lista conocida (creadas desde la app o previas a la migración) están en @default
-                service.tasks().patch(task.taskListId ?: DEFAULT_TASK_LIST, remoteId, body).execute()
+                remote.patchTask(task.taskListId ?: DEFAULT_TASK_LIST, remoteId, body)
                 remoteId
             } catch (e: GoogleJsonResponseException) {
                 if (!e.isNotFound()) throw e
@@ -282,14 +250,12 @@ class GoogleSyncRepositoryImpl @Inject constructor(
         }
 
         val body = local.toGoogleEvent(eventDao.getSubtasksForEvent(eventId))
-        val service = calendarService()
         val remoteId = local.remoteId
         val syncedRemoteId = if (remoteId == null) {
-            service.events().insert(PRIMARY_CALENDAR, body).execute().id
+            remote.insertEvent(body).id
         } else {
             try {
-                // Patch y no update: conserva en Google lo que la app no gestiona (invitados, avisos…)
-                service.events().patch(PRIMARY_CALENDAR, remoteId, body).execute()
+                remote.patchEvent(remoteId, body)
                 remoteId
             } catch (e: GoogleJsonResponseException) {
                 if (!e.isNotFound()) throw e
@@ -349,24 +315,6 @@ class GoogleSyncRepositoryImpl @Inject constructor(
                 Result.failure(e)
             }
         }
-
-    private suspend fun credentialFor(scope: String): GoogleAccountCredential {
-        val email = userDao.getUser().first()?.email ?: throw IllegalStateException("No user logged in")
-        require(email.contains("@") && !email.equals("null", ignoreCase = true)) { "Invalid user email: $email" }
-        return GoogleAccountCredential.usingOAuth2(context, listOf(scope)).apply {
-            selectedAccount = Account(email, "com.google")
-        }
-    }
-
-    private suspend fun tasksService(): Tasks =
-        Tasks.Builder(transport, jsonFactory, credentialFor(TASKS_SCOPE))
-            .setApplicationName(APP_NAME)
-            .build()
-
-    private suspend fun calendarService(): Calendar =
-        Calendar.Builder(transport, jsonFactory, credentialFor(CALENDAR_SCOPE))
-            .setApplicationName(APP_NAME)
-            .build()
 
     // endregion
 
@@ -473,14 +421,9 @@ class GoogleSyncRepositoryImpl @Inject constructor(
 
     private companion object {
         const val TAG = "GoogleSync"
-        const val APP_NAME = "Syncro"
-        const val TASKS_SCOPE = "https://www.googleapis.com/auth/tasks"
-        const val CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar"
-        const val PRIMARY_CALENDAR = "primary"
         const val DEFAULT_TASK_LIST = "@default"
         const val TASK_STATUS_COMPLETED = "completed"
         const val TASK_STATUS_NEEDS_ACTION = "needsAction"
-        const val MAX_TASKS_PER_PAGE = 100
         const val TASKS_SYNC_MIN_INTERVAL_MS = 60_000L
         const val DEFAULT_TASK_TIME = "09:00"
         const val ALL_DAY_TIME = "00:00" // Los eventos de día completo se guardan como 00:00–00:00
