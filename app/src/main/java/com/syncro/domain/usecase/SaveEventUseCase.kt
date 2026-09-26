@@ -7,6 +7,7 @@ import com.syncro.domain.model.Priority
 import com.syncro.domain.model.Subtask
 import com.syncro.domain.model.SyncroItem
 import com.syncro.domain.model.isValidEventRange
+import com.syncro.domain.model.toSentenceCase
 import com.syncro.domain.repository.EventRepository
 import com.syncro.domain.repository.GoogleSyncRepository
 import java.time.LocalDate
@@ -49,13 +50,15 @@ class SaveEventUseCase @Inject constructor(
         // Al editar se conservan el remoteId (para actualizar en Google en vez de duplicar),
         // el estado de completado y el de las subtareas que sigan existiendo
         val existing = id?.let { repository.getEventById(it) }
-        val completedSubtasks = existing?.subtasks.orEmpty().filter { it.isCompleted }.map { it.title }.toSet()
+        // Sin distinguir mayúsculas: una subtarea "comprar pan" de Google que ahora se guarda como
+        // "Comprar pan" sigue siendo la misma y no debe perder su check
+        val completedSubtasks = existing?.subtasks.orEmpty().filter { it.isCompleted }.map { it.title.lowercase() }.toSet()
 
         val event = SyncroItem.Event(
             id = id ?: UUID.randomUUID().toString(),
             remoteId = existing?.remoteId,
-            title = title.trim(),
-            description = description,
+            title = title.toSentenceCase(),
+            description = description?.toSentenceCase(),
             date = date,
             endDate = endDate,
             startTime = startTime,
@@ -63,9 +66,10 @@ class SaveEventUseCase @Inject constructor(
             categoryText = categoryText,
             categoryColor = categoryColor,
             priority = priority,
-            subtasks = subtasks.map { Subtask(it, it in completedSubtasks) },
+            subtasks = subtasks.map { it.toSentenceCase() }.filter { it.isNotEmpty() }
+                .map { Subtask(it, it.lowercase() in completedSubtasks) },
             isCompleted = existing?.isCompleted ?: false,
-            location = location
+            location = location?.toSentenceCase()
         )
         repository.insertEvent(event)
 

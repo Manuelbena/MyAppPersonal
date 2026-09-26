@@ -1,5 +1,7 @@
 package com.syncro.presentation.event
 
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -178,6 +180,7 @@ fun AddEventContent(
         
         // Título
         TextField(
+            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
             value = title,
             onValueChange = { title = it },
             placeholder = { 
@@ -299,6 +302,7 @@ fun AddEventContent(
         // Descripción
         EventSection(icon = Icons.AutoMirrored.Rounded.Notes) {
             TextField(
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
                 value = description,
                 onValueChange = { description = it },
                 placeholder = { 
@@ -329,6 +333,7 @@ fun AddEventContent(
         // Ubicación (Minimalista como título)
         EventSection(icon = Icons.Rounded.LocationOn) {
             TextField(
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
                 value = location,
                 onValueChange = { location = it },
                 placeholder = { 
@@ -398,6 +403,7 @@ fun AddEventContent(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     TextField(
+                        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
                         value = subtaskInput,
                         onValueChange = { subtaskInput = it },
                         placeholder = { 

@@ -84,6 +84,33 @@ class SaveEventUseCaseTest {
         assertEquals("Reunión", events.events.value.values.single().title)
     }
 
+    @Test
+    fun `los textos del usuario se guardan empezando en mayuscula`() = runTest {
+        saveEvent(
+            id = null, title = "cena con Ana", description = "llevar postre", location = "casa de Ana",
+            date = DAY, startTime = at("21:00"), endTime = at("23:00"),
+            categoryText = "Ocio", categoryColor = ArgbColor(0xFFF59E0B), priority = null,
+            subtasks = listOf("comprar tarta", "  ")
+        )
+
+        val saved = events.events.value.values.single()
+        assertEquals("Cena con Ana", saved.title)
+        assertEquals("Llevar postre", saved.description)
+        assertEquals("Casa de Ana", saved.location)
+        // Las subtareas vacías se descartan
+        assertEquals(listOf(Subtask("Comprar tarta", false)), saved.subtasks)
+    }
+
+    @Test
+    fun `al editar, una subtarea hecha en minusculas conserva su check al pasar a mayuscula`() = runTest {
+        // Las subtareas que vienen de Google pueden estar en minúsculas
+        events.insertEvent(anEvent(id = "e1", subtasks = listOf(Subtask("comprar pan", true))))
+
+        save(id = "e1", subtasks = listOf("comprar pan"))
+
+        assertEquals(listOf(Subtask("Comprar pan", true)), events.events.value.getValue("e1").subtasks)
+    }
+
     // endregion
 
     // region Validación: si falla, no se guarda ni se sube nada

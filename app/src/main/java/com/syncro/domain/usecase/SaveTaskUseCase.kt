@@ -3,6 +3,7 @@ package com.syncro.domain.usecase
 import com.syncro.domain.model.ArgbColor
 import com.syncro.domain.model.BlankTitleException
 import com.syncro.domain.model.SyncroItem
+import com.syncro.domain.model.toSentenceCase
 import com.syncro.domain.repository.GoogleSyncRepository
 import com.syncro.domain.repository.TaskRepository
 import java.time.LocalDate
@@ -31,8 +32,8 @@ class SaveTaskUseCase @Inject constructor(
 
         val task = SyncroItem.Task(
             id = UUID.randomUUID().toString(),
-            title = title.trim(),
-            description = description,
+            title = title.toSentenceCase(),
+            description = description.toSentenceCase(),
             date = date,
             time = time,
             isCompleted = false,

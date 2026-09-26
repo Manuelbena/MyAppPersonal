@@ -1,5 +1,7 @@
 package com.syncro.presentation.home.components
 
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -68,6 +70,7 @@ fun QuickTaskSheet(
                 .navigationBarsPadding()
         ) {
             BasicTextField(
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
                 value = title,
                 onValueChange = { title = it },
                 modifier = Modifier.fillMaxWidth(),
@@ -93,6 +96,7 @@ fun QuickTaskSheet(
             if (showDescriptionField) {
                 Spacer(modifier = Modifier.height(12.dp))
                 TextField(
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
                     value = description,
                     onValueChange = { description = it },
                     placeholder = { Text("Añadir detalles...") },

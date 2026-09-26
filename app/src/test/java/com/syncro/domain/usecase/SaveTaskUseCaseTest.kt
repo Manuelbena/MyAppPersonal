@@ -66,6 +66,15 @@ class SaveTaskUseCaseTest {
     }
 
     @Test
+    fun `el titulo y la descripcion se guardan empezando en mayuscula`() = runTest {
+        saveTask(title = "tomar creatina", description = "después de entrenar", date = DAY, time = at("10:00"))
+
+        val saved = tasks.tasks.value.values.single()
+        assertEquals("Tomar creatina", saved.title)
+        assertEquals("Después de entrenar", saved.description)
+    }
+
+    @Test
     fun `sin conexion la tarea se guarda igualmente`() = runTest {
         google.isOffline = true
 
