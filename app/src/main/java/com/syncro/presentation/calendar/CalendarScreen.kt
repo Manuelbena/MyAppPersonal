@@ -15,6 +15,8 @@ import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.rounded.CalendarMonth
+import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.RadioButtonUnchecked
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -23,6 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -473,17 +476,43 @@ fun EventSnippet(event: SyncroItem.Event) {
     ItemSnippet(title = event.title, color = event.categoryColor.toColor(), isAllDay = event.isAllDay)
 }
 
+/**
+ * Las tareas tienen su propio aspecto (círculo de check delante), tengan hora o no, para que no se
+ * confundan con los eventos: el estilo sólido es solo para eventos de todo el día.
+ */
 @Composable
 fun TaskSnippet(task: SyncroItem.Task) {
-    ItemSnippet(
-        title = task.title,
-        color = task.categoryColor?.toColor() ?: MaterialTheme.colorScheme.secondary,
-        isAllDay = task.isAllDay
-    )
+    val color = task.categoryColor?.toColor() ?: MaterialTheme.colorScheme.secondary
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(4.dp))
+            .background(color.copy(alpha = 0.12f))
+            .padding(horizontal = 3.dp, vertical = 2.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                imageVector = if (task.isCompleted) Icons.Rounded.CheckCircle else Icons.Rounded.RadioButtonUnchecked,
+                contentDescription = if (task.isCompleted) "Tarea completada" else "Tarea",
+                tint = color,
+                modifier = Modifier.size(9.dp)
+            )
+            Spacer(modifier = Modifier.width(3.dp))
+            Text(
+                text = task.title,
+                fontSize = 8.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                color = MaterialTheme.colorScheme.onSurface,
+                textDecoration = if (task.isCompleted) TextDecoration.LineThrough else null,
+                lineHeight = 10.sp
+            )
+        }
+    }
 }
 
 /**
- * Etiqueta de un elemento dentro de la celda del día. Los de todo el día van como una barra de
+ * Etiqueta de un evento dentro de la celda del día. Los de todo el día van como una barra de
  * color sólido con texto blanco (como en Google Calendar); los que tienen hora, con fondo suave
  * y una marca de color, para distinguirlos de un vistazo.
  */
