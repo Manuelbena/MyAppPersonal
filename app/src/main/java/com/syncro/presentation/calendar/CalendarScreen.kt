@@ -1,5 +1,8 @@
 package com.syncro.presentation.calendar
 
+import androidx.compose.ui.platform.LocalContext
+import com.syncro.presentation.components.shareEvent
+import com.syncro.presentation.home.components.TaskDetailDialog
 import com.syncro.presentation.theme.toColor
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -114,6 +117,9 @@ fun CalendarScreen(
                 onNextMonth = {
                     val next = state.firstVisibleMonth.yearMonth.plusMonths(1)
                     coroutineScope.launch { state.animateScrollToMonth(next) }
+                },
+                onTodayClick = {
+                    coroutineScope.launch { state.animateScrollToMonth(YearMonth.now()) }
                 }
             )
 
@@ -252,6 +258,17 @@ fun DayDetailsDialog(
     onEditEvent: (SyncroItem.Event) -> Unit,
     viewModel: CalendarViewModel
 ) {
+    val context = LocalContext.current
+    var selectedTask by remember { mutableStateOf<SyncroItem.Task?>(null) }
+
+    selectedTask?.let { task ->
+        TaskDetailDialog(
+            task = task,
+            onDismiss = { selectedTask = null },
+            onComplete = { viewModel.toggleTaskCompletion(task.id) }
+        )
+    }
+
     BasicAlertDialog(
         onDismissRequest = onDismiss,
         properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false),
@@ -330,14 +347,14 @@ fun DayDetailsDialog(
                                                 viewModel.toggleEventCompletion(item.id)
                                             },
                                             onEditClick = { onEditEvent(item) },
-                                            onShareClick = { /* TODO */ }
+                                            onShareClick = { context.shareEvent(item) }
                                         )
                                     }
                                     is SyncroItem.Task -> {
                                         TaskRow(
                                             task = item,
-                                            onToggle = { /* TODO */ },
-                                            onClick = { /* TODO */ }
+                                            onToggle = { viewModel.toggleTaskCompletion(item.id) },
+                                            onClick = { selectedTask = item }
                                         )
                                     }
                                     is SyncroItem.Note -> {}
@@ -355,7 +372,8 @@ fun DayDetailsDialog(
 fun CalendarHeader(
     selectedMonth: YearMonth,
     onPreviousMonth: () -> Unit,
-    onNextMonth: () -> Unit
+    onNextMonth: () -> Unit,
+    onTodayClick: () -> Unit
 ) {
     Row(
         modifier = Modifier
@@ -380,8 +398,8 @@ fun CalendarHeader(
         }
 
         Row {
-            IconButton(onClick = { /* TODO */ }) {
-                Icon(Icons.Rounded.CalendarMonth, contentDescription = null)
+            IconButton(onClick = onTodayClick) {
+                Icon(Icons.Rounded.CalendarMonth, contentDescription = "Ir al mes actual")
             }
         }
     }

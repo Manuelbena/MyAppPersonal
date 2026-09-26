@@ -1,5 +1,6 @@
 package com.syncro.presentation.navigation
 
+import android.annotation.SuppressLint
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.core.EaseInOutQuart
 import androidx.compose.animation.core.EaseOutQuart
@@ -18,6 +19,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -26,8 +28,10 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.syncro.presentation.AuthViewModel
+import com.syncro.presentation.SessionState
 import com.syncro.presentation.assistant.AssistantMainScreen
 import com.syncro.presentation.calendar.CalendarScreen
+import com.syncro.presentation.components.ComingSoonScreen
 import com.syncro.presentation.event.AddEventScreen
 import com.syncro.presentation.home.HomeScreen
 import com.syncro.presentation.login.LoginScreen
@@ -35,20 +39,22 @@ import com.syncro.presentation.notes.NotesListScreen
 import com.syncro.presentation.theme.SyncroTheme
 import com.syncro.presentation.theme.ThemeViewModel
 
+// Diseño a pantalla completa: la barra inferior flota sobre el contenido, así que el padding del
+// Scaffold se ignora a propósito (cada pantalla deja su propio margen inferior)
+@SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
 @Composable
 fun MainScaffold(
     themeViewModel: ThemeViewModel = hiltViewModel(),
     authViewModel: AuthViewModel = hiltViewModel()
 ) {
     val isDarkTheme by themeViewModel.isDarkTheme.collectAsState()
-    val currentUser by authViewModel.currentUser.collectAsState()
+    val session by authViewModel.session.collectAsState()
     val navController = rememberNavController()
 
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
     
-    val showBottomBar = currentRoute != AppScreen.AddEvent.route && 
-                       currentRoute != AppScreen.Login.route && 
+    val showBottomBar = currentRoute != AppScreen.Login.route && 
                        currentRoute != AppScreen.NotesList.route
 
     SyncroTheme(darkTheme = isDarkTheme) {
@@ -57,6 +63,13 @@ fun MainScaffold(
                 .fillMaxSize()
                 .background(MaterialTheme.colorScheme.background)
         ) {
+            // Mientras se lee la sesión no se muestra nada: evita el parpadeo del login
+            if (session == SessionState.Loading) return@Box
+            // Se decide una sola vez; después, login -> inicio lo gestiona la propia navegación
+            val startDestination = remember {
+                if (session is SessionState.LoggedIn) AppScreen.Home.route else AppScreen.Login.route
+            }
+
             Scaffold(
                 bottomBar = {
                     if (showBottomBar) {
@@ -77,11 +90,11 @@ fun MainScaffold(
                 },
                 containerColor = Color.Transparent,
                 contentWindowInsets = WindowInsets(0, 0, 0, 0)
-            ) { paddingValues ->
-                // Ingnoramos paddingValues para que el contenido sea inmersivo
+            ) { _ ->
+                // Sin padding a propósito: el contenido va a pantalla completa y la barra flota encima
                 NavHost(
                     navController = navController,
-                    startDestination = if (currentUser == null) AppScreen.Login.route else AppScreen.Home.route,
+                    startDestination = startDestination,
                     modifier = Modifier.fillMaxSize(),
                     enterTransition = {
                         val initialRoute = initialState.destination.route
@@ -144,7 +157,6 @@ fun MainScaffold(
                      HomeScreen(
                          isDarkTheme = isDarkTheme,
                          onThemeToggle = { themeViewModel.toggleTheme() },
-                         onNavigateToAddEvent = { /* Ya no navegamos, se gestiona internamente */ },
                          onNavigateToNotes = { navController.navigate(AppScreen.NotesList.route) }
                      )
                 }
@@ -157,12 +169,15 @@ fun MainScaffold(
                      CalendarScreen()
                 }
                 composable(AppScreen.Savings.route) {
-                     //SavingsScreen()
+                    ComingSoonScreen(
+                        icon = AppScreen.Savings.icon,
+                        title = "Ahorros",
+                        description = "Controla tus objetivos de ahorro junto a tus tareas y eventos."
+                    )
                 }
                 composable(AppScreen.Assistant.route) {
                      AssistantMainScreen()
                 }
-                // Quitamos la ruta separada de AddEvent para evitar el pantallazo blanco
                 }
             }
         }

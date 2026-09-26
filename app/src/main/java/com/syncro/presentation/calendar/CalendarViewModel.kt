@@ -9,6 +9,7 @@ import com.syncro.domain.usecase.SyncGoogleCalendarUseCase
 import com.syncro.domain.usecase.SyncGoogleTasksUseCase
 import com.syncro.domain.usecase.ToggleEventCompletionUseCase
 import com.syncro.domain.usecase.ToggleSubtaskCompletionUseCase
+import com.syncro.domain.usecase.ToggleTaskCompletionUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
@@ -35,7 +36,8 @@ class CalendarViewModel @Inject constructor(
     private val syncGoogleCalendarUseCase: SyncGoogleCalendarUseCase,
     private val syncGoogleTasksUseCase: SyncGoogleTasksUseCase,
     private val toggleEventCompletionUseCase: ToggleEventCompletionUseCase,
-    private val toggleSubtaskCompletionUseCase: ToggleSubtaskCompletionUseCase
+    private val toggleSubtaskCompletionUseCase: ToggleSubtaskCompletionUseCase,
+    private val toggleTaskCompletionUseCase: ToggleTaskCompletionUseCase
 ) : ViewModel() {
 
     private val _selectedMonth = MutableStateFlow(YearMonth.now())
@@ -78,6 +80,12 @@ class CalendarViewModel @Inject constructor(
 
     fun onDateSelected(date: LocalDate?) {
         _selectedDate.value = date
+    }
+
+    fun toggleTaskCompletion(taskId: String) {
+        viewModelScope.launch {
+            toggleTaskCompletionUseCase(taskId)
+        }
     }
 
     fun toggleEventCompletion(eventId: String) {

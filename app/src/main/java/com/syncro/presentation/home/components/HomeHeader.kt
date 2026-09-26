@@ -4,7 +4,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.DarkMode
 import androidx.compose.material.icons.outlined.LightMode
-import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Today
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -19,7 +18,6 @@ import com.syncro.presentation.components.SyncroIconButton
 fun HomeHeader(
     userName: String,
     currentDate: String,
-    onSettingsClick: () -> Unit,
     onThemeToggle: () -> Unit,
     isDarkTheme: Boolean,
     onTodayClick: () -> Unit,
@@ -34,7 +32,7 @@ fun HomeHeader(
     ) {
         Column {
             Text(
-                text = "Hola, $userName",
+                text = if (userName.isBlank()) "Hola" else "Hola, $userName",
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onBackground
@@ -55,10 +53,6 @@ fun HomeHeader(
             SyncroIconButton(
                 icon = if (isDarkTheme) Icons.Outlined.LightMode else Icons.Outlined.DarkMode,
                 onClick = onThemeToggle
-            )
-            SyncroIconButton(
-                icon = Icons.Outlined.Settings,
-                onClick = onSettingsClick
             )
         }
     }

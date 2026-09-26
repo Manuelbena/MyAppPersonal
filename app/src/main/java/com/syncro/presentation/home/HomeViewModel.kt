@@ -8,7 +8,6 @@ import androidx.lifecycle.viewModelScope
 import com.google.api.client.googleapis.extensions.android.gms.auth.UserRecoverableAuthIOException
 import androidx.compose.ui.graphics.Color
 import com.syncro.domain.model.Priority
-import com.syncro.domain.model.QuotesProvider
 import com.syncro.domain.model.SyncroItem
 import com.syncro.domain.usecase.GetTimelineUseCase
 import com.syncro.domain.usecase.SaveEventUseCase
@@ -20,6 +19,8 @@ import com.syncro.domain.usecase.ToggleSubtaskCompletionUseCase
 import com.syncro.domain.usecase.ToggleTaskCompletionUseCase
 import com.syncro.domain.usecase.DeleteNoteUseCase
 import com.syncro.domain.usecase.GetNotesUseCase
+import com.syncro.domain.usecase.GetDailyQuoteUseCase
+import com.syncro.domain.usecase.GetLocalUserUseCase
 import com.syncro.domain.usecase.SaveNoteUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -33,10 +34,11 @@ import java.time.LocalTime
 import javax.inject.Inject
 
 data class HomeUiState(
-    val userName: String = "Manuel",
+    /** Nombre de pila del usuario; vacío si Google no lo proporciona. */
+    val userName: String = "",
     val selectedDate: LocalDate = LocalDate.now(),
-    val quote: String = "La mejor manera de empezar es dejar de hablar y empezar a hacer.",
-    val quoteAuthor: String = "Walt Disney",
+    val quote: String = "",
+    val quoteAuthor: String = "",
     val timelineItems: List<SyncroItem> = emptyList(),
     val notes: List<SyncroItem.Note> = emptyList(),
     val isLoading: Boolean = false,
@@ -61,6 +63,8 @@ class HomeViewModel @Inject constructor(
     private val syncGoogleCalendarUseCase: SyncGoogleCalendarUseCase,
     private val pushPendingChangesUseCase: com.syncro.domain.usecase.PushPendingChangesUseCase,
     getNotesUseCase: GetNotesUseCase,
+    getLocalUserUseCase: GetLocalUserUseCase,
+    getDailyQuoteUseCase: GetDailyQuoteUseCase,
     private val saveNoteUseCase: SaveNoteUseCase,
     private val deleteNoteUseCase: DeleteNoteUseCase
 ) : ViewModel() {
@@ -74,10 +78,7 @@ class HomeViewModel @Inject constructor(
     private var syncJob: Job? = null
 
     init {
-        // Frase del día basada en el día del año
-        val dayOfYear = LocalDate.now().dayOfYear
-        val quoteIndex = dayOfYear % QuotesProvider.quotes.size
-        val dailyQuote = QuotesProvider.quotes[quoteIndex]
+        val dailyQuote = getDailyQuoteUseCase()
         _uiState.update { it.copy(quote = dailyQuote.text, quoteAuthor = dailyQuote.author) }
 
         // Observar cambios en la fecha seleccionada
@@ -100,6 +101,12 @@ class HomeViewModel @Inject constructor(
         getNotesUseCase()
             .onEach { notes ->
                 _uiState.update { it.copy(notes = notes) }
+            }
+            .launchIn(viewModelScope)
+
+        getLocalUserUseCase()
+            .onEach { user ->
+                _uiState.update { it.copy(userName = user?.name.orEmpty().trim().substringBefore(' ')) }
             }
             .launchIn(viewModelScope)
     }

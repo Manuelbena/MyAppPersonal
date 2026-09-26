@@ -91,18 +91,28 @@ class FakeEventRepository(private val log: CallLog = CallLog()) : EventRepositor
     }
 }
 
-/** Simula Google: anota qué se sube y permite simular que no hay conexión con [isOffline]. */
+/**
+ * Simula Google: anota qué se sube y sincroniza. [isOffline] simula que no hay conexión y
+ * [syncFailure] que la descarga falla con un error concreto (por ejemplo, falta de permisos).
+ */
 class FakeGoogleSyncRepository(private val log: CallLog = CallLog()) : GoogleSyncRepository {
     var isOffline = false
+    var syncFailure: Throwable? = null
     val pushedTaskIds = mutableListOf<String>()
     val pushedEventIds = mutableListOf<String>()
 
     private fun result(): Result<Unit> =
         if (isOffline) Result.failure(IOException("Sin conexión")) else Result.success(Unit)
 
-    override suspend fun syncTasks(force: Boolean): Result<Unit> = result()
+    override suspend fun syncTasks(force: Boolean): Result<Unit> {
+        log.calls += "syncTasks"
+        return syncFailure?.let { Result.failure(it) } ?: result()
+    }
 
-    override suspend fun syncCalendar(startDate: LocalDate, endDate: LocalDate): Result<Unit> = result()
+    override suspend fun syncCalendar(startDate: LocalDate, endDate: LocalDate): Result<Unit> {
+        log.calls += "syncCalendar($startDate..$endDate)"
+        return syncFailure?.let { Result.failure(it) } ?: result()
+    }
 
     override suspend fun pushTask(taskId: String): Result<Unit> {
         log.calls += "pushTask($taskId)"
@@ -116,7 +126,10 @@ class FakeGoogleSyncRepository(private val log: CallLog = CallLog()) : GoogleSyn
         return result()
     }
 
-    override suspend fun pushPendingChanges(): Result<Unit> = result()
+    override suspend fun pushPendingChanges(): Result<Unit> {
+        log.calls += "pushPendingChanges"
+        return result()
+    }
 }
 
 class FakeUserRepository : UserRepository {

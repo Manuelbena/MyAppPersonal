@@ -91,8 +91,6 @@ fun AddEventContent(
     var selectedCategory by remember { mutableStateOf(eventToEdit?.categoryText ?: "Personal") }
     var selectedPriority by remember { mutableStateOf(eventToEdit?.priority ?: Priority.MEDIUM) }
     var isAllDay by remember { mutableStateOf(eventToEdit?.isAllDay == true) }
-    var isRecurring by remember { mutableStateOf(false) }
-    var notificationEnabled by remember { mutableStateOf(true) }
 
     // Subtareas
     var subtaskInput by remember { mutableStateOf("") }
@@ -114,8 +112,11 @@ fun AddEventContent(
 
     val dateFormatter = DateTimeFormatter.ofPattern("EEE, d MMM.", Locale("es", "ES"))
     val timeFormatter = DateTimeFormatter.ofPattern("HH:mm")
+    // "Todo el día" se guarda como 00:00–00:00: así lo entienden el resto de la app y la sync con Google
+    val effectiveStartTime = if (isAllDay) LocalTime.MIDNIGHT else startTime
+    val effectiveEndTime = if (isAllDay) LocalTime.MIDNIGHT else endTime
     // Se comparan fecha y hora: 21:30 → 01:00 del día siguiente es válido
-    val isTimeRangeValid = isValidEventRange(startDate.atTime(startTime), endDate.atTime(endTime))
+    val isTimeRangeValid = isValidEventRange(startDate.atTime(effectiveStartTime), endDate.atTime(effectiveEndTime))
     val canSave = title.isNotBlank() && isTimeRangeValid
 
     val categories = listOf(
@@ -153,8 +154,8 @@ fun AddEventContent(
                         location.ifBlank { null }, 
                         startDate, 
                         endDate,
-                        startTime, 
-                        endTime, 
+                        effectiveStartTime,
+                        effectiveEndTime,
                         selectedCategory, 
                         categories.find { it.name == selectedCategory }?.color ?: Emerald500,
                         selectedPriority, 
@@ -212,7 +213,7 @@ fun AddEventContent(
             ) {
                 DateTimeSelector(
                     label = "Empieza",
-                    dateTime = "${startDate.format(dateFormatter)} • ${startTime.format(timeFormatter)}",
+                    dateTime = if (isAllDay) startDate.format(dateFormatter) else "${startDate.format(dateFormatter)} • ${startTime.format(timeFormatter)}",
                     onClick = { 
                         pickingStart = true
                         showDatePicker = true 
@@ -220,7 +221,7 @@ fun AddEventContent(
                 )
                 DateTimeSelector(
                     label = "Termina",
-                    dateTime = "${endDate.format(dateFormatter)} • ${endTime.format(timeFormatter)}",
+                    dateTime = if (isAllDay) endDate.format(dateFormatter) else "${endDate.format(dateFormatter)} • ${endTime.format(timeFormatter)}",
                     onClick = { 
                         pickingStart = false
                         showDatePicker = true 
@@ -442,70 +443,6 @@ fun AddEventContent(
             }
         }
 
-        Spacer(modifier = Modifier.height(32.dp))
-        
-        Column(
-            verticalArrangement = Arrangement.spacedBy(20.dp),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        Icons.Rounded.Repeat, 
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(24.dp)
-                    )
-                    Spacer(modifier = Modifier.width(16.dp))
-                    Text(
-                        "Repetir", 
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontWeight = FontWeight.Medium
-                    )
-                }
-                Switch(
-                    checked = isRecurring,
-                    onCheckedChange = { isRecurring = it },
-                    colors = SwitchDefaults.colors(
-                        checkedThumbColor = Cyan400,
-                        checkedTrackColor = Cyan900
-                    )
-                )
-            }
-            
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        Icons.Rounded.NotificationsActive, 
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(24.dp)
-                    )
-                    Spacer(modifier = Modifier.width(16.dp))
-                    Text(
-                        "Notificación", 
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontWeight = FontWeight.Medium
-                    )
-                }
-                Switch(
-                    checked = notificationEnabled,
-                    onCheckedChange = { notificationEnabled = it },
-                    colors = SwitchDefaults.colors(
-                        checkedThumbColor = Cyan400,
-                        checkedTrackColor = Cyan900
-                    )
-                )
-            }
-        }
 
         Spacer(modifier = Modifier.height(40.dp))
     }

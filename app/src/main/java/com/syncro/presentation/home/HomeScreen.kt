@@ -1,5 +1,7 @@
 package com.syncro.presentation.home
 
+import androidx.compose.ui.platform.LocalContext
+import com.syncro.presentation.components.shareEvent
 import android.app.Activity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -36,11 +38,11 @@ import java.util.*
 fun HomeScreen(
     isDarkTheme: Boolean,
     onThemeToggle: () -> Unit,
-    onNavigateToAddEvent: () -> Unit,
     onNavigateToNotes: () -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
     val scrollState = rememberScrollState()
     val snackbarHostState = remember { SnackbarHostState() }
     var showAddItemSheet by remember { mutableStateOf(false) }
@@ -116,7 +118,6 @@ fun HomeScreen(
             HomeHeader(
                 userName = uiState.userName,
                 currentDate = formattedDate,
-                onSettingsClick = { /* TODO */ },
                 onThemeToggle = onThemeToggle,
                 isDarkTheme = isDarkTheme,
                 onTodayClick = { viewModel.onDaySelected(LocalDate.now()) }
@@ -182,9 +183,7 @@ fun HomeScreen(
                                         onEditClick = {
                                             selectedEventForEdit = item
                                         },
-                                        onShareClick = {
-                                            // TODO: Share event
-                                        }
+                                        onShareClick = { context.shareEvent(item) }
                                     )
                                     is SyncroItem.Task -> TaskRow(
                                         task = item,

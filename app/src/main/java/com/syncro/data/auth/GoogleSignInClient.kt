@@ -4,6 +4,8 @@ import android.content.Context
 import android.util.Log
 import androidx.credentials.CredentialManager
 import androidx.credentials.GetCredentialRequest
+import androidx.credentials.exceptions.GetCredentialCancellationException
+import androidx.credentials.exceptions.NoCredentialException
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.syncro.domain.model.User
@@ -42,13 +44,18 @@ class GoogleSignInClient @Inject constructor() {
             Result.success(
                 User(
                     email = googleCredential.id,
-                    name = googleCredential.displayName ?: "User",
+                    name = googleCredential.displayName.orEmpty(),
                     photoUrl = googleCredential.profilePictureUri?.toString(),
                     idToken = googleCredential.idToken
                 )
             )
         } catch (e: CancellationException) {
             throw e
+        } catch (e: GetCredentialCancellationException) {
+            // El usuario cerró el selector: no es un error que haya que mostrar
+            Result.failure(SignInCancelledException())
+        } catch (e: NoCredentialException) {
+            Result.failure(IllegalStateException("No hay ninguna cuenta de Google en este móvil. Añade una en Ajustes y vuelve a intentarlo."))
         } catch (e: Exception) {
             Log.e(TAG, "Google Sign-In failed", e)
             Result.failure(e)
@@ -61,3 +68,6 @@ class GoogleSignInClient @Inject constructor() {
         const val SERVER_CLIENT_ID = "155567191441-chsv0sh2fe8kmfougqer9kkkn6mghq9d.apps.googleusercontent.com"
     }
 }
+
+/** El usuario cerró el selector de cuentas sin elegir ninguna. */
+class SignInCancelledException : Exception("Inicio de sesión cancelado")

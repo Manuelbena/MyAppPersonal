@@ -1,18 +1,15 @@
 package com.syncro.presentation.assistant
 
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.Text
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
+import com.syncro.presentation.components.ComingSoonScreen
 
 @Composable
 fun AssistantMainScreen() {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(text = "Assistant Screen")
-    }
+    ComingSoonScreen(
+        icon = Icons.Outlined.AutoAwesome,
+        title = "Asistente",
+        description = "Un asistente con IA que te ayudará a organizar tu día a partir de tus tareas y eventos."
+    )
 }
