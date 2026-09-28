@@ -1,6 +1,7 @@
 package com.syncro.presentation.home
 
 import androidx.compose.ui.platform.LocalContext
+import com.syncro.presentation.components.rememberCurrentMinute
 import com.syncro.presentation.components.shareEvent
 import android.app.Activity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -45,6 +46,8 @@ fun HomeScreen(
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    // Hora actual al minuto: mueve la línea "Ahora" y el progreso de los eventos en curso
+    val now = rememberCurrentMinute()
     val context = LocalContext.current
     val scrollState = rememberScrollState()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -176,7 +179,9 @@ fun HomeScreen(
                                 )
                             }
 
-                            uiState.timelineItems.forEach { item ->
+                            val nowIndex = nowIndicatorIndex(uiState.timelineItems, uiState.selectedDate, now)
+                            uiState.timelineItems.forEachIndexed { index, item ->
+                                if (index == nowIndex) NowIndicator(now)
                                 when (item) {
                                     is SyncroItem.Event -> EventCard(
                                         event = item,
@@ -186,7 +191,8 @@ fun HomeScreen(
                                         onToggleEvent = {
                                             viewModel.toggleEventCompletion(item.id)
                                         },
-                                        onClick = { selectedEventIdForDetail = item.id }
+                                        onClick = { selectedEventIdForDetail = item.id },
+                                        now = now
                                     )
                                     is SyncroItem.Task -> TaskRow(
                                         task = item,
@@ -198,6 +204,8 @@ fun HomeScreen(
                                     }
                                 }
                             }
+                            // Si ya empezó todo lo del día, la línea "Ahora" va al final
+                            if (nowIndex == uiState.timelineItems.size) NowIndicator(now)
                         }
 
                         if (uiState.notes.isNotEmpty()) {

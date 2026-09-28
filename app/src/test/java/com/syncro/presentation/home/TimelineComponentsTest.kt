@@ -15,6 +15,7 @@ import androidx.compose.ui.test.onParent
 import androidx.compose.ui.unit.dp
 import com.syncro.domain.model.Subtask
 import com.syncro.presentation.home.components.EventCard
+import com.syncro.presentation.home.components.NowIndicator
 import com.syncro.presentation.home.components.QuickTaskSheet
 import com.syncro.presentation.home.components.TaskRow
 import com.syncro.testutil.DAY
@@ -101,6 +102,26 @@ class TimelineComponentsTest {
         compose.onNodeWithContentDescription("Completar").assertTouchWidthIsEqualTo(48.dp).assertTouchHeightIsEqualTo(48.dp)
         compose.onNodeWithContentDescription("Ver subtareas").performClick()
         compose.onNodeWithText("Cajas").onParent().assertHeightIsAtLeast(48.dp)
+    }
+
+    @Test
+    fun `un evento en curso dice cuanto le queda`() {
+        compose.setContent {
+            EventCard(
+                event = anEvent(title = "Comida", startTime = at("12:00"), endTime = at("13:30")),
+                onSubtaskToggle = {},
+                now = DAY.atTime(13, 5)
+            )
+        }
+
+        compose.onNodeWithText("En curso · quedan 25 min").assertIsDisplayed()
+    }
+
+    @Test
+    fun `la linea Ahora muestra la hora actual`() {
+        compose.setContent { NowIndicator(now = DAY.atTime(12, 25)) }
+
+        compose.onNodeWithContentDescription("Ahora, 12:25").assertIsDisplayed()
     }
 
     @Test

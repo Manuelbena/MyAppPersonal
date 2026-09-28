@@ -1,6 +1,7 @@
 package com.syncro.presentation.calendar
 
 import androidx.compose.ui.platform.LocalContext
+import com.syncro.presentation.components.rememberCurrentMinute
 import com.syncro.presentation.components.shareEvent
 import com.syncro.presentation.event.EventDetailSheet
 import com.syncro.presentation.task.TaskDetailSheet
@@ -233,6 +234,7 @@ fun DayDetailsDialog(
     viewModel: CalendarViewModel
 ) {
     val context = LocalContext.current
+    val now = rememberCurrentMinute()
     // Se guarda el id y no el elemento para que el detalle refleje los cambios (subtareas, completar)
     var selectedTaskId by remember { mutableStateOf<String?>(null) }
     var selectedEventId by remember { mutableStateOf<String?>(null) }
@@ -340,7 +342,8 @@ fun DayDetailsDialog(
                                             onToggleEvent = {
                                                 viewModel.toggleEventCompletion(item.id)
                                             },
-                                            onClick = { selectedEventId = item.id }
+                                            onClick = { selectedEventId = item.id },
+                                            now = now
                                         )
                                     }
                                     is SyncroItem.Task -> {

@@ -31,6 +31,18 @@ import com.syncro.presentation.theme.Emerald500
 import com.syncro.presentation.theme.color
 import com.syncro.presentation.theme.label
 import com.syncro.presentation.theme.toColor
+import com.syncro.presentation.event.formatDuration
+import com.syncro.presentation.home.minutesLeftAt
+import com.syncro.presentation.home.progressAt
+import androidx.compose.foundation.Canvas
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
+import java.time.LocalDateTime
+import java.time.temporal.ChronoUnit
 
 /**
  * Tarjeta de un evento en el timeline. Muestra lo esencial (título, lugar, descripción corta,
@@ -42,24 +54,28 @@ fun EventCard(
     event: SyncroItem.Event,
     onSubtaskToggle: (String) -> Unit,
     onToggleEvent: () -> Unit = {},
-    onClick: () -> Unit = {}
+    onClick: () -> Unit = {},
+    // Hora actual para el progreso del raíl; null = sin progreso (solo el trazo)
+    now: LocalDateTime? = null
 ) {
     var isSubtasksExpanded by remember { mutableStateOf(false) }
     // Verde si está completado, si no el color de la categoría (igual que en el detalle)
     val accent = if (event.isCompleted) Emerald500 else event.categoryColor.toColor()
+    val minutesLeft = now?.let { event.minutesLeftAt(it) }
 
+    // IntrinsicSize.Min: el raíl de la izquierda se estira a la altura de la tarjeta
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .height(IntrinsicSize.Min)
             .padding(vertical = 6.dp)
     ) {
-        TimeColumn(
-            isAllDay = event.isAllDay,
-            start = event.startTime,
-            end = event.endTime,
-            extraDays = java.time.temporal.ChronoUnit.DAYS.between(event.date, event.endDate),
-            modifier = Modifier.padding(top = 16.dp)
+        EventTimeRail(
+            event = event,
+            accent = accent,
+            progress = now?.let { event.progressAt(it) } ?: 0f
         )
+        Spacer(Modifier.width(RAIL_GAP))
 
         Surface(
             onClick = onClick,
@@ -95,6 +111,17 @@ fun EventCard(
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (event.isCompleted) 0.6f else 1f),
                         textDecoration = if (event.isCompleted) TextDecoration.LineThrough else TextDecoration.None
                     )
+
+                    if (minutesLeft != null) {
+                        Text(
+                            text = "En curso · quedan ${formatDuration(minutesLeft)}",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = accent,
+                            maxLines = 1,
+                            modifier = Modifier.padding(top = 2.dp)
+                        )
+                    }
 
                     if (!event.location.isNullOrBlank()) {
                         Row(
@@ -251,7 +278,8 @@ fun TaskRow(
             .padding(vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        TimeColumn(isAllDay = task.isAllDay, start = task.time)
+        TaskTimeRail(task)
+        Spacer(Modifier.width(RAIL_GAP))
 
         Surface(
             onClick = onClick,
@@ -324,38 +352,156 @@ private fun CompletionToggle(
     }
 }
 
-/**
- * Columna de la izquierda del timeline, común a tareas y eventos: "Todo el día" o la hora de
- * inicio y, si la hay, la de fin. Si el evento termina otro día se indica debajo ("+1 día").
+// region Raíl de tiempo
+
+/*
+ * La columna izquierda del timeline es un raíl: las horas a la izquierda y, al lado, una línea del
+ * color del evento que va de su inicio (punto) a su fin (anillo). La parte ya transcurrida se
+ * rellena, así el día se lee de un vistazo: lo pasado lleno, lo que viene vacío. Las tareas no
+ * duran, así que solo llevan un punto. La línea "Ahora" usa las mismas columnas para alinearse.
  */
+
+private val TIME_LABEL_WIDTH = 48.dp
+private val RAIL_WIDTH = 20.dp
+private val RAIL_GAP = 8.dp
+/** Distancia del borde de la tarjeta al centro de la primera/última línea de hora. */
+private val RAIL_END_INSET = 24.dp
+
 @Composable
-private fun TimeColumn(
-    isAllDay: Boolean,
-    start: java.time.LocalTime,
-    end: java.time.LocalTime? = null,
-    extraDays: Long = 0,
-    modifier: Modifier = Modifier
-) {
-    Column(
-        modifier = modifier.width(70.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        if (isAllDay) {
-            Text("Todo el", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = MaterialTheme.colorScheme.onBackground)
-            Text("día", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = MaterialTheme.colorScheme.onBackground)
-        } else {
-            Text(start.toDisplayTime(), fontWeight = FontWeight.Bold, fontSize = 14.sp, color = MaterialTheme.colorScheme.onBackground)
-            end?.let {
-                Text(it.toDisplayTime(), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+private fun EventTimeRail(event: SyncroItem.Event, accent: Color, progress: Float) {
+    val extraDays = ChronoUnit.DAYS.between(event.date, event.endDate)
+    val surface = MaterialTheme.colorScheme.background
+
+    Row(modifier = Modifier.fillMaxHeight()) {
+        Column(
+            modifier = Modifier
+                .width(TIME_LABEL_WIDTH)
+                .fillMaxHeight()
+                .padding(vertical = 14.dp),
+            horizontalAlignment = Alignment.End
+        ) {
+            if (event.isAllDay) {
+                TimeLabel("Todo el", bold = true, small = true)
+                TimeLabel("día", bold = true, small = true)
+                if (extraDays > 0) TimeLabel("${extraDays + 1} días", small = true)
+            } else {
+                TimeLabel(event.startTime.toDisplayTime(), bold = true)
+                Spacer(Modifier.weight(1f))
+                // "+1 día" encima de la hora de fin, para que esta quede alineada con el anillo
+                if (extraDays > 0) {
+                    Text(
+                        text = if (extraDays == 1L) "+1 día" else "+$extraDays días",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                        maxLines = 1
+                    )
+                }
+                TimeLabel(event.endTime.toDisplayTime())
             }
-            if (extraDays > 0) {
-                Text(
-                    text = if (extraDays == 1L) "+1 día" else "+$extraDays días",
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
+        }
+
+        Canvas(
+            modifier = Modifier
+                .width(RAIL_WIDTH)
+                .fillMaxHeight()
+        ) {
+            val x = size.width / 2
+            val top = RAIL_END_INSET.toPx()
+            val stroke = 3.dp.toPx()
+            if (event.isAllDay) {
+                // Todo el día: la línea se desvanece hacia abajo, no tiene un fin concreto
+                drawLine(
+                    brush = Brush.verticalGradient(listOf(accent.copy(alpha = 0.5f), Color.Transparent), startY = top, endY = size.height),
+                    start = Offset(x, top),
+                    end = Offset(x, size.height),
+                    strokeWidth = stroke,
+                    cap = StrokeCap.Round
                 )
+            } else {
+                val bottom = maxOf(size.height - RAIL_END_INSET.toPx(), top + 8.dp.toPx())
+                drawLine(accent.copy(alpha = 0.25f), Offset(x, top), Offset(x, bottom), stroke, StrokeCap.Round)
+                if (progress > 0f) {
+                    drawLine(accent, Offset(x, top), Offset(x, top + (bottom - top) * progress), stroke, StrokeCap.Round)
+                }
+                // Anillo del fin: relleno con el fondo para que la línea no lo atraviese
+                val ringRadius = 4.5.dp.toPx()
+                drawCircle(if (progress >= 1f) accent else surface, ringRadius, Offset(x, bottom))
+                drawCircle(accent, ringRadius, Offset(x, bottom), style = Stroke(2.dp.toPx()))
             }
+            drawCircle(accent, 5.dp.toPx(), Offset(x, top))
         }
     }
 }
+
+@Composable
+private fun TaskTimeRail(task: SyncroItem.Task) {
+    val color = if (task.isCompleted) Emerald500 else task.categoryColor?.toColor() ?: MaterialTheme.colorScheme.outline
+    val surface = MaterialTheme.colorScheme.background
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Column(modifier = Modifier.width(TIME_LABEL_WIDTH), horizontalAlignment = Alignment.End) {
+            if (task.isAllDay) {
+                TimeLabel("Todo el", bold = true, small = true)
+                TimeLabel("día", bold = true, small = true)
+            } else {
+                TimeLabel(task.time.toDisplayTime(), bold = true)
+            }
+        }
+        // Punto pequeño: hueco si está pendiente, relleno si está hecha
+        Canvas(modifier = Modifier.size(RAIL_WIDTH)) {
+            val center = Offset(size.width / 2, size.height / 2)
+            val radius = 4.dp.toPx()
+            drawCircle(if (task.isCompleted) color else surface, radius, center)
+            drawCircle(color, radius, center, style = Stroke(2.dp.toPx()))
+        }
+    }
+}
+
+@Composable
+private fun TimeLabel(text: String, bold: Boolean = false, small: Boolean = false) {
+    Text(
+        text = text,
+        fontWeight = if (bold) FontWeight.Bold else FontWeight.Normal,
+        fontSize = if (small) 12.sp else if (bold) 14.sp else 12.sp,
+        color = if (bold) MaterialTheme.colorScheme.onBackground else MaterialTheme.colorScheme.onSurfaceVariant,
+        maxLines = 1
+    )
+}
+
+/**
+ * Línea de la hora actual en el timeline de hoy: la hora en la columna de horas y, desde el raíl,
+ * una línea hasta el borde, como en Google Calendar.
+ */
+@Composable
+fun NowIndicator(now: LocalDateTime) {
+    val color = MaterialTheme.colorScheme.primary
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(24.dp)
+            .semantics(mergeDescendants = true) { contentDescription = "Ahora, ${now.toLocalTime().toDisplayTime()}" },
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = now.toLocalTime().toDisplayTime(),
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold,
+            color = color,
+            textAlign = TextAlign.End,
+            maxLines = 1,
+            modifier = Modifier.width(TIME_LABEL_WIDTH)
+        )
+        Canvas(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxHeight()
+        ) {
+            val y = size.height / 2
+            val x = RAIL_WIDTH.toPx() / 2
+            drawLine(color, Offset(x, y), Offset(size.width, y), 2.dp.toPx(), StrokeCap.Round)
+            drawCircle(color, 5.dp.toPx(), Offset(x, y))
+        }
+    }
+}
+
+// endregion
