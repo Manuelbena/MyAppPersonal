@@ -413,7 +413,7 @@ class GoogleSyncRepositoryImpl @Inject constructor(
      * - Sin fecha y pendiente: hoy, para que no queden olvidadas en días pasados.
      */
     private fun resolveTaskDate(googleTask: Task): LocalDate {
-        val today = LocalDate.now(zone)
+        val today = LocalDate.now(clock)
         googleTask.due?.let { due ->
             return runCatching { OffsetDateTime.parse(due).toLocalDate() }.getOrDefault(today)
         }

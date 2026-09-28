@@ -202,6 +202,7 @@ class GoogleSyncRepositoryImplTest {
         assertEquals(DAY.plusDays(4).toEpochDay(), taskDao.getTaskByRemoteId("g-1")!!.date)
     }
 
+    // Regresión: se usaba LocalDate.now(zone) (hora del sistema) y no el reloj inyectado
     @Test
     fun `una tarea sin fecha y pendiente aparece hoy`() = runTest {
         google.addTask(googleTask("g-1", "Sin fecha"))
