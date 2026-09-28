@@ -32,3 +32,10 @@ val MIGRATION_9_10 = object : Migration(9, 10) {
         db.execSQL("UPDATE events SET endDate = date + 1 WHERE endTime < startTime")
     }
 }
+
+/** Marca de "fecha cambiada en la app", para mandar a Google la nueva fecha al pasar tareas de día. */
+val MIGRATION_10_11 = object : Migration(10, 11) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE tasks ADD COLUMN dateChanged INTEGER NOT NULL DEFAULT 0")
+    }
+}

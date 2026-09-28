@@ -119,6 +119,36 @@ class DigestMessagesTest {
     }
 
     @Test
+    fun `por la noche con pendientes la notificacion lleva al chat para decidir`() {
+        val message = digest(DigestMoment.EVENING, tasks = listOf(aTask(), aTask(isCompleted = true))).toMessage()
+
+        assertTrue(message.opensAssistant)
+        assertEquals("👉 Toca para decidir qué hacer con ellas", message.lines.last())
+    }
+
+    @Test
+    fun `sin pendientes la notificacion no lleva al chat`() {
+        assertFalse(digest(DigestMoment.EVENING, tasks = listOf(aTask(isCompleted = true))).toMessage().opensAssistant)
+        // Una sola tarea: no hay prioridades que elegir
+        assertFalse(digest(DigestMoment.MORNING, tasks = listOf(aTask())).toMessage().opensAssistant)
+    }
+
+    @Test
+    fun `por la manana con varias tareas invita a elegir las prioridades`() {
+        val message = digest(DigestMoment.MORNING, tasks = listOf(aTask(), aTask())).toMessage()
+
+        assertTrue(message.opensAssistant)
+        assertEquals("👉 Toca para elegir tus 3 prioridades", message.lines.last())
+    }
+
+    @Test
+    fun `por la manana con las prioridades ya elegidas no vuelve a invitar`() {
+        val message = digest(DigestMoment.MORNING, tasks = listOf(aTask(), aTask())).copy(offerFocus = false).toMessage()
+
+        assertFalse(message.opensAssistant)
+    }
+
+    @Test
     fun `por la noche sin nada hecho anima sin agobiar`() {
         val message = digest(DigestMoment.EVENING, tasks = listOf(aTask())).toMessage()
 

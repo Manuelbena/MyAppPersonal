@@ -41,8 +41,7 @@ import java.util.*
 
 @Composable
 fun HomeScreen(
-    isDarkTheme: Boolean,
-    onThemeToggle: () -> Unit,
+    onOpenSettings: () -> Unit,
     onNavigateToNotes: () -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel()
 ) {
@@ -128,8 +127,8 @@ fun HomeScreen(
             HomeHeader(
                 userName = uiState.userName,
                 currentDate = formattedDate,
-                onThemeToggle = onThemeToggle,
-                isDarkTheme = isDarkTheme,
+                userPhotoUrl = uiState.userPhotoUrl,
+                onOpenSettings = onOpenSettings,
                 onTodayClick = { viewModel.onDaySelected(LocalDate.now()) }
             )
 
@@ -157,6 +156,16 @@ fun HomeScreen(
                             quote = uiState.quote,
                             author = uiState.quoteAuthor
                         )
+
+                        // Prioridades del día (se eligen en el chat del asistente)
+                        if (uiState.focusTasks.isNotEmpty()) {
+                            FocusCard(
+                                tasks = uiState.focusTasks,
+                                isToday = uiState.selectedDate == LocalDate.now(),
+                                onToggle = { viewModel.toggleTaskCompletion(it.id) },
+                                onClick = { selectedTaskIdForDetail = it.id }
+                            )
+                        }
 
                         // Timeline de items (Eventos y Tareas)
                         Column(

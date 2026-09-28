@@ -41,6 +41,10 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.unit.Dp
 import java.time.LocalDateTime
 import java.time.temporal.ChronoUnit
 
@@ -361,7 +365,10 @@ private fun CompletionToggle(
  * duran, así que solo llevan un punto. La línea "Ahora" usa las mismas columnas para alinearse.
  */
 
-private val TIME_LABEL_WIDTH = 48.dp
+/** Ancho mínimo de la columna de horas; si la hora no cabe (fuente, letra grande del sistema) se ensancha. */
+private val MIN_TIME_LABEL_WIDTH = 48.dp
+/** Números de ancho fijo: todas las horas miden lo mismo y quedan alineadas en columna. */
+private const val TABULAR_NUMBERS = "tnum"
 private val RAIL_WIDTH = 20.dp
 private val RAIL_GAP = 8.dp
 /** Distancia del borde de la tarjeta al centro de la primera/última línea de hora. */
@@ -375,7 +382,7 @@ private fun EventTimeRail(event: SyncroItem.Event, accent: Color, progress: Floa
     Row(modifier = Modifier.fillMaxHeight()) {
         Column(
             modifier = Modifier
-                .width(TIME_LABEL_WIDTH)
+                .width(timeLabelWidth())
                 .fillMaxHeight()
                 .padding(vertical = 14.dp),
             horizontalAlignment = Alignment.End
@@ -439,7 +446,7 @@ private fun TaskTimeRail(task: SyncroItem.Task) {
     val color = if (task.isCompleted) Emerald500 else task.categoryColor?.toColor() ?: MaterialTheme.colorScheme.outline
     val surface = MaterialTheme.colorScheme.background
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Column(modifier = Modifier.width(TIME_LABEL_WIDTH), horizontalAlignment = Alignment.End) {
+        Column(modifier = Modifier.width(timeLabelWidth()), horizontalAlignment = Alignment.End) {
             if (task.isAllDay) {
                 TimeLabel("Todo el", bold = true, small = true)
                 TimeLabel("día", bold = true, small = true)
@@ -457,10 +464,28 @@ private fun TaskTimeRail(task: SyncroItem.Task) {
     }
 }
 
+/**
+ * Ancho de la columna de horas: el de "00:00" en negrita (la etiqueta más ancha) medido con la fuente
+ * y la escala de letra actuales. Regresión: con un ancho fijo, "14:00" salía cortado como "14:0".
+ */
+@Composable
+private fun timeLabelWidth(): Dp {
+    val measurer = rememberTextMeasurer()
+    val style = LocalTextStyle.current.merge(
+        TextStyle(fontSize = 14.sp, fontWeight = FontWeight.Bold, fontFeatureSettings = TABULAR_NUMBERS)
+    )
+    val density = LocalDensity.current
+    val measured = remember(style, density) {
+        with(density) { measurer.measure("00:00", style, maxLines = 1).size.width.toDp() }
+    }
+    return maxOf(MIN_TIME_LABEL_WIDTH, measured + 2.dp)
+}
+
 @Composable
 private fun TimeLabel(text: String, bold: Boolean = false, small: Boolean = false) {
     Text(
         text = text,
+        style = LocalTextStyle.current.copy(fontFeatureSettings = TABULAR_NUMBERS),
         fontWeight = if (bold) FontWeight.Bold else FontWeight.Normal,
         fontSize = if (small) 12.sp else if (bold) 14.sp else 12.sp,
         color = if (bold) MaterialTheme.colorScheme.onBackground else MaterialTheme.colorScheme.onSurfaceVariant,
@@ -485,11 +510,12 @@ fun NowIndicator(now: LocalDateTime) {
         Text(
             text = now.toLocalTime().toDisplayTime(),
             fontSize = 12.sp,
+            style = LocalTextStyle.current.copy(fontFeatureSettings = TABULAR_NUMBERS),
             fontWeight = FontWeight.Bold,
             color = color,
             textAlign = TextAlign.End,
             maxLines = 1,
-            modifier = Modifier.width(TIME_LABEL_WIDTH)
+            modifier = Modifier.width(timeLabelWidth())
         )
         Canvas(
             modifier = Modifier

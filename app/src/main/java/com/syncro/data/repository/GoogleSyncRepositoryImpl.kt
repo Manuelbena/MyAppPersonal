@@ -224,10 +224,13 @@ class GoogleSyncRepositoryImpl @Inject constructor(
             )
         }
         val remoteId = task.remoteId
-        val syncedRemoteId = if (remoteId == null) {
-            // La fecha solo se envía al crear: así un patch no añade fecha a tareas que no la tienen.
-            // Google Tasks solo guarda la fecha de vencimiento; la hora se descarta
+        // La fecha se envía al crear y cuando se cambió en la app (pasar a mañana…); si no, un patch
+        // añadiría fecha a las tareas de Google que no la tienen.
+        // Google Tasks solo guarda la fecha de vencimiento; la hora se descarta
+        if (remoteId == null || task.dateChanged) {
             body.setDue("${LocalDate.ofEpochDay(task.date)}T00:00:00.000Z")
+        }
+        val syncedRemoteId = if (remoteId == null) {
             remote.insertTask(DEFAULT_TASK_LIST, body).id
         } else {
             try {

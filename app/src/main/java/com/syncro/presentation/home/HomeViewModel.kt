@@ -19,6 +19,7 @@ import com.syncro.domain.usecase.ToggleSubtaskCompletionUseCase
 import com.syncro.domain.usecase.ToggleTaskCompletionUseCase
 import com.syncro.domain.usecase.DeleteNoteUseCase
 import com.syncro.domain.usecase.GetNotesUseCase
+import com.syncro.domain.usecase.GetDailyFocusUseCase
 import com.syncro.domain.usecase.GetDailyQuoteUseCase
 import com.syncro.domain.usecase.GetLocalUserUseCase
 import com.syncro.domain.usecase.SaveNoteUseCase
@@ -36,10 +37,13 @@ import javax.inject.Inject
 data class HomeUiState(
     /** Nombre de pila del usuario; vacío si Google no lo proporciona. */
     val userName: String = "",
+    val userPhotoUrl: String? = null,
     val selectedDate: LocalDate = LocalDate.now(),
     val quote: String = "",
     val quoteAuthor: String = "",
     val timelineItems: List<SyncroItem> = emptyList(),
+    /** Las prioridades elegidas para el día seleccionado (en el orden en que se eligieron). */
+    val focusTasks: List<SyncroItem.Task> = emptyList(),
     val notes: List<SyncroItem.Note> = emptyList(),
     val isLoading: Boolean = false,
     val syncMessage: String? = null
@@ -66,7 +70,8 @@ class HomeViewModel @Inject constructor(
     getLocalUserUseCase: GetLocalUserUseCase,
     getDailyQuoteUseCase: GetDailyQuoteUseCase,
     private val saveNoteUseCase: SaveNoteUseCase,
-    private val deleteNoteUseCase: DeleteNoteUseCase
+    private val deleteNoteUseCase: DeleteNoteUseCase,
+    getDailyFocusUseCase: GetDailyFocusUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HomeUiState())
@@ -98,6 +103,13 @@ class HomeViewModel @Inject constructor(
             }
             .launchIn(viewModelScope)
 
+        _uiState
+            .map { it.selectedDate }
+            .distinctUntilChanged()
+            .flatMapLatest { date -> getDailyFocusUseCase(date) }
+            .onEach { focus -> _uiState.update { it.copy(focusTasks = focus) } }
+            .launchIn(viewModelScope)
+
         getNotesUseCase()
             .onEach { notes ->
                 _uiState.update { it.copy(notes = notes) }
@@ -106,7 +118,9 @@ class HomeViewModel @Inject constructor(
 
         getLocalUserUseCase()
             .onEach { user ->
-                _uiState.update { it.copy(userName = user?.name.orEmpty().trim().substringBefore(' ')) }
+                _uiState.update {
+                    it.copy(userName = user?.name.orEmpty().trim().substringBefore(' '), userPhotoUrl = user?.photoUrl)
+                }
             }
             .launchIn(viewModelScope)
     }

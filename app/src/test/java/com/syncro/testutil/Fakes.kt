@@ -1,6 +1,12 @@
 package com.syncro.testutil
 
+import com.syncro.domain.model.AppSettings
+import com.syncro.domain.model.DailyFocus
+import com.syncro.domain.model.DataLossSummary
 import com.syncro.domain.model.SyncroItem
+import com.syncro.domain.repository.AccountDataRepository
+import com.syncro.domain.repository.DailyFocusRepository
+import com.syncro.domain.repository.SettingsRepository
 import com.syncro.domain.repository.EventRepository
 import com.syncro.domain.repository.GoogleSyncRepository
 import com.syncro.domain.repository.NoteRepository
@@ -52,6 +58,17 @@ class FakeTaskRepository(private val log: CallLog = CallLog()) : TaskRepository 
             all + (taskId to task.copy(isCompleted = !task.isCompleted))
         }
     }
+
+    override suspend fun moveTask(taskId: String, date: LocalDate) {
+        log.calls += "moveTask($taskId, $date)"
+        tasks.update { all ->
+            val task = all[taskId] ?: return@update all
+            all + (taskId to task.copy(date = date))
+        }
+    }
+
+    override fun getUnfinishedTasksUntil(date: LocalDate): Flow<List<SyncroItem.Task>> =
+        tasks.map { all -> all.values.filter { !it.isCompleted && !it.date.isAfter(date) }.sortedWith(compareBy({ it.date }, { it.time })) }
 }
 
 class FakeEventRepository(private val log: CallLog = CallLog()) : EventRepository {
@@ -161,4 +178,36 @@ class FakeNoteRepository : NoteRepository {
     }
 
     override suspend fun getNoteById(id: String): SyncroItem.Note? = notes.value[id]
+}
+
+class FakeDailyFocusRepository : DailyFocusRepository {
+    val focus = MutableStateFlow<Map<LocalDate, DailyFocus>>(emptyMap())
+
+    override fun getFocus(date: LocalDate): Flow<DailyFocus?> = focus.map { it[date] }
+
+    override fun getFocusSince(date: LocalDate): Flow<List<DailyFocus>> =
+        focus.map { all -> all.values.filter { !it.date.isBefore(date) }.sortedBy { it.date } }
+
+    override suspend fun saveFocus(focus: DailyFocus) {
+        this.focus.update { it + (focus.date to focus) }
+    }
+}
+
+class FakeSettingsRepository(initial: AppSettings = AppSettings()) : SettingsRepository {
+    val current = MutableStateFlow(initial)
+    override val settings: Flow<AppSettings> = current
+
+    override suspend fun save(settings: AppSettings) {
+        current.value = settings
+    }
+}
+
+class FakeAccountDataRepository(private val log: CallLog = CallLog()) : AccountDataRepository {
+    var summary = DataLossSummary(unsyncedChanges = 0, notes = 0)
+
+    override suspend fun dataLossSummary(): DataLossSummary = summary
+
+    override suspend fun clearAccountData() {
+        log.calls += "clearAccountData"
+    }
 }

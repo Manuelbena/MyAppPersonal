@@ -6,6 +6,7 @@ import android.content.Intent
 import android.util.Log
 import com.syncro.domain.model.DigestMoment
 import com.syncro.domain.model.toMessage
+import com.syncro.domain.repository.SettingsRepository
 import com.syncro.domain.usecase.GetDailyDigestUseCase
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
@@ -14,6 +15,7 @@ import dagger.hilt.components.SingletonComponent
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 // Acceso a Hilt con EntryPoint, como PushPendingChangesWorker: sin @AndroidEntryPoint en receivers
@@ -23,12 +25,27 @@ interface DigestEntryPoint {
     fun getDailyDigest(): GetDailyDigestUseCase
     fun notifier(): DigestNotifier
     fun scheduler(): DigestAlarmScheduler
+    fun settings(): SettingsRepository
 }
 
 private fun Context.digestEntryPoint(): DigestEntryPoint =
     EntryPointAccessors.fromApplication(applicationContext, DigestEntryPoint::class.java)
 
-/** Suena a las 9:00 / 21:00: programa el aviso de mañana y publica el de ahora. */
+/** Trabajo en segundo plano desde un receiver: goAsync, porque leer DataStore o Room no puede ir en el hilo principal. */
+private fun BroadcastReceiver.runAsync(tag: String, block: suspend () -> Unit) {
+    val pendingResult = goAsync()
+    CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+        try {
+            block()
+        } catch (e: Exception) {
+            Log.e(tag, "Fallo en el aviso diario", e)
+        } finally {
+            pendingResult.finish()
+        }
+    }
+}
+
+/** Suena a la hora del aviso: programa el de mañana y publica el de ahora. */
 class DigestAlarmReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
@@ -37,19 +54,14 @@ class DigestAlarmReceiver : BroadcastReceiver() {
             ?: return
         val entryPoint = context.digestEntryPoint()
 
-        // goAsync: leer la base de datos no debe hacerse en el hilo principal del receiver
-        val pendingResult = goAsync()
-        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
-            try {
-                // Primero la de mañana: si algo falla al escribir el aviso, la cadena no se corta
-                entryPoint.scheduler().schedule(moment)
-                entryPoint.getDailyDigest()(moment)?.let { digest ->
-                    entryPoint.notifier().show(moment, digest.toMessage())
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "No se pudo publicar el aviso $moment", e)
-            } finally {
-                pendingResult.finish()
+        runAsync(TAG) {
+            val settings = entryPoint.settings().settings.first().digest
+            // Primero el de mañana: si algo falla al escribir el aviso, la cadena no se corta
+            entryPoint.scheduler().schedule(moment, settings)
+            // Por si se apagó justo antes de sonar
+            if (!settings.isEnabled(moment)) return@runAsync
+            entryPoint.getDailyDigest()(moment)?.let { digest ->
+                entryPoint.notifier().show(moment, digest.toMessage())
             }
         }
     }
@@ -67,8 +79,10 @@ class DigestAlarmReceiver : BroadcastReceiver() {
  */
 class DigestRescheduleReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        if (intent.action in RESCHEDULE_ACTIONS) {
-            context.digestEntryPoint().scheduler().scheduleAll()
+        if (intent.action !in RESCHEDULE_ACTIONS) return
+        val entryPoint = context.digestEntryPoint()
+        runAsync("DailyDigest") {
+            entryPoint.scheduler().scheduleAll(entryPoint.settings().settings.first().digest)
         }
     }
 

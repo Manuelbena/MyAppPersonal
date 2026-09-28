@@ -47,7 +47,7 @@ class DigestNotifier @Inject constructor(
             .setContentTitle(message.title)
             .setContentText(message.text)
             .setStyle(NotificationCompat.BigTextStyle().bigText(expanded))
-            .setContentIntent(openAppIntent(moment))
+            .setContentIntent(openAppIntent(moment, message.opensAssistant))
             .setAutoCancel(true)
             .setCategory(NotificationCompat.CATEGORY_REMINDER)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
@@ -64,9 +64,10 @@ class DigestNotifier @Inject constructor(
         context.getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
     }
 
-    private fun openAppIntent(moment: DigestMoment): PendingIntent? {
+    private fun openAppIntent(moment: DigestMoment, opensAssistant: Boolean): PendingIntent? {
         val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)
             ?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            ?.putExtra(EXTRA_OPEN_ASSISTANT, opensAssistant)
             ?: return null
         return PendingIntent.getActivity(
             context,
@@ -79,6 +80,8 @@ class DigestNotifier @Inject constructor(
     companion object {
         const val CHANNEL_ID = "daily_digest"
         const val NOTIFICATION_ID_BASE = 9_000
+        /** Extra del intent: la app abre directamente el chat del asistente. */
+        const val EXTRA_OPEN_ASSISTANT = "open_assistant"
         private const val ACCENT_COLOR = 0xFF22D3EE.toInt() // Cyan400, el acento de la app
     }
 }

@@ -8,6 +8,7 @@ import androidx.core.app.NotificationCompat
 import androidx.test.core.app.ApplicationProvider
 import com.syncro.domain.model.DigestMessage
 import com.syncro.domain.model.DigestMoment
+import com.syncro.domain.model.DigestSettings
 import com.syncro.testutil.DAY
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -18,6 +19,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.shadows.ShadowAlarmManager
 import java.time.Clock
+import java.time.LocalTime
 import java.time.ZoneOffset
 
 /**
@@ -44,18 +46,38 @@ class DigestNotificationsTest {
     fun `programa los avisos de las 9 y las 21 sin duplicarlos al reprogramar`() {
         val scheduler = DigestAlarmScheduler(app, clock)
 
-        scheduler.scheduleAll()
-        scheduler.scheduleAll() // p. ej. al abrir la app otra vez
+        scheduler.scheduleAll(DigestSettings())
+        scheduler.scheduleAll(DigestSettings()) // p. ej. al abrir la app otra vez
 
         val triggers = shadowOf(alarmManager).scheduledAlarms.map { it.triggerAtMs }.sorted()
         assertEquals(listOf(millisAt(9), millisAt(21)), triggers)
     }
 
     @Test
+    fun `usa la hora elegida en Ajustes`() {
+        DigestAlarmScheduler(app, clock).scheduleAll(DigestSettings(morningTime = LocalTime.of(7, 30), eveningTime = LocalTime.of(20, 0)))
+
+        val triggers = shadowOf(alarmManager).scheduledAlarms.map { it.triggerAtMs }.sorted()
+        // A las 8:00 (reloj del test) las 7:30 ya han pasado: el de la mañana queda para mañana
+        val expectedMorning = DAY.plusDays(1).atTime(7, 30).toInstant(ZoneOffset.UTC).toEpochMilli()
+        assertEquals(listOf(millisAt(20), expectedMorning), triggers)
+    }
+
+    @Test
+    fun `apagar un aviso en Ajustes cancela su alarma`() {
+        val scheduler = DigestAlarmScheduler(app, clock)
+        scheduler.scheduleAll(DigestSettings())
+
+        scheduler.scheduleAll(DigestSettings(eveningEnabled = false))
+
+        assertEquals(listOf(millisAt(9)), shadowOf(alarmManager).scheduledAlarms.map { it.triggerAtMs })
+    }
+
+    @Test
     fun `pasada la hora de la manana el aviso es para manana`() {
         val lateClock = Clock.fixed(DAY.atTime(10, 0).toInstant(ZoneOffset.UTC), ZoneOffset.UTC)
 
-        DigestAlarmScheduler(app, lateClock).schedule(DigestMoment.MORNING)
+        DigestAlarmScheduler(app, lateClock).schedule(DigestMoment.MORNING, DigestSettings())
 
         assertEquals(millisAt(9, dayOffset = 1), shadowOf(alarmManager).scheduledAlarms.single().triggerAtMs)
     }

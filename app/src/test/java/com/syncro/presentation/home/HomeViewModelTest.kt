@@ -6,6 +6,9 @@ import com.google.android.gms.auth.UserRecoverableAuthException
 import com.google.api.client.googleapis.extensions.android.gms.auth.UserRecoverableAuthIOException
 import com.syncro.domain.model.User
 import com.syncro.domain.usecase.DeleteNoteUseCase
+import com.syncro.domain.model.DailyFocus
+import com.syncro.domain.model.FocusedTask
+import com.syncro.domain.usecase.GetDailyFocusUseCase
 import com.syncro.domain.usecase.GetDailyQuoteUseCase
 import com.syncro.domain.usecase.GetLocalUserUseCase
 import com.syncro.domain.usecase.GetNotesUseCase
@@ -21,6 +24,7 @@ import com.syncro.domain.usecase.ToggleSubtaskCompletionUseCase
 import com.syncro.domain.usecase.ToggleTaskCompletionUseCase
 import com.syncro.testutil.CallLog
 import com.syncro.testutil.DAY
+import com.syncro.testutil.FakeDailyFocusRepository
 import com.syncro.testutil.FakeEventRepository
 import com.syncro.testutil.FakeGoogleSyncRepository
 import com.syncro.testutil.FakeNoteRepository
@@ -68,6 +72,7 @@ class HomeViewModelTest {
     private lateinit var google: FakeGoogleSyncRepository
     private lateinit var notes: FakeNoteRepository
     private lateinit var users: FakeUserRepository
+    private val focus = FakeDailyFocusRepository()
 
     @Before
     fun setUp() {
@@ -93,7 +98,8 @@ class HomeViewModelTest {
         getLocalUserUseCase = GetLocalUserUseCase(users),
         getDailyQuoteUseCase = GetDailyQuoteUseCase(clock),
         saveNoteUseCase = SaveNoteUseCase(notes, clock),
-        deleteNoteUseCase = DeleteNoteUseCase(notes)
+        deleteNoteUseCase = DeleteNoteUseCase(notes),
+        getDailyFocusUseCase = GetDailyFocusUseCase(focus, tasks)
     )
 
     /** Recoge los efectos de un solo uso (snackbars, petición de permisos) que emite el ViewModel. */
@@ -116,10 +122,25 @@ class HomeViewModelTest {
 
     @Test
     fun `si Google no da nombre el saludo queda sin nombre`() = runTest {
-        // Regresión: el nombre estaba fijo en el código y cualquier cuenta veía "Hola, Manuel"
+        // Regresión: el nombre estaba fijo en el código y cualquier cuenta veía el mismo saludo
         users.saveUser(User(email = "ana@example.com", name = "", photoUrl = null))
 
         assertEquals("", createViewModel().uiState.value.userName)
+    }
+
+    @Test
+    fun `las prioridades del dia se muestran en el orden elegido y sin las pasadas a otro dia`() = runTest {
+        val viewModel = createViewModel()
+        val day = viewModel.uiState.value.selectedDate
+        tasks.insertTask(aTask(id = "t1", title = "Gimnasio", date = day))
+        tasks.insertTask(aTask(id = "t2", title = "Llamar al banco", date = day))
+        tasks.insertTask(aTask(id = "t3", title = "Regalo", date = day.plusDays(1)))
+
+        focus.saveFocus(
+            DailyFocus(day, listOf(FocusedTask("t2", "Llamar al banco"), FocusedTask("t1", "Gimnasio"), FocusedTask("t3", "Regalo")))
+        )
+
+        assertEquals(listOf("t2", "t1"), viewModel.uiState.value.focusTasks.map { it.id })
     }
 
     @Test

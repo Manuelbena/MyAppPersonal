@@ -27,6 +27,14 @@ interface TaskDao {
     @Query("UPDATE tasks SET isCompleted = NOT isCompleted, pendingChanges = pendingChanges + 1 WHERE id = :id")
     suspend fun toggleTaskCompletion(id: String)
 
+    /** Cambia la tarea de día (misma hora) y marca que la nueva fecha debe subirse a Google. */
+    @Query("UPDATE tasks SET date = :dateEpoch, dateChanged = 1, pendingChanges = pendingChanges + 1 WHERE id = :id")
+    suspend fun moveTask(id: String, dateEpoch: Long)
+
+    /** Tareas sin hacer hasta ese día incluido (las atrasadas de días anteriores también). */
+    @Query("SELECT * FROM tasks WHERE isCompleted = 0 AND date <= :untilEpoch ORDER BY date ASC, time ASC")
+    fun getUnfinishedTasksUntil(untilEpoch: Long): Flow<List<TaskEntity>>
+
     // region Sincronización
 
     /** Tareas con cambios locales sin subir o que nunca llegaron a Google. */
@@ -43,6 +51,7 @@ interface TaskDao {
      */
     @Query(
         "UPDATE tasks SET remoteId = :remoteId, " +
+            "dateChanged = CASE WHEN pendingChanges = :expectedPending THEN 0 ELSE dateChanged END, " +
             "pendingChanges = CASE WHEN pendingChanges = :expectedPending THEN 0 ELSE pendingChanges END " +
             "WHERE id = :id"
     )

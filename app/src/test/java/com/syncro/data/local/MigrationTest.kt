@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -81,13 +82,30 @@ class MigrationTest {
         assertTrue("Debe seguir pendiente para subirse", "cena" in db.eventDao.getPendingEventIds())
     }
 
-    private fun createVersion9Database(seed: SQLiteDatabase.() -> Unit) {
+    @Test
+    fun `migrar de la version 10 conserva las tareas y sus cambios pendientes, sin marcar la fecha`() = runTest {
+        createDatabase(Schema10.CREATE_STATEMENTS, Schema10.VERSION) {
+            execSQL("INSERT INTO tasks (id, remoteId, taskListId, title, description, date, time, isCompleted, pendingChanges) VALUES ('t1', 'g-t1', NULL, 'Llamar al banco', '', ${DAY.toEpochDay()}, '17:00', 0, 2)")
+        }
+
+        val task = openCurrentVersion().taskDao.getTaskById("t1")!!
+
+        assertEquals("Llamar al banco", task.title)
+        assertEquals(2, task.pendingChanges)
+        // Las tareas existentes no cambiaron de fecha en la app: el patch no debe tocar su fecha en Google
+        assertFalse(task.dateChanged)
+    }
+
+    private fun createVersion9Database(seed: SQLiteDatabase.() -> Unit) =
+        createDatabase(Schema9.CREATE_STATEMENTS, Schema9.VERSION, seed)
+
+    private fun createDatabase(statements: List<String>, version: Int, seed: SQLiteDatabase.() -> Unit) {
         val file = context.getDatabasePath(DB_NAME)
         file.parentFile?.mkdirs()
         SQLiteDatabase.openOrCreateDatabase(file, null).use { db ->
-            Schema9.CREATE_STATEMENTS.forEach(db::execSQL)
+            statements.forEach(db::execSQL)
             db.seed()
-            db.version = Schema9.VERSION
+            db.version = version
         }
     }
 
@@ -102,7 +120,7 @@ class MigrationTest {
     /** Igual que en AppModule pero sin fallbackToDestructiveMigration: un fallo debe verse. */
     private fun openCurrentVersion(): SyncroDatabase =
         Room.databaseBuilder(context, SyncroDatabase::class.java, DB_NAME)
-            .addMigrations(MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10)
+            .addMigrations(MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11)
             .allowMainThreadQueries()
             .build()
             .also { database = it }

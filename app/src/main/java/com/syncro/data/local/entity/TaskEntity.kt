@@ -18,5 +18,8 @@ data class TaskEntity(
     val categoryColor: Int? = null,
     // Cambios locales aún no confirmados por Google (0 = sincronizada). Contador y no booleano
     // para no perder un cambio hecho mientras se subía el anterior
-    @ColumnInfo(defaultValue = "0") val pendingChanges: Int = 0
+    @ColumnInfo(defaultValue = "0") val pendingChanges: Int = 0,
+    // La fecha se cambió en la app (p. ej. al pasar la tarea a mañana) y hay que mandarla a Google.
+    // Sin esta marca el patch no envía la fecha, para no ponérsela a las tareas de Google que no tienen
+    @ColumnInfo(defaultValue = "0") val dateChanged: Boolean = false
 )

@@ -54,6 +54,10 @@ private fun DailyDigest.morningMessage(): DigestMessage {
     val items = (pending + events).sortedForDay(date)
     val lines = items.take(MAX_LINES).map { it.line(date) } + moreLine(items.size) +
         pick(listOf("¡Tú puedes! 💪", "Vamos a por ello 🚀", "Paso a paso, que lo tienes 🙂"))
+    // Con varias tareas y sin prioridades elegidas, la notificación lleva al chat para elegirlas
+    if (offerFocus && pending.size >= MIN_FOCUS_CANDIDATES) {
+        return DigestMessage(title, text, lines + "👉 Toca para elegir tus $MAX_FOCUS_TASKS prioridades", opensAssistant = true)
+    }
     return DigestMessage(title, text, lines)
 }
 
@@ -86,7 +90,9 @@ private fun DailyDigest.eveningMessage(): DigestMessage {
     }
 
     val lines = pending.take(MAX_LINES).map { it.line(date) } + moreLine(pending.size) + "🔜 ${tomorrowSentence()}"
-    return DigestMessage(title, text, lines)
+    if (pending.isEmpty() || !offerLeftovers) return DigestMessage(title, text, lines)
+    // Con pendientes, la notificación lleva al chat, donde se decide qué hacer con ellas
+    return DigestMessage(title, text, lines + "👉 Toca para decidir qué hacer con ellas", opensAssistant = true)
 }
 
 /** "Mañana tienes 2 eventos y 1 tarea; empiezas a las 09:00 con Dentista." */

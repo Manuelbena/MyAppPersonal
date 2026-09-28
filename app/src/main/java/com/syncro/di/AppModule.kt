@@ -5,11 +5,15 @@ import androidx.room.Room
 import com.syncro.data.local.MIGRATION_7_8
 import com.syncro.data.local.MIGRATION_8_9
 import com.syncro.data.local.MIGRATION_9_10
+import com.syncro.data.local.MIGRATION_10_11
 import com.syncro.data.local.SyncroDatabase
 import com.syncro.data.local.dao.EventDao
 import com.syncro.data.local.dao.NoteDao
 import com.syncro.data.local.dao.TaskDao
 import com.syncro.data.local.dao.UserDao
+import com.syncro.data.repository.AccountDataRepositoryImpl
+import com.syncro.data.repository.DailyFocusRepositoryImpl
+import com.syncro.data.repository.SettingsRepositoryImpl
 import com.syncro.data.repository.EventRepositoryImpl
 import com.syncro.data.repository.GoogleSyncRepositoryImpl
 import com.syncro.data.repository.NoteRepositoryImpl
@@ -19,6 +23,9 @@ import com.syncro.data.remote.GoogleApiRemoteDataSource
 import com.syncro.data.remote.GoogleRemoteDataSource
 import com.syncro.data.sync.SyncScheduler
 import com.syncro.data.sync.WorkManagerSyncScheduler
+import com.syncro.domain.repository.AccountDataRepository
+import com.syncro.domain.repository.DailyFocusRepository
+import com.syncro.domain.repository.SettingsRepository
 import com.syncro.domain.repository.EventRepository
 import com.syncro.domain.repository.GoogleSyncRepository
 import com.syncro.domain.repository.NoteRepository
@@ -44,7 +51,7 @@ object AppModule {
             SyncroDatabase::class.java,
             "syncro_db"
         )
-            .addMigrations(MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10)
+            .addMigrations(MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11)
             .fallbackToDestructiveMigration(true)
             .build()
     }
@@ -97,6 +104,18 @@ object AppModule {
     fun provideEventRepository(dao: EventDao): EventRepository {
         return EventRepositoryImpl(dao)
     }
+
+    @Provides
+    @Singleton
+    fun provideDailyFocusRepository(impl: DailyFocusRepositoryImpl): DailyFocusRepository = impl
+
+    @Provides
+    @Singleton
+    fun provideSettingsRepository(impl: SettingsRepositoryImpl): SettingsRepository = impl
+
+    @Provides
+    @Singleton
+    fun provideAccountDataRepository(impl: AccountDataRepositoryImpl): AccountDataRepository = impl
 
     @Provides
     @Singleton

@@ -1,86 +1,266 @@
 package com.syncro.domain.model
 
+import java.time.LocalDate
+
 /** Lo que el usuario contestó a "¿Te recuerdo tu día?". */
 enum class DigestAnswer { ACCEPTED, DECLINED }
+
+/** Lo que puede contestar el usuario tocando una opción bajo un mensaje. */
+enum class ChatReply {
+    ENABLE_DIGEST,
+    NOT_NOW,
+    LEFTOVERS_MOVE_ALL,
+    LEFTOVERS_ONE_BY_ONE,
+    LEFTOVERS_KEEP,
+    /** Confirma las tareas marcadas en la lista del mensaje (prioridades del día). */
+    FOCUS_CONFIRM,
+    FOCUS_SKIP
+}
+
+data class ChatOption(val reply: ChatReply, val label: String)
+
+/** Lo que se puede hacer con cada tarea en el modo "una a una". */
+enum class TaskAction { MOVE_TO_TARGET, OTHER_DAY, DONE }
 
 /**
  * Un mensaje del chat del asistente. El [id] es estable (no depende del orden) para poder
  * recordar cuáles ha leído el usuario.
+ *
+ * @param tasks lista de tareas dentro de la burbuja (las pendientes)
+ * @param taskTarget si no es null, cada tarea lleva sus acciones (pasar a este día, otro día, hecha)
+ * @param maxSelectable si es mayor que 0, las tareas se pueden marcar (hasta ese número) y
+ *   [ChatReply.FOCUS_CONFIRM] confirma las marcadas
+ * @param options opciones para contestar, bajo el mensaje; desaparecen al contestar
  */
-data class ChatMessage(val id: String, val fromAssistant: Boolean, val text: String)
+data class ChatMessage(
+    val id: String,
+    val fromAssistant: Boolean,
+    val text: String,
+    val tasks: List<ChatTask> = emptyList(),
+    val taskTarget: MoveTarget? = null,
+    val maxSelectable: Int = 0,
+    val options: List<ChatOption> = emptyList()
+)
 
-/** Opciones que el usuario puede tocar bajo la pregunta; desaparecen en cuanto contesta. */
-enum class ChatReply(val label: String) {
-    ENABLE_DIGEST("Sí, avísame"),
-    NOT_NOW("Ahora no")
-}
-
-data class AssistantConversation(val messages: List<ChatMessage>, val replies: List<ChatReply>) {
+data class AssistantConversation(val messages: List<ChatMessage>) {
     /** Mensajes del asistente que el usuario aún no ha visto (el número del icono de Asistente). */
     fun unreadCount(readIds: Set<String>): Int = messages.count { it.fromAssistant && it.id !in readIds }
 }
 
 /**
  * Construye la conversación a partir de lo que se sabe (no es un historial guardado): así siempre
- * refleja el estado real, p. ej. si el usuario activa las notificaciones desde los ajustes.
+ * refleja el estado real, p. ej. si el usuario activa las notificaciones desde los ajustes o
+ * completa una tarea desde Inicio.
  *
- * @param answer lo que contestó el usuario, o null si aún no ha contestado
+ * @param answer lo que contestó el usuario a los avisos, o null si aún no ha contestado
  * @param notificationsAllowed si Android deja publicar los avisos ahora mismo
+ * @param leftovers las tareas pendientes del repaso actual (null si aún no se saben)
+ * @param outcomes lo que el usuario decidió en cada repaso (el actual y los recientes)
+ * @param focus las tareas de hoy entre las que elegir prioridades (null desde las 21:00)
+ * @param focusHistory las prioridades ya elegidas (la de hoy y las recientes)
  * @param clearedIds mensajes que el usuario borró al vaciar el chat (no vuelven a salir)
  */
 fun assistantConversation(
     answer: DigestAnswer?,
     notificationsAllowed: Boolean,
+    leftovers: LeftoverTasks? = null,
+    outcomes: List<LeftoverOutcome> = emptyList(),
+    focus: FocusCandidates? = null,
+    focusHistory: List<DailyFocus> = emptyList(),
     clearedIds: Set<String> = emptySet()
 ): AssistantConversation {
+    val messages = digestMessages(answer, notificationsAllowed)
+
+    // Repasos y prioridades por orden de llegada: el repaso de un día se contesta por la noche (o a
+    // la mañana siguiente), así que va detrás de las prioridades de ese día y delante de las del siguiente
+    val blocks = mutableListOf<Pair<Moment, List<ChatMessage>>>()
+    outcomes.forEach { outcome ->
+        val pending = leftovers?.takeIf { it.reviewDate == outcome.reviewDate }?.tasks.orEmpty()
+        blocks += Moment(outcome.reviewDate.plusDays(1), LEFTOVERS_ORDER) to answeredLeftoverMessages(outcome, pending)
+    }
+    val unanswered = leftovers?.takeIf { current ->
+        current.tasks.isNotEmpty() && outcomes.none { it.reviewDate == current.reviewDate }
+    }
+    unanswered?.let { blocks += Moment(it.reviewDate.plusDays(1), LEFTOVERS_ORDER) to listOf(leftoverQuestion(it)) }
+    val leftoverPending = unanswered != null
+    focusHistory.forEach { chosen -> blocks += Moment(chosen.date, FOCUS_ORDER) to answeredFocusMessages(chosen) }
+    // Las prioridades se preguntan cuando ya no queda un repaso por contestar: lo que se pase a hoy
+    // también puede ser prioridad
+    if (focus != null && !leftoverPending && focusHistory.none { it.date == focus.date } &&
+        focus.tasks.size >= MIN_FOCUS_CANDIDATES
+    ) {
+        blocks += Moment(focus.date, FOCUS_ORDER) to listOf(focusQuestion(focus))
+    }
+    blocks.sortedWith(compareBy({ it.first.day }, { it.first.order })).forEach { messages += it.second }
+
+    return AssistantConversation(messages.filter { it.id !in clearedIds })
+}
+
+/** Posición de un bloque en el chat: el día y, dentro del día, repaso (antes) o prioridades. */
+private data class Moment(val day: LocalDate, val order: Int)
+private const val LEFTOVERS_ORDER = 0
+private const val FOCUS_ORDER = 1
+
+// region Avisos diarios
+
+private fun digestMessages(answer: DigestAnswer?, notificationsAllowed: Boolean): MutableList<ChatMessage> {
     val messages = mutableListOf(assistant(ID_HELLO, "¡Hola! Soy tu asistente. Por aquí te iré contando cosas de tu día."))
 
-    when {
-        // Ya tiene los avisos y nunca se le preguntó (p. ej. Android 12, sin permiso que pedir): se le cuenta y ya
-        answer == null && notificationsAllowed ->
-            messages += assistant(ID_DIGEST_ON, "Cada mañana a las 9:00 te cuento lo que te espera, y a las 21:00 cómo ha ido el día. 🔔")
-        else -> {
+    // Ya tiene los avisos y nunca se le preguntó (p. ej. Android 12, sin permiso que pedir): se le cuenta y ya
+    if (answer == null && notificationsAllowed) {
+        messages += assistant(ID_DIGEST_ON, "Cada mañana a las 9:00 te cuento lo que te espera, y a las 21:00 cómo ha ido el día. 🔔")
+        return messages
+    }
+
+    messages += assistant(
+        ID_DIGEST_QUESTION,
+        "¿Te recuerdo tu día? Cada mañana a las 9:00 te cuento lo que te espera, y a las 21:00 " +
+            "cómo ha ido el día. Funciona también sin internet.",
+        options = if (answer == null) {
+            listOf(ChatOption(ChatReply.ENABLE_DIGEST, "Sí, avísame"), ChatOption(ChatReply.NOT_NOW, "Ahora no"))
+        } else {
+            emptyList()
+        }
+    )
+    when (answer) {
+        null -> Unit
+        DigestAnswer.ACCEPTED -> {
+            messages += user(ID_USER_ANSWER, "Sí, avísame")
+            messages += if (notificationsAllowed) {
+                assistant(ID_DIGEST_ACCEPTED, "¡Hecho! Te escribo mañana a las 9:00. 😊")
+            } else {
+                // Aceptó pero Android no lo permite (denegó el diálogo o las tiene silenciadas)
+                assistant(
+                    ID_DIGEST_BLOCKED,
+                    "Android no me deja enviarte avisos. Puedes activarlos en los ajustes de notificaciones de Syncro."
+                )
+            }
+        }
+        DigestAnswer.DECLINED -> {
+            messages += user(ID_USER_ANSWER, "Ahora no")
             messages += assistant(
-                ID_DIGEST_QUESTION,
-                "¿Te recuerdo tu día? Cada mañana a las 9:00 te cuento lo que te espera, y a las 21:00 " +
-                    "cómo ha ido el día. Funciona también sin internet."
+                ID_DIGEST_DECLINED,
+                "Vale, sin problema. Si cambias de idea, puedes activarlos en los ajustes de notificaciones de Syncro."
             )
-            when (answer) {
-                null -> Unit
-                DigestAnswer.ACCEPTED -> {
-                    messages += user(ID_USER_ANSWER, ChatReply.ENABLE_DIGEST.label)
-                    messages += if (notificationsAllowed) {
-                        assistant(ID_DIGEST_ACCEPTED, "¡Hecho! Te escribo mañana a las 9:00. 😊")
-                    } else {
-                        // Aceptó pero Android no lo permite (denegó el diálogo o las tiene silenciadas)
-                        assistant(
-                            ID_DIGEST_BLOCKED,
-                            "Android no me deja enviarte avisos. Puedes activarlos en los ajustes de notificaciones de Syncro."
-                        )
-                    }
-                }
-                DigestAnswer.DECLINED -> {
-                    messages += user(ID_USER_ANSWER, ChatReply.NOT_NOW.label)
-                    messages += assistant(
-                        ID_DIGEST_DECLINED,
-                        "Vale, sin problema. Si cambias de idea, puedes activarlos en los ajustes de notificaciones de Syncro."
+        }
+    }
+    return messages
+}
+
+// endregion
+
+// region Tareas pendientes
+
+private fun leftoverQuestionText(target: MoveTarget, total: Int): String {
+    val greeting = if (target == MoveTarget.TODAY) "¡Buenos días! ☀️ " else ""
+    val verb = if (total == 1) "quedó 1 tarea" else "quedaron $total tareas"
+    return "${greeting}Se te $verb sin hacer. ¿Qué hacemos?"
+}
+
+private fun moveAllLabel(target: MoveTarget) = if (target == MoveTarget.TODAY) "Todas a hoy" else "Todas a mañana"
+
+/** La pregunta, con la lista de tareas y las tres opciones. */
+private fun leftoverQuestion(leftovers: LeftoverTasks): ChatMessage = assistant(
+    leftoverId(leftovers.reviewDate),
+    leftoverQuestionText(leftovers.target, leftovers.tasks.size),
+    tasks = leftovers.tasks.map { it.toChatTask(leftovers.reviewDate) },
+    options = listOf(
+        ChatOption(ChatReply.LEFTOVERS_MOVE_ALL, moveAllLabel(leftovers.target)),
+        ChatOption(ChatReply.LEFTOVERS_ONE_BY_ONE, "Elegir una a una"),
+        ChatOption(ChatReply.LEFTOVERS_KEEP, "Déjalas")
+    )
+)
+
+/** Un repaso ya contestado: la pregunta (sin lista ni opciones), la respuesta y cómo quedó. */
+private fun answeredLeftoverMessages(outcome: LeftoverOutcome, pending: List<SyncroItem.Task>): List<ChatMessage> {
+    val id = leftoverId(outcome.reviewDate)
+    val question = assistant(id, leftoverQuestionText(outcome.target, outcome.total))
+    val targetName = outcome.target.label.lowercase()
+
+    return when (outcome.choice) {
+        LeftoverChoice.MOVE_ALL -> listOf(
+            question,
+            user("$id-answer", moveAllLabel(outcome.target)),
+            assistant("$id-done", "Hecho ✅ He pasado ${tasksCount(outcome.total)} a $targetName.")
+        )
+        LeftoverChoice.KEEP -> listOf(
+            question,
+            user("$id-answer", "Déjalas"),
+            assistant("$id-done", "Vale, las dejo como están. Te las vuelvo a recordar en el próximo repaso.")
+        )
+        LeftoverChoice.ONE_BY_ONE -> buildList {
+            add(question)
+            add(user("$id-answer", "Elegir una a una"))
+            if (pending.isNotEmpty()) {
+                // En curso: la lista con las acciones de cada tarea; se vacía según las resuelve
+                add(
+                    assistant(
+                        "$id-pick",
+                        "Vale, dime qué hago con cada una:",
+                        tasks = pending.map { it.toChatTask(outcome.reviewDate) },
+                        taskTarget = outcome.target
                     )
-                }
+                )
+            } else {
+                add(assistant("$id-done", oneByOneSummary(outcome)))
             }
         }
     }
-
-    val visible = messages.filter { it.id !in clearedIds }
-    // Las opciones solo mientras la pregunta está sin contestar (y a la vista)
-    val replies = if (answer == null && visible.any { it.id == ID_DIGEST_QUESTION }) {
-        listOf(ChatReply.ENABLE_DIGEST, ChatReply.NOT_NOW)
-    } else {
-        emptyList()
-    }
-    return AssistantConversation(visible, replies)
 }
 
-private fun assistant(id: String, text: String) = ChatMessage(id, fromAssistant = true, text = text)
+private fun oneByOneSummary(outcome: LeftoverOutcome): String {
+    val parts = listOfNotNull(
+        outcome.moved.takeIf { it > 0 }?.let { "he movido ${tasksCount(it)}" },
+        outcome.done.takeIf { it > 0 }?.let { if (it == 1) "has hecho 1" else "has hecho $it" }
+    )
+    return if (parts.isEmpty()) "Listo ✅ Ya no te queda nada pendiente." else "Listo ✅ ${parts.joinToString(" y ").replaceFirstChar { it.uppercase() }}."
+}
+
+private fun leftoverId(reviewDate: LocalDate) = "leftovers-$reviewDate"
+
+// endregion
+
+// region Prioridades del día
+
+private fun focusQuestion(focus: FocusCandidates): ChatMessage = assistant(
+    focusId(focus.date),
+    "¿Cuáles son tus $MAX_FOCUS_TASKS prioridades de hoy? Márcalas y te las destaco en Inicio. 🎯",
+    tasks = focus.tasks.map { it.toChatTask(focus.date) },
+    maxSelectable = MAX_FOCUS_TASKS,
+    options = listOf(ChatOption(ChatReply.FOCUS_CONFIRM, "Listo"), ChatOption(ChatReply.FOCUS_SKIP, "Hoy no"))
+)
+
+private fun answeredFocusMessages(focus: DailyFocus): List<ChatMessage> {
+    val id = focusId(focus.date)
+    val question = assistant(id, "¿Cuáles son tus $MAX_FOCUS_TASKS prioridades de hoy? Márcalas y te las destaco en Inicio. 🎯")
+    return if (focus.skipped) {
+        listOf(
+            question,
+            user("$id-answer", "Hoy no"),
+            assistant("$id-done", "Vale, hoy sin prioridades. ¡Que vaya bien el día!")
+        )
+    } else {
+        listOf(
+            question,
+            user("$id-answer", focus.tasks.joinToString("\n") { "⭐ ${it.title}" }),
+            assistant("$id-done", "¡Perfecto! Te las destaco en Inicio. A por ellas 💪")
+        )
+    }
+}
+
+private fun focusId(date: LocalDate) = "focus-$date"
+
+// endregion
+
+private fun assistant(
+    id: String,
+    text: String,
+    tasks: List<ChatTask> = emptyList(),
+    taskTarget: MoveTarget? = null,
+    maxSelectable: Int = 0,
+    options: List<ChatOption> = emptyList()
+) = ChatMessage(id, fromAssistant = true, text = text, tasks = tasks, taskTarget = taskTarget, maxSelectable = maxSelectable, options = options)
+
 private fun user(id: String, text: String) = ChatMessage(id, fromAssistant = false, text = text)
 
 private const val ID_HELLO = "hello"

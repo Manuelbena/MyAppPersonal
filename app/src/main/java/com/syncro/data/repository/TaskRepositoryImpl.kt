@@ -55,6 +55,13 @@ class TaskRepositoryImpl @Inject constructor(
         dao.toggleTaskCompletion(taskId)
     }
 
+    override suspend fun moveTask(taskId: String, date: LocalDate) {
+        dao.moveTask(taskId, date.toEpochDay())
+    }
+
+    override fun getUnfinishedTasksUntil(date: LocalDate): Flow<List<SyncroItem.Task>> =
+        dao.getUnfinishedTasksUntil(date.toEpochDay()).map { entities -> entities.map { it.toDomain() } }
+
     private fun TaskEntity.toDomain(): SyncroItem.Task {
         return SyncroItem.Task(
             id = id,

@@ -13,16 +13,23 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.LinkAnnotation
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLinkStyles
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.syncro.R
+import com.syncro.presentation.legal.LegalDocumentId
 
 @Composable
 fun LoginScreen(
     onLoginSuccess: () -> Unit,
+    onOpenLegal: (LegalDocumentId) -> Unit,
     viewModel: LoginViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -105,6 +112,34 @@ fun LoginScreen(
                     fontSize = 14.sp
                 )
             }
+
+            Spacer(modifier = Modifier.height(32.dp))
+            LegalConsentText(onOpenLegal)
         }
     }
+}
+
+/** "Al continuar, aceptas los Términos de uso y la Política de privacidad", con los dos enlaces. */
+@Composable
+private fun LegalConsentText(onOpenLegal: (LegalDocumentId) -> Unit) {
+    val linkStyle = TextLinkStyles(
+        style = SpanStyle(color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
+    )
+    val text = buildAnnotatedString {
+        append("Al continuar, aceptas los ")
+        withLink(LinkAnnotation.Clickable("terms", linkStyle) { onOpenLegal(LegalDocumentId.TERMS) }) {
+            append("Términos de uso")
+        }
+        append(" y la ")
+        withLink(LinkAnnotation.Clickable("privacy", linkStyle) { onOpenLegal(LegalDocumentId.PRIVACY) }) {
+            append("Política de privacidad")
+        }
+        append(".")
+    }
+    Text(
+        text,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        textAlign = TextAlign.Center
+    )
 }

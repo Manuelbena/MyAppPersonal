@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -360,6 +361,46 @@ class GoogleSyncRepositoryImplTest {
         assertEquals("completed", remote.status)
         // En local la tarea está en "hoy", pero en Google no tenía fecha: el patch no debe añadirla
         assertNull(remote.due)
+    }
+
+    @Test
+    fun `pasar una tarea a otro dia manda la nueva fecha a Google y la marca se limpia`() = runTest {
+        google.addTask(googleTask("g-1", "Llamar al banco", due = DAY))
+        taskDao.insertTask(aSyncedTaskEntity(id = "t1", remoteId = "g-1"))
+
+        taskDao.moveTask("t1", DAY.plusDays(1).toEpochDay())
+        repository.pushTask("t1")
+
+        assertEquals("${DAY.plusDays(1)}T00:00:00.000Z", google.task("g-1")!!.due)
+        val local = taskDao.getTaskById("t1")!!
+        assertEquals(0, local.pendingChanges)
+        assertFalse(local.dateChanged)
+    }
+
+    @Test
+    fun `una tarea pasada a otro dia no vuelve a su fecha antigua al sincronizar`() = runTest {
+        google.addTask(googleTask("g-1", "Llamar al banco", due = DAY))
+        taskDao.insertTask(aSyncedTaskEntity(id = "t1", remoteId = "g-1"))
+
+        taskDao.moveTask("t1", DAY.plusDays(1).toEpochDay())
+        repository.pushTask("t1")
+        repository.syncTasks(force = true)
+
+        assertEquals(DAY.plusDays(1).toEpochDay(), taskDao.getTaskById("t1")!!.date)
+    }
+
+    @Test
+    fun `pasar de dia una tarea sin conexion la deja pendiente con la marca de fecha`() = runTest {
+        google.addTask(googleTask("g-1", "Llamar al banco", due = DAY))
+        taskDao.insertTask(aSyncedTaskEntity(id = "t1", remoteId = "g-1"))
+        google.networkError = IOException("Sin conexión")
+
+        taskDao.moveTask("t1", DAY.plusDays(1).toEpochDay())
+        repository.pushTask("t1")
+
+        val local = taskDao.getTaskById("t1")!!
+        assertTrue(local.dateChanged)
+        assertTrue("t1" in taskDao.getPendingTaskIds())
     }
 
     @Test

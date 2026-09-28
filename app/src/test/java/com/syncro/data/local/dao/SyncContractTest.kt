@@ -6,6 +6,7 @@ import com.syncro.testutil.DAY
 import com.syncro.testutil.aSyncedEventEntity
 import com.syncro.testutil.aSyncedTaskEntity
 import com.syncro.testutil.createInMemoryDatabase
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -150,6 +151,31 @@ class SyncContractTest {
         assertEquals("g-nuevo", task.remoteId)
         assertEquals(2, task.pendingChanges)
         assertTrue(task.id in taskDao.getPendingTaskIds())
+    }
+
+    @Test
+    fun `si la tarea se mueve otra vez durante la subida la marca de fecha se conserva`() = runTest {
+        taskDao.insertTask(aSyncedTaskEntity(id = "t1", remoteId = "g-1"))
+        taskDao.moveTask("t1", DAY.plusDays(1).toEpochDay())
+        taskDao.moveTask("t1", DAY.plusDays(2).toEpochDay()) // durante la subida del primer cambio
+
+        taskDao.markSynced("t1", remoteId = "g-1", expectedPending = 1)
+
+        val task = taskDao.getTaskById("t1")!!
+        assertTrue("La segunda fecha aún tiene que llegar a Google", task.dateChanged)
+        assertEquals(DAY.plusDays(2).toEpochDay(), task.date)
+    }
+
+    @Test
+    fun `las tareas sin hacer incluyen las atrasadas pero no las hechas ni las futuras`() = runTest {
+        taskDao.insertTask(aSyncedTaskEntity(id = "ayer", remoteId = "g-1", date = DAY.minusDays(1)))
+        taskDao.insertTask(aSyncedTaskEntity(id = "hoy", remoteId = "g-2", date = DAY))
+        taskDao.insertTask(aSyncedTaskEntity(id = "hecha", remoteId = "g-3", date = DAY, isCompleted = true))
+        taskDao.insertTask(aSyncedTaskEntity(id = "manana", remoteId = "g-4", date = DAY.plusDays(1)))
+
+        val ids = taskDao.getUnfinishedTasksUntil(DAY.toEpochDay()).first().map { it.id }
+
+        assertEquals(listOf("ayer", "hoy"), ids)
     }
 
     @Test
