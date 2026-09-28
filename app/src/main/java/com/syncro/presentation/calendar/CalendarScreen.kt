@@ -2,7 +2,8 @@ package com.syncro.presentation.calendar
 
 import androidx.compose.ui.platform.LocalContext
 import com.syncro.presentation.components.shareEvent
-import com.syncro.presentation.home.components.TaskDetailDialog
+import com.syncro.presentation.event.EventDetailSheet
+import com.syncro.presentation.task.TaskDetailSheet
 import com.syncro.presentation.theme.toColor
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -232,15 +233,35 @@ fun DayDetailsDialog(
     viewModel: CalendarViewModel
 ) {
     val context = LocalContext.current
-    var selectedTask by remember { mutableStateOf<SyncroItem.Task?>(null) }
+    // Se guarda el id y no el elemento para que el detalle refleje los cambios (subtareas, completar)
+    var selectedTaskId by remember { mutableStateOf<String?>(null) }
+    var selectedEventId by remember { mutableStateOf<String?>(null) }
 
-    selectedTask?.let { task ->
-        TaskDetailDialog(
-            task = task,
-            onDismiss = { selectedTask = null },
-            onComplete = { viewModel.toggleTaskCompletion(task.id) }
-        )
-    }
+    selectedTaskId
+        ?.let { id -> items.firstOrNull { it is SyncroItem.Task && it.id == id } as SyncroItem.Task? }
+        ?.let { task ->
+            TaskDetailSheet(
+                task = task,
+                onDismiss = { selectedTaskId = null },
+                onToggleCompleted = { viewModel.toggleTaskCompletion(task.id) }
+            )
+        }
+
+    selectedEventId
+        ?.let { id -> items.firstOrNull { it is SyncroItem.Event && it.id == id } as SyncroItem.Event? }
+        ?.let { event ->
+            EventDetailSheet(
+                event = event,
+                onDismiss = { selectedEventId = null },
+                onToggleCompleted = { viewModel.toggleEventCompletion(event.id) },
+                onSubtaskToggle = { viewModel.toggleSubtaskCompletion(event.id, it) },
+                onEdit = {
+                    selectedEventId = null
+                    onEditEvent(event)
+                },
+                onShare = { context.shareEvent(event) }
+            )
+        }
 
     BasicAlertDialog(
         onDismissRequest = onDismiss,
@@ -319,15 +340,14 @@ fun DayDetailsDialog(
                                             onToggleEvent = {
                                                 viewModel.toggleEventCompletion(item.id)
                                             },
-                                            onEditClick = { onEditEvent(item) },
-                                            onShareClick = { context.shareEvent(item) }
+                                            onClick = { selectedEventId = item.id }
                                         )
                                     }
                                     is SyncroItem.Task -> {
                                         TaskRow(
                                             task = item,
                                             onToggle = { viewModel.toggleTaskCompletion(item.id) },
-                                            onClick = { selectedTask = item }
+                                            onClick = { selectedTaskId = item.id }
                                         )
                                     }
                                     is SyncroItem.Note -> {}

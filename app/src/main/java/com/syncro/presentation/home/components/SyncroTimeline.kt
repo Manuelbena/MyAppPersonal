@@ -1,52 +1,57 @@
 package com.syncro.presentation.home.components
 
-import com.syncro.presentation.components.toDisplayTime
-import com.syncro.presentation.theme.color
-import com.syncro.presentation.theme.label
-import com.syncro.presentation.theme.toColor
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.*
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.syncro.domain.model.Subtask
 import com.syncro.domain.model.SyncroItem
+import com.syncro.presentation.components.Pill
+import com.syncro.presentation.components.SubtaskProgress
+import com.syncro.presentation.components.categoryIcon
+import com.syncro.presentation.components.toDisplayTime
 import com.syncro.presentation.theme.Emerald500
-import com.syncro.presentation.theme.Slate100
-import com.syncro.presentation.theme.Slate200
-import com.syncro.presentation.theme.Slate500
-import com.syncro.presentation.theme.Slate800
+import com.syncro.presentation.theme.color
+import com.syncro.presentation.theme.label
+import com.syncro.presentation.theme.toColor
 
+/**
+ * Tarjeta de un evento en el timeline. Muestra lo esencial (título, lugar, descripción corta,
+ * categoría y progreso de subtareas); tocarla abre el detalle completo, con editar y compartir.
+ */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun EventCard(
     event: SyncroItem.Event,
     onSubtaskToggle: (String) -> Unit,
     onToggleEvent: () -> Unit = {},
-    onEditClick: () -> Unit = {},
-    onShareClick: () -> Unit = {}
+    onClick: () -> Unit = {}
 ) {
-    var isSubtasksExpanded by remember { mutableStateOf(true) }
+    var isSubtasksExpanded by remember { mutableStateOf(false) }
+    // Verde si está completado, si no el color de la categoría (igual que en el detalle)
+    val accent = if (event.isCompleted) Emerald500 else event.categoryColor.toColor()
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 8.dp)
+            .padding(vertical = 6.dp)
     ) {
         TimeColumn(
             isAllDay = event.isAllDay,
@@ -56,155 +61,135 @@ fun EventCard(
             modifier = Modifier.padding(top = 16.dp)
         )
 
-        // Tarjeta
         Surface(
+            onClick = onClick,
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(20.dp),
+            shape = RoundedCornerShape(22.dp),
             color = MaterialTheme.colorScheme.surface,
-            shadowElevation = 0.dp,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f))
         ) {
-            Row(modifier = Modifier.height(IntrinsicSize.Min)) {
-                // Tira de color lateral
+            Row(
+                modifier = Modifier
+                    .background(Brush.horizontalGradient(listOf(accent.copy(alpha = 0.10f), Color.Transparent)))
+                    .height(IntrinsicSize.Min)
+                    .padding(14.dp)
+            ) {
+                // Barra de color redondeada
                 Box(
                     modifier = Modifier
-                        .width(6.dp)
+                        .width(4.dp)
                         .fillMaxHeight()
-                        .background(if (event.isCompleted) Emerald500 else event.categoryColor.toColor())
+                        .clip(RoundedCornerShape(50))
+                        .background(accent)
                 )
+                Spacer(Modifier.width(12.dp))
 
-                Column(
-                    modifier = Modifier
-                        .padding(16.dp)
-                        .fillMaxWidth()
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        // Checkbox para el evento principal
-                        Icon(
-                            imageVector = if (event.isCompleted) Icons.Rounded.CheckCircle else Icons.Rounded.RadioButtonUnchecked,
-                            contentDescription = "Completar evento",
-                            tint = if (event.isCompleted) Emerald500 else event.categoryColor.toColor().copy(alpha = 0.5f),
-                            modifier = Modifier
-                                .size(22.dp)
-                                .clickable(
-                                    interactionSource = remember { MutableInteractionSource() },
-                                    indication = null,
-                                    onClick = onToggleEvent
-                                )
-                        )
-                        
-                        Spacer(modifier = Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = event.title,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp,
+                        lineHeight = 21.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (event.isCompleted) 0.6f else 1f),
+                        textDecoration = if (event.isCompleted) TextDecoration.LineThrough else TextDecoration.None
+                    )
 
-                        Text(
-                            text = event.title,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 16.sp,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            textDecoration = if (event.isCompleted) TextDecoration.LineThrough else TextDecoration.None,
-                            modifier = Modifier.weight(1f)
-                        )
-                        
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Rounded.Share,
-                                contentDescription = "Compartir",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier
-                                    .size(20.dp)
-                                    .clickable(
-                                        interactionSource = remember { MutableInteractionSource() },
-                                        indication = null,
-                                        onClick = onShareClick
-                                    )
-                            )
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Icon(
-                                imageVector = Icons.Rounded.Edit,
-                                contentDescription = "Editar",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier
-                                    .size(20.dp)
-                                    .clickable(
-                                        interactionSource = remember { MutableInteractionSource() },
-                                        indication = null,
-                                        onClick = onEditClick
-                                    )
-                            )
-                        }
-                    }
-                    
-                    if (!event.description.isNullOrEmpty()) {
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = event.description,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontSize = 13.sp,
-                            lineHeight = 18.sp
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    // Etiquetas (Tags)
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        TagChip(text = event.categoryText, color = event.categoryColor.toColor())
-                        
-                        if (event.priority != null) {
-                            TagChip(text = event.priority.label, color = event.priority.color)
-                        }
-                    }
-
-                    // SECCIÓN DE SUBTAREAS
-                    if (event.subtasks.isNotEmpty()) {
-                        Spacer(modifier = Modifier.height(16.dp))
-                        val completedCount = event.subtasks.count { it.isCompleted }
-                        
+                    if (!event.location.isNullOrBlank()) {
                         Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(8.dp))
-                                .clickable { isSubtasksExpanded = !isSubtasksExpanded }
-                                .padding(vertical = 4.dp),
+                            modifier = Modifier.padding(top = 4.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Icon(
-                                imageVector = if (isSubtasksExpanded) Icons.Rounded.KeyboardArrowUp else Icons.Rounded.KeyboardArrowDown,
-                                contentDescription = "Expandir subtareas",
-                                tint = event.categoryColor.toColor(),
-                                modifier = Modifier.size(20.dp)
+                                Icons.Rounded.Place,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(14.dp)
                             )
-                            Spacer(modifier = Modifier.width(4.dp))
+                            Spacer(Modifier.width(4.dp))
                             Text(
-                                text = "SUBTAREAS ($completedCount/${event.subtasks.size})",
-                                fontSize = 11.sp,
-                                color = event.categoryColor.toColor(),
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 0.5.sp
+                                text = event.location,
+                                fontSize = 13.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
+                    }
 
-                        if (isSubtasksExpanded) {
-                            HorizontalDivider(
-                                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.1f),
-                                modifier = Modifier.padding(vertical = 8.dp)
+                    if (!event.description.isNullOrBlank()) {
+                        Text(
+                            text = event.description,
+                            fontSize = 13.sp,
+                            lineHeight = 18.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
+                    }
+
+                    Spacer(Modifier.height(10.dp))
+                    // FlowRow: en tarjetas estrechas (diálogo del Calendario) la prioridad baja de línea
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Pill(categoryIcon(event.categoryText), event.categoryText, event.categoryColor.toColor(), compact = true)
+                        event.priority?.let { Pill(Icons.Rounded.Flag, it.label, it.color, compact = true) }
+                    }
+
+                    if (event.subtasks.isNotEmpty()) {
+                        val done = event.subtasks.count { it.isCompleted }
+                        // Resumen de subtareas; al tocarlo se despliegan para marcarlas aquí mismo
+                        Row(
+                            modifier = Modifier
+                                .padding(top = 4.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable { isSubtasksExpanded = !isSubtasksExpanded }
+                                .heightIn(min = MIN_TOUCH_TARGET),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            SubtaskProgress(done, event.subtasks.size, accent, Modifier.weight(1f))
+                            Spacer(Modifier.width(10.dp))
+                            Text(
+                                text = "$done/${event.subtasks.size}",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = accent
                             )
-                            
-                            event.subtasks.forEach { subtask ->
-                                SubtaskRow(
-                                    subtask = subtask, 
-                                    color = event.categoryColor.toColor(),
-                                    onClick = { onSubtaskToggle(subtask.title) }
-                                )
+                            Icon(
+                                imageVector = if (isSubtasksExpanded) Icons.Rounded.KeyboardArrowUp else Icons.Rounded.KeyboardArrowDown,
+                                contentDescription = if (isSubtasksExpanded) "Ocultar subtareas" else "Ver subtareas",
+                                tint = accent,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                        AnimatedVisibility(visible = isSubtasksExpanded) {
+                            Column(Modifier.padding(top = 4.dp)) {
+                                event.subtasks.forEach { subtask ->
+                                    SubtaskRow(
+                                        subtask = subtask,
+                                        color = accent,
+                                        onClick = { onSubtaskToggle(subtask.title) },
+                                        maxLines = 1
+                                    )
+                                }
                             }
                         }
                     }
                 }
+
+                // El área táctil (48 dp) se sale hacia el margen para que el círculo quede alineado
+                // con la esquina de la tarjeta como si midiera solo lo que se ve
+                CompletionToggle(
+                    isCompleted = event.isCompleted,
+                    uncheckedTint = accent.copy(alpha = 0.6f),
+                    contentDescription = "Completar evento",
+                    onToggle = onToggleEvent,
+                    modifier = Modifier.offset(x = 11.dp, y = (-11).dp)
+                )
             }
         }
     }
@@ -212,12 +197,14 @@ fun EventCard(
 
 @Composable
 fun SubtaskRow(
-    subtask: Subtask, 
+    subtask: Subtask,
     color: Color,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    // En la tarjeta cabe una línea; en el detalle se lee entera
+    maxLines: Int = Int.MAX_VALUE
 ) {
     val interactionSource = remember { MutableInteractionSource() }
-    
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -226,7 +213,8 @@ fun SubtaskRow(
                 indication = null,
                 onClick = onClick
             )
-            .padding(vertical = 6.dp),
+            .heightIn(min = MIN_TOUCH_TARGET)
+            .padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
@@ -239,12 +227,18 @@ fun SubtaskRow(
         Text(
             text = subtask.title,
             fontSize = 14.sp,
+            maxLines = maxLines,
+            overflow = TextOverflow.Ellipsis,
             color = if (subtask.isCompleted) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f) else MaterialTheme.colorScheme.onSurface,
             textDecoration = if (subtask.isCompleted) TextDecoration.LineThrough else TextDecoration.None
         )
     }
 }
 
+/**
+ * Fila de una tarea en el timeline. Relleno suave y sin borde ni barra de color, para que nunca
+ * se confunda con un evento.
+ */
 @Composable
 fun TaskRow(
     task: SyncroItem.Task,
@@ -254,53 +248,49 @@ fun TaskRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 8.dp),
+            .padding(vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         TimeColumn(isAllDay = task.isAllDay, start = task.time)
 
         Surface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable(onClick = onClick),
-            shape = RoundedCornerShape(24.dp),
-            color = MaterialTheme.colorScheme.surface,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
+            onClick = onClick,
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(18.dp),
+            color = if (task.isCompleted) Emerald500.copy(alpha = 0.08f) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.045f)
         ) {
+            // El botón de completar ya mide 48 dp, así que da el alto mínimo de la fila (56 dp con el margen)
             Row(
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                modifier = Modifier.padding(start = 4.dp, end = 14.dp, top = 4.dp, bottom = 4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    imageVector = if (task.isCompleted) Icons.Rounded.CheckCircleOutline else Icons.Rounded.RadioButtonUnchecked,
+                CompletionToggle(
+                    isCompleted = task.isCompleted,
+                    uncheckedTint = task.categoryColor?.toColor() ?: MaterialTheme.colorScheme.outline,
                     contentDescription = "Completar",
-                    tint = if (task.isCompleted) Emerald500 else MaterialTheme.colorScheme.outline,
-                    modifier = Modifier
-                        .size(24.dp)
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null,
-                            onClick = onToggle
-                        )
+                    onToggle = onToggle
                 )
-                
-                Spacer(modifier = Modifier.width(12.dp))
-                
-                Column {
+
+                Spacer(modifier = Modifier.width(4.dp))
+
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = task.title,
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (task.isCompleted) 0.6f else 1f),
                         textDecoration = if (task.isCompleted) TextDecoration.LineThrough else TextDecoration.None
                     )
-                    
-                    if (!task.description.isNullOrEmpty()) {
+
+                    if (!task.description.isNullOrBlank()) {
                         Text(
                             text = task.description,
                             fontSize = 12.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                            maxLines = 1
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                 }
@@ -309,161 +299,30 @@ fun TaskRow(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+/** Área táctil mínima de Material (48 dp) para todo lo que se pulsa. */
+private val MIN_TOUCH_TARGET = 48.dp
+
+/**
+ * Círculo para completar un evento o una tarea: verde con check cuando está hecho. Se ve de 26 dp
+ * pero, como IconButton, responde en 48 dp.
+ */
 @Composable
-fun TaskDetailDialog(
-    task: SyncroItem.Task,
-    onDismiss: () -> Unit,
-    onComplete: () -> Unit
+private fun CompletionToggle(
+    isCompleted: Boolean,
+    uncheckedTint: Color,
+    contentDescription: String,
+    onToggle: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false),
-        modifier = Modifier.padding(24.dp),
-        content = {
-            Surface(
-                shape = RoundedCornerShape(28.dp),
-                color = MaterialTheme.colorScheme.surface,
-                tonalElevation = 0.dp
-            ) {
-                Column(
-                    modifier = Modifier
-                        .padding(24.dp)
-                        .fillMaxWidth()
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = task.title,
-                            style = MaterialTheme.typography.headlineSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        
-                        IconButton(
-                            onClick = onDismiss,
-                            modifier = Modifier
-                                .size(32.dp)
-                                .background(
-                                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f), 
-                                    RoundedCornerShape(16.dp)
-                                )
-                        ) {
-                            Icon(
-                                imageVector = Icons.Rounded.Close,
-                                contentDescription = "Cerrar",
-                                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-                    }
-                    
-                    Spacer(modifier = Modifier.height(16.dp))
-                    
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Rounded.Schedule,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = if (task.isAllDay) "Todo el día" else task.time.toDisplayTime(),
-                            fontSize = 14.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    
-                    if (!task.description.isNullOrEmpty()) {
-                        Spacer(modifier = Modifier.height(24.dp))
-                        Text(
-                            text = task.description,
-                            fontSize = 16.sp,
-                            lineHeight = 24.sp,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.9f)
-                        )
-                    }
-                    
-                    Spacer(modifier = Modifier.height(32.dp))
-                    
-                    Button(
-                        onClick = {
-                            onComplete()
-                            onDismiss()
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(56.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (task.isCompleted) MaterialTheme.colorScheme.outline.copy(alpha = 0.1f) else MaterialTheme.colorScheme.primary,
-                            contentColor = if (task.isCompleted) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onPrimary
-                        ),
-                        shape = RoundedCornerShape(16.dp)
-                    ) {
-                        Icon(
-                            imageVector = if (task.isCompleted) Icons.Rounded.RestartAlt else Icons.Rounded.CheckCircleOutline,
-                            contentDescription = null,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = if (task.isCompleted) "Marcar como pendiente" else "Completar tarea",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 16.sp
-                        )
-                    }
-                }
-            }
-        }
-    )
-}
-
-@Composable
-fun TagChip(text: String, color: Color) {
-    if (text.isBlank()) return // Evitar chips vacíos
-
-    val icon = when (text.lowercase().trim()) {
-        "trabajo" -> Icons.Rounded.Work
-        "personal" -> Icons.Rounded.Person
-        "google calendar" -> Icons.Rounded.CalendarMonth
-        "salud" -> Icons.Rounded.Favorite
-        "ocio" -> Icons.Rounded.SportsEsports
-        "general" -> Icons.AutoMirrored.Rounded.Label
-        else -> Icons.AutoMirrored.Rounded.Label
-    }
-
-    Box(
-        modifier = Modifier
-            .clip(RoundedCornerShape(8.dp))
-            .background(color.copy(alpha = 0.15f)) // Un poco más de contraste
-            .border(BorderStroke(1.dp, color.copy(alpha = 0.3f)), RoundedCornerShape(8.dp))
-            .padding(horizontal = 10.dp, vertical = 4.dp)
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = color,
-                modifier = Modifier.size(12.dp)
-            )
-            Text(
-                text = text.uppercase(),
-                color = color,
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 0.5.sp
-            )
-        }
+    IconButton(onClick = onToggle, modifier = modifier.size(MIN_TOUCH_TARGET)) {
+        Icon(
+            imageVector = if (isCompleted) Icons.Rounded.CheckCircle else Icons.Rounded.RadioButtonUnchecked,
+            contentDescription = contentDescription,
+            tint = if (isCompleted) Emerald500 else uncheckedTint,
+            modifier = Modifier.size(26.dp)
+        )
     }
 }
-
 
 /**
  * Columna de la izquierda del timeline, común a tareas y eventos: "Todo el día" o la hora de

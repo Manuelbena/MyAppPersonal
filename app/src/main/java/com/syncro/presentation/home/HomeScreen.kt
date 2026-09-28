@@ -26,6 +26,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.syncro.presentation.event.AddEventScreen
+import com.syncro.presentation.event.EventDetailSheet
+import com.syncro.presentation.notes.NoteDetailSheet
+import com.syncro.presentation.task.TaskDetailSheet
 import com.syncro.presentation.home.components.*
 import com.syncro.domain.model.SyncroItem
 import com.syncro.presentation.navigation.AppScreen
@@ -50,8 +53,11 @@ fun HomeScreen(
     var showDetailedEventSheet by remember { mutableStateOf(false) }
     var selectedEventForEdit by remember { mutableStateOf<com.syncro.domain.model.SyncroItem.Event?>(null) }
     var showAddNoteSheet by remember { mutableStateOf(false) }
-    var selectedTaskForDetail by remember { mutableStateOf<SyncroItem.Task?>(null) }
-    var selectedNoteForDetail by remember { mutableStateOf<SyncroItem.Note?>(null) }
+    // Se guarda el id y no el elemento para que el detalle refleje los cambios (subtareas, completar)
+    var selectedTaskIdForDetail by remember { mutableStateOf<String?>(null) }
+    var selectedEventIdForDetail by remember { mutableStateOf<String?>(null) }
+    var selectedNoteIdForDetail by remember { mutableStateOf<String?>(null) }
+    var noteToEdit by remember { mutableStateOf<SyncroItem.Note?>(null) }
 
     val authLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
@@ -180,15 +186,12 @@ fun HomeScreen(
                                         onToggleEvent = {
                                             viewModel.toggleEventCompletion(item.id)
                                         },
-                                        onEditClick = {
-                                            selectedEventForEdit = item
-                                        },
-                                        onShareClick = { context.shareEvent(item) }
+                                        onClick = { selectedEventIdForDetail = item.id }
                                     )
                                     is SyncroItem.Task -> TaskRow(
                                         task = item,
                                         onToggle = { viewModel.toggleTaskCompletion(item.id) },
-                                        onClick = { selectedTaskForDetail = item }
+                                        onClick = { selectedTaskIdForDetail = item.id }
                                     )
                                     is SyncroItem.Note -> {
                                         // Las notas se muestran en el carrusel, no en el timeline
@@ -201,7 +204,7 @@ fun HomeScreen(
                             Spacer(modifier = Modifier.height(24.dp))
                             NotesSection(
                                 notes = uiState.notes,
-                                onNoteClick = { selectedNoteForDetail = it },
+                                onNoteClick = { selectedNoteIdForDetail = it.id },
                                 onSeeAllClick = onNavigateToNotes
                             )
                         }
@@ -267,20 +270,36 @@ fun HomeScreen(
 
     if (showAddNoteSheet) {
         AddNoteSheet(
-            onDismiss = { showAddNoteSheet = false },
+            initialNote = noteToEdit,
+            onDismiss = {
+                showAddNoteSheet = false
+                noteToEdit = null
+            },
             onSave = { id, title, content, color ->
                 viewModel.saveNote(id, title, content, color)
                 showAddNoteSheet = false
+                noteToEdit = null
             }
         )
     }
 
-    if (selectedNoteForDetail != null) {
-        NoteDetailDialog(
-            note = selectedNoteForDetail!!,
-            onDismiss = { selectedNoteForDetail = null }
-        )
-    }
+    selectedNoteIdForDetail
+        ?.let { id -> uiState.notes.firstOrNull { it.id == id } }
+        ?.let { note ->
+            NoteDetailSheet(
+                note = note,
+                onDismiss = { selectedNoteIdForDetail = null },
+                onEdit = {
+                    selectedNoteIdForDetail = null
+                    noteToEdit = note
+                    showAddNoteSheet = true
+                },
+                onDelete = {
+                    selectedNoteIdForDetail = null
+                    viewModel.deleteNote(note)
+                }
+            )
+        }
 
     if (showDetailedEventSheet || selectedEventForEdit != null) {
         AddEventScreen(
@@ -302,11 +321,29 @@ fun HomeScreen(
         )
     }
 
-    selectedTaskForDetail?.let { task ->
-        TaskDetailDialog(
-            task = task,
-            onDismiss = { selectedTaskForDetail = null },
-            onComplete = { viewModel.toggleTaskCompletion(task.id) }
-        )
-    }
+    selectedEventIdForDetail
+        ?.let { id -> uiState.timelineItems.firstOrNull { it is SyncroItem.Event && it.id == id } as SyncroItem.Event? }
+        ?.let { event ->
+            EventDetailSheet(
+                event = event,
+                onDismiss = { selectedEventIdForDetail = null },
+                onToggleCompleted = { viewModel.toggleEventCompletion(event.id) },
+                onSubtaskToggle = { viewModel.toggleSubtaskCompletion(event.id, it) },
+                onEdit = {
+                    selectedEventIdForDetail = null
+                    selectedEventForEdit = event
+                },
+                onShare = { context.shareEvent(event) }
+            )
+        }
+
+    selectedTaskIdForDetail
+        ?.let { id -> uiState.timelineItems.firstOrNull { it is SyncroItem.Task && it.id == id } as SyncroItem.Task? }
+        ?.let { task ->
+            TaskDetailSheet(
+                task = task,
+                onDismiss = { selectedTaskIdForDetail = null },
+                onToggleCompleted = { viewModel.toggleTaskCompletion(task.id) }
+            )
+        }
 }

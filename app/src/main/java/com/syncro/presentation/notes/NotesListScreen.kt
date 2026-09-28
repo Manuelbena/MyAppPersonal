@@ -1,32 +1,30 @@
 package com.syncro.presentation.notes
 
-import com.syncro.presentation.theme.toColor
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
 import androidx.compose.foundation.lazy.staggeredgrid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.EditNote
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.syncro.domain.model.SyncroItem
 import com.syncro.presentation.home.components.AddNoteSheet
-import com.syncro.presentation.home.components.formatRelativeTime
+import com.syncro.presentation.home.components.CountBadge
+import com.syncro.presentation.home.components.NoteCard
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -35,24 +33,33 @@ fun NotesListScreen(
     viewModel: NotesViewModel = hiltViewModel()
 ) {
     val notes by viewModel.notes.collectAsState()
+    // Se guarda el id y no la nota para que el detalle refleje los cambios al editarla
+    var selectedNoteId by remember { mutableStateOf<String?>(null) }
     var noteToEdit by remember { mutableStateOf<SyncroItem.Note?>(null) }
-    var showEditSheet by remember { mutableStateOf(false) }
+    var showNoteSheet by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
-                    Text(
-                        "Mis Notas",
-                        style = MaterialTheme.typography.headlineSmall.copy(
-                            fontFamily = FontFamily.Serif,
-                            fontStyle = FontStyle.Italic
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            "Mi libreta",
+                            style = MaterialTheme.typography.headlineSmall.copy(
+                                fontFamily = FontFamily.Serif,
+                                fontStyle = FontStyle.Italic
+                            ),
+                            maxLines = 1
                         )
-                    )
+                        if (notes.isNotEmpty()) {
+                            Spacer(Modifier.width(10.dp))
+                            CountBadge(notes.size)
+                        }
+                    }
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
+                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Volver")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -60,50 +67,78 @@ fun NotesListScreen(
                 )
             )
         },
+        floatingActionButton = {
+            if (notes.isNotEmpty()) {
+                ExtendedFloatingActionButton(
+                    onClick = {
+                        noteToEdit = null
+                        showNoteSheet = true
+                    },
+                    icon = { Icon(Icons.Rounded.Add, contentDescription = null) },
+                    text = { Text("Nueva nota", fontWeight = FontWeight.Bold) },
+                    shape = RoundedCornerShape(18.dp)
+                )
+            }
+        },
         containerColor = MaterialTheme.colorScheme.background
     ) { padding ->
         if (notes.isEmpty()) {
-            Box(
-                modifier = Modifier.fillMaxSize().padding(padding),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    "No tienes notas aún",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
+            EmptyNotebook(
+                onCreate = {
+                    noteToEdit = null
+                    showNoteSheet = true
+                },
+                modifier = Modifier.padding(padding)
+            )
         } else {
             LazyVerticalStaggeredGrid(
                 columns = StaggeredGridCells.Fixed(2),
                 modifier = Modifier.fillMaxSize().padding(padding),
-                contentPadding = PaddingValues(16.dp),
+                // Hueco abajo para que el botón flotante no tape la última fila
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 96.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalItemSpacing = 12.dp
             ) {
-                items(notes) { note ->
-                    NoteGridItem(
+                items(notes, key = { it.id }) { note ->
+                    NoteCard(
                         note = note,
-                        onEdit = {
-                            noteToEdit = note
-                            showEditSheet = true
-                        },
-                        onDelete = { viewModel.deleteNote(note) }
+                        onClick = { selectedNoteId = note.id },
+                        modifier = Modifier.fillMaxWidth(),
+                        contentMaxLines = 8
                     )
                 }
             }
         }
     }
 
-    if (showEditSheet) {
+    selectedNoteId
+        ?.let { id -> notes.firstOrNull { it.id == id } }
+        ?.let { note ->
+            NoteDetailSheet(
+                note = note,
+                onDismiss = { selectedNoteId = null },
+                onEdit = {
+                    selectedNoteId = null
+                    noteToEdit = note
+                    showNoteSheet = true
+                },
+                onDelete = {
+                    selectedNoteId = null
+                    viewModel.deleteNote(note)
+                }
+            )
+        }
+
+    if (showNoteSheet) {
         AddNoteSheet(
             initialNote = noteToEdit,
-            onDismiss = { 
-                showEditSheet = false
+            onDismiss = {
+                showNoteSheet = false
                 noteToEdit = null
             },
             onSave = { id, title, content, color ->
                 viewModel.saveNote(id, title, content, color)
-                showEditSheet = false
+                showNoteSheet = false
                 noteToEdit = null
             }
         )
@@ -111,79 +146,46 @@ fun NotesListScreen(
 }
 
 @Composable
-fun NoteGridItem(
-    note: SyncroItem.Note,
-    onEdit: () -> Unit,
-    onDelete: () -> Unit
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = note.color.toColor().copy(alpha = 0.15f)
-        )
+private fun EmptyNotebook(onCreate: () -> Unit, modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
     ) {
-        Column(
-            modifier = Modifier.padding(16.dp)
+        Box(
+            modifier = Modifier
+                .size(72.dp)
+                .clip(RoundedCornerShape(24.dp))
+                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
+            contentAlignment = Alignment.Center
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Top
-            ) {
-                Text(
-                    text = note.title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.weight(1f),
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Text(
-                text = note.content,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 6,
-                overflow = TextOverflow.Ellipsis
+            Icon(
+                Icons.Rounded.EditNote,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(36.dp)
             )
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = formatRelativeTime(note.createdAt),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                )
-
-                Row {
-                    IconButton(onClick = onEdit, modifier = Modifier.size(32.dp)) {
-                        Icon(
-                            Icons.Default.Edit,
-                            contentDescription = "Editar",
-                            modifier = Modifier.size(16.dp),
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                    IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
-                        Icon(
-                            Icons.Default.Delete,
-                            contentDescription = "Borrar",
-                            modifier = Modifier.size(16.dp),
-                            tint = MaterialTheme.colorScheme.error
-                        )
-                    }
-                }
-            }
+        }
+        Spacer(Modifier.height(20.dp))
+        Text(
+            "Tu libreta está vacía",
+            style = MaterialTheme.typography.titleLarge.copy(fontFamily = FontFamily.Serif, fontStyle = FontStyle.Italic),
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onBackground
+        )
+        Spacer(Modifier.height(6.dp))
+        Text(
+            "Apunta ideas, listas o lo que no quieras olvidar.",
+            textAlign = TextAlign.Center,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(Modifier.height(24.dp))
+        Button(onClick = onCreate, shape = RoundedCornerShape(16.dp)) {
+            Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(6.dp))
+            Text("Crear nota", fontWeight = FontWeight.Bold)
         }
     }
 }

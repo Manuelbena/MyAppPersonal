@@ -6,6 +6,14 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.foundation.layout.Column
+import androidx.compose.ui.test.assertHeightIsAtLeast
+import androidx.compose.ui.test.assertTouchHeightIsEqualTo
+import androidx.compose.ui.test.assertTouchWidthIsEqualTo
+import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onParent
+import androidx.compose.ui.unit.dp
+import com.syncro.domain.model.Subtask
 import com.syncro.presentation.home.components.EventCard
 import com.syncro.presentation.home.components.QuickTaskSheet
 import com.syncro.presentation.home.components.TaskRow
@@ -53,6 +61,57 @@ class TimelineComponentsTest {
 
         compose.onNodeWithText("01:00").assertIsDisplayed()
         compose.onNodeWithText("+1 día").assertIsDisplayed()
+    }
+
+    @Test
+    fun `la tarjeta de evento resume las subtareas y se pueden marcar sin abrir el detalle`() {
+        var opened = false
+        val toggled = mutableListOf<String>()
+        compose.setContent {
+            EventCard(
+                event = anEvent(
+                    title = "Mudanza",
+                    subtasks = listOf(Subtask("Cajas", isCompleted = true), Subtask("Furgoneta", isCompleted = false))
+                ),
+                onSubtaskToggle = { toggled += it },
+                onClick = { opened = true }
+            )
+        }
+
+        compose.onNodeWithText("1/2").assertIsDisplayed()
+        compose.onNodeWithText("Furgoneta").assertDoesNotExist()
+
+        compose.onNodeWithText("1/2").performClick()
+        compose.onNodeWithText("Furgoneta").performClick()
+        assertEquals(listOf("Furgoneta"), toggled)
+        assertEquals(false, opened)
+    }
+
+    // Material pide al menos 48 dp para todo lo que se pulsa; el círculo se ve de 26 dp
+    @Test
+    fun `completar y las subtareas tienen el area tactil minima de Material`() {
+        compose.setContent {
+            Column {
+                EventCard(event = anEvent(subtasks = listOf(Subtask("Cajas", isCompleted = false))), onSubtaskToggle = {})
+                TaskRow(task = aTask(), onToggle = {}, onClick = {})
+            }
+        }
+
+        compose.onNodeWithContentDescription("Completar evento").assertTouchWidthIsEqualTo(48.dp).assertTouchHeightIsEqualTo(48.dp)
+        compose.onNodeWithContentDescription("Completar").assertTouchWidthIsEqualTo(48.dp).assertTouchHeightIsEqualTo(48.dp)
+        compose.onNodeWithContentDescription("Ver subtareas").performClick()
+        compose.onNodeWithText("Cajas").onParent().assertHeightIsAtLeast(48.dp)
+    }
+
+    @Test
+    fun `tocar la tarjeta de evento abre el detalle`() {
+        var opened = false
+        compose.setContent {
+            EventCard(event = anEvent(title = "Mudanza", description = null), onSubtaskToggle = {}, onClick = { opened = true })
+        }
+
+        compose.onNodeWithText("Mudanza").performClick()
+        assertEquals(true, opened)
     }
 
     @Test

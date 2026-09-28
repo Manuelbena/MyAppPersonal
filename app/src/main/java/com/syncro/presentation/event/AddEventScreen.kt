@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.syncro.domain.model.Priority
 import com.syncro.domain.model.isValidEventRange
+import com.syncro.presentation.components.categoryIcon
 import com.syncro.presentation.theme.*
 import java.time.Instant
 import java.time.LocalDate
@@ -122,15 +123,15 @@ fun AddEventContent(
     val canSave = title.isNotBlank() && isTimeRangeValid
 
     val categories = listOf(
-        CategoryItem("Personal", Icons.Rounded.Person, Emerald500),
-        CategoryItem("Trabajo", Icons.Rounded.Work, Indigo500),
-        CategoryItem("Salud", Icons.Rounded.Favorite, Color(0xFFFF5252)),
-        CategoryItem("Ocio", Icons.Rounded.SportsEsports, Amber500),
-        CategoryItem("Deporte", Icons.Rounded.FitnessCenter, Pink500),
-        CategoryItem("Compras", Icons.Rounded.ShoppingCart, Violet500),
-        CategoryItem("Recados", Icons.Rounded.Checklist, Sky500),
-        CategoryItem("Otro", Icons.Rounded.MoreHoriz, Slate500)
-    )
+        "Personal" to Emerald500,
+        "Trabajo" to Indigo500,
+        "Salud" to Color(0xFFFF5252),
+        "Ocio" to Amber500,
+        "Deporte" to Pink500,
+        "Compras" to Violet500,
+        "Recados" to Sky500,
+        "Otro" to Slate500
+    ).map { (name, color) -> CategoryItem(name, categoryIcon(name), color) }
 
     val priorities = Priority.entries.toTypedArray()
 

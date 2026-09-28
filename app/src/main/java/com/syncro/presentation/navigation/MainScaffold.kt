@@ -2,6 +2,11 @@ package com.syncro.presentation.navigation
 
 import android.annotation.SuppressLint
 import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.animation.core.EaseInOutQuart
 import androidx.compose.animation.core.EaseOutQuart
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -39,6 +44,9 @@ import com.syncro.presentation.notes.NotesListScreen
 import com.syncro.presentation.theme.SyncroTheme
 import com.syncro.presentation.theme.ThemeViewModel
 
+/** Ritmo de las transiciones de página (libreta) y de la barra inferior, que van a la vez. */
+private fun <T> pushSpec() = tween<T>(durationMillis = 400, easing = FastOutSlowInEasing)
+
 // Diseño a pantalla completa: la barra inferior flota sobre el contenido, así que el padding del
 // Scaffold se ignora a propósito (cada pantalla deja su propio margen inferior)
 @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
@@ -54,8 +62,11 @@ fun MainScaffold(
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
     
-    val showBottomBar = currentRoute != AppScreen.Login.route && 
+    val showBottomBar = currentRoute != AppScreen.Login.route &&
                        currentRoute != AppScreen.NotesList.route
+    // Mientras la barra se oculta con animación, sigue marcando la sección de la que se viene
+    var lastBottomRoute by remember { mutableStateOf(currentRoute) }
+    if (bottomNavItems.any { it.route == currentRoute }) lastBottomRoute = currentRoute
 
     SyncroTheme(darkTheme = isDarkTheme) {
         Box(
@@ -72,10 +83,15 @@ fun MainScaffold(
 
             Scaffold(
                 bottomBar = {
-                    if (showBottomBar) {
+                    // Entra y sale deslizándose al ritmo de la pantalla, en vez de aparecer de golpe
+                    AnimatedVisibility(
+                        visible = showBottomBar,
+                        enter = slideInVertically(pushSpec()) { it } + fadeIn(pushSpec()),
+                        exit = slideOutVertically(pushSpec()) { it } + fadeOut(pushSpec())
+                    ) {
                         FloatingBottomNav(
                             items = bottomNavItems,
-                            currentRoute = currentRoute,
+                            currentRoute = lastBottomRoute,
                             onItemClick = { screen ->
                                 navController.navigate(screen.route) {
                                     popUpTo(navController.graph.startDestinationId) {
@@ -99,11 +115,14 @@ fun MainScaffold(
                     enterTransition = {
                         val initialRoute = initialState.destination.route
                         val targetRoute = targetState.destination.route
-                        
+
                         val initialIndex = bottomNavItems.indexOfFirst { it.route == initialRoute }
                         val targetIndex = bottomNavItems.indexOfFirst { it.route == targetRoute }
 
-                        if (initialIndex != -1 && targetIndex != -1 && initialIndex != targetIndex) {
+                        if (initialRoute == AppScreen.NotesList.route) {
+                            // Volviendo de la libreta: Inicio regresa desde la izquierda
+                            slideInHorizontally(pushSpec()) { -it / 4 } + fadeIn(pushSpec())
+                        } else if (initialIndex != -1 && targetIndex != -1 && initialIndex != targetIndex) {
                             if (targetIndex > initialIndex) {
                                 slideInHorizontally(
                                     initialOffsetX = { it / 3 },
@@ -127,7 +146,10 @@ fun MainScaffold(
                         val initialIndex = bottomNavItems.indexOfFirst { it.route == initialRoute }
                         val targetIndex = bottomNavItems.indexOfFirst { it.route == targetRoute }
 
-                        if (initialIndex != -1 && targetIndex != -1 && initialIndex != targetIndex) {
+                        if (targetRoute == AppScreen.NotesList.route) {
+                            // Abriendo la libreta: Inicio se aparta un poco hacia la izquierda
+                            slideOutHorizontally(pushSpec()) { -it / 4 } + fadeOut(pushSpec())
+                        } else if (initialIndex != -1 && targetIndex != -1 && initialIndex != targetIndex) {
                             if (targetIndex > initialIndex) {
                                 slideOutHorizontally(
                                     targetOffsetX = { -it / 3 },
@@ -160,7 +182,12 @@ fun MainScaffold(
                          onNavigateToNotes = { navController.navigate(AppScreen.NotesList.route) }
                      )
                 }
-                composable(AppScreen.NotesList.route) {
+                // La libreta es una página "encima" de Inicio: entra por la derecha y sale por ella
+                composable(
+                    AppScreen.NotesList.route,
+                    enterTransition = { slideInHorizontally(pushSpec()) { it } },
+                    popExitTransition = { slideOutHorizontally(pushSpec()) { it } }
+                ) {
                     NotesListScreen(
                         onBack = { navController.popBackStack() }
                     )
