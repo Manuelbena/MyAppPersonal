@@ -1,5 +1,6 @@
 package com.syncro.presentation.home
 
+import com.syncro.presentation.theme.NotebookFontFamily
 import androidx.compose.ui.platform.LocalContext
 import com.syncro.presentation.components.rememberCurrentMinute
 import com.syncro.presentation.components.shareEvent
@@ -165,7 +166,7 @@ fun HomeScreen(
                             Text(
                                 text = tasksTitle,
                                 style = MaterialTheme.typography.titleLarge.copy(
-                                    fontFamily = FontFamily.Serif,
+                                    fontFamily = NotebookFontFamily,
                                     fontStyle = FontStyle.Italic,
                                     fontWeight = FontWeight.Medium
                                 ),

@@ -1,5 +1,6 @@
 package com.syncro.presentation.home.components
 
+import com.syncro.presentation.theme.NotebookFontFamily
 import com.syncro.presentation.theme.toColor
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -44,7 +45,7 @@ fun NotesSection(
             Text(
                 text = "Mi libreta",
                 style = MaterialTheme.typography.headlineSmall.copy(
-                    fontFamily = FontFamily.Serif,
+                    fontFamily = NotebookFontFamily,
                     fontStyle = FontStyle.Italic
                 ),
                 color = MaterialTheme.colorScheme.onBackground,
@@ -143,7 +144,7 @@ fun NoteCard(
             Text(
                 text = note.title,
                 style = MaterialTheme.typography.titleLarge.copy(
-                    fontFamily = FontFamily.Serif,
+                    fontFamily = NotebookFontFamily,
                     fontStyle = FontStyle.Italic
                 ),
                 fontWeight = FontWeight.Bold,

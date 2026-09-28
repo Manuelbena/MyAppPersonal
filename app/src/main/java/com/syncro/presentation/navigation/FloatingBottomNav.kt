@@ -24,7 +24,9 @@ fun FloatingBottomNav(
     items: List<AppScreen>,
     currentRoute: String?,
     onItemClick: (AppScreen) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    /** Número sin leer por ruta (p. ej. mensajes del asistente); 0 o ausente no muestra nada. */
+    badges: Map<String, Int> = emptyMap()
 ) {
     Surface(
         modifier = modifier
@@ -47,6 +49,7 @@ fun FloatingBottomNav(
                 NavBarItem(
                     screen = screen,
                     isSelected = isSelected,
+                    badgeCount = badges[screen.route] ?: 0,
                     onClick = { onItemClick(screen) }
                 )
             }
@@ -58,6 +61,7 @@ fun FloatingBottomNav(
 private fun NavBarItem(
     screen: AppScreen,
     isSelected: Boolean,
+    badgeCount: Int,
     onClick: () -> Unit
 ) {
     val interactionSource = remember { MutableInteractionSource() }
@@ -83,18 +87,30 @@ private fun NavBarItem(
             ),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Box(
-            modifier = Modifier
-                .clip(RoundedCornerShape(16.dp))
-                .background(backgroundColor)
-                .padding(horizontal = 24.dp, vertical = 4.dp),
-            contentAlignment = Alignment.Center
+        // El número va en la esquina de la píldora (no dentro, que la recorta)
+        BadgedBox(
+            badge = {
+                if (badgeCount > 0) {
+                    Badge(
+                        containerColor = MaterialTheme.colorScheme.error,
+                        contentColor = MaterialTheme.colorScheme.onError
+                    ) { Text(if (badgeCount > 9) "9+" else badgeCount.toString()) }
+                }
+            }
         ) {
-            Icon(
-                imageVector = screen.icon,
-                contentDescription = screen.title,
-                tint = contentColor
-            )
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(backgroundColor)
+                    .padding(horizontal = 24.dp, vertical = 4.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = screen.icon,
+                    contentDescription = if (badgeCount > 0) "${screen.title}, $badgeCount sin leer" else screen.title,
+                    tint = contentColor
+                )
+            }
         }
 
         Spacer(modifier = Modifier.height(4.dp))

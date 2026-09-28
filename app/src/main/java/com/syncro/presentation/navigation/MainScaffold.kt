@@ -35,6 +35,8 @@ import androidx.navigation.compose.rememberNavController
 import com.syncro.presentation.AuthViewModel
 import com.syncro.presentation.SessionState
 import com.syncro.presentation.assistant.AssistantMainScreen
+import com.syncro.presentation.assistant.AssistantViewModel
+import com.syncro.presentation.assistant.TrackNotificationsAllowed
 import com.syncro.presentation.calendar.CalendarScreen
 import com.syncro.presentation.components.ComingSoonScreen
 import com.syncro.presentation.event.AddEventScreen
@@ -53,10 +55,14 @@ private fun <T> pushSpec() = tween<T>(durationMillis = 400, easing = FastOutSlow
 @Composable
 fun MainScaffold(
     themeViewModel: ThemeViewModel = hiltViewModel(),
-    authViewModel: AuthViewModel = hiltViewModel()
+    authViewModel: AuthViewModel = hiltViewModel(),
+    // Uno solo para el chat y el número de la barra, así nunca se desincronizan
+    assistantViewModel: AssistantViewModel = hiltViewModel()
 ) {
     val isDarkTheme by themeViewModel.isDarkTheme.collectAsState()
     val session by authViewModel.session.collectAsState()
+    TrackNotificationsAllowed(assistantViewModel)
+    val assistantUnread = assistantViewModel.uiState.collectAsState().value?.unreadCount ?: 0
     val navController = rememberNavController()
 
     val navBackStackEntry by navController.currentBackStackEntryAsState()
@@ -92,6 +98,7 @@ fun MainScaffold(
                         FloatingBottomNav(
                             items = bottomNavItems,
                             currentRoute = lastBottomRoute,
+                            badges = mapOf(AppScreen.Assistant.route to assistantUnread),
                             onItemClick = { screen ->
                                 navController.navigate(screen.route) {
                                     popUpTo(navController.graph.startDestinationId) {
@@ -203,7 +210,7 @@ fun MainScaffold(
                     )
                 }
                 composable(AppScreen.Assistant.route) {
-                     AssistantMainScreen()
+                     AssistantMainScreen(viewModel = assistantViewModel)
                 }
                 }
             }

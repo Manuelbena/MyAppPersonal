@@ -1,5 +1,6 @@
 package com.syncro.presentation.home.components
 
+import com.syncro.presentation.theme.NotebookFontFamily
 import com.syncro.presentation.theme.toColor
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
@@ -110,7 +111,7 @@ fun AddNoteSheet(
                         Text(
                             "Título",
                             fontSize = 26.sp,
-                            fontFamily = FontFamily.Serif,
+                            fontFamily = NotebookFontFamily,
                             fontStyle = FontStyle.Italic,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
@@ -118,7 +119,7 @@ fun AddNoteSheet(
                     },
                     textStyle = MaterialTheme.typography.headlineMedium.copy(
                         fontSize = 26.sp,
-                        fontFamily = FontFamily.Serif,
+                        fontFamily = NotebookFontFamily,
                         fontStyle = FontStyle.Italic,
                         fontWeight = FontWeight.Bold
                     ),

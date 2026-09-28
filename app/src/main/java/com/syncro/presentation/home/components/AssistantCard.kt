@@ -1,5 +1,6 @@
 package com.syncro.presentation.home.components
 
+import com.syncro.presentation.theme.NotebookFontFamily
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -136,6 +137,8 @@ fun AssistantCard(
                 Text(
                     text = "\"$quote\"",
                     style = MaterialTheme.typography.bodyLarge,
+                    // Toda la cursiva de la app es la de la libreta
+                    fontFamily = NotebookFontFamily,
                     fontStyle = FontStyle.Italic,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

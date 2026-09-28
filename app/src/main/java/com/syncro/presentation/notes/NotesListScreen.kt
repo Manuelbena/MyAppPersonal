@@ -1,5 +1,6 @@
 package com.syncro.presentation.notes
 
+import com.syncro.presentation.theme.NotebookFontFamily
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
@@ -46,7 +47,7 @@ fun NotesListScreen(
                         Text(
                             "Mi libreta",
                             style = MaterialTheme.typography.headlineSmall.copy(
-                                fontFamily = FontFamily.Serif,
+                                fontFamily = NotebookFontFamily,
                                 fontStyle = FontStyle.Italic
                             ),
                             maxLines = 1
@@ -171,7 +172,7 @@ private fun EmptyNotebook(onCreate: () -> Unit, modifier: Modifier = Modifier) {
         Spacer(Modifier.height(20.dp))
         Text(
             "Tu libreta está vacía",
-            style = MaterialTheme.typography.titleLarge.copy(fontFamily = FontFamily.Serif, fontStyle = FontStyle.Italic),
+            style = MaterialTheme.typography.titleLarge.copy(fontFamily = NotebookFontFamily, fontStyle = FontStyle.Italic),
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onBackground
         )

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Icono de las notificaciones (barra de estado): el mismo anillo con check que el icono de la app,
+  como silueta blanca (Android solo usa la forma). Mismos trazados que ic_launcher_foreground,
+  recortados a su zona (24..84 del lienzo de 108).
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="60"
+    android:viewportHeight="60">
+    <group
+        android:translateX="-24"
+        android:translateY="-24">
+        <path
+            android:pathData="M32.75,48.31 A22,22 0 0,1 72.02,41.38 M73.82,35.24 L73.74,43.84 L65.62,40.98 M75.25,59.69 A22,22 0 0,1 35.98,66.62 M34.18,72.76 L34.26,64.16 L42.38,67.02 M44.5,54.5 L51,61 L63.5,47.5"
+            android:strokeColor="#FFFFFFFF"
+            android:strokeWidth="6"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round"
+            android:fillColor="#00000000" />
+    </group>
+</vector>

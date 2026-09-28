@@ -1,5 +1,6 @@
 package com.syncro.presentation.notes
 
+import com.syncro.presentation.theme.NotebookFontFamily
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -62,7 +63,7 @@ fun NoteDetailContent(
             accent = noteColor,
             title = note.title,
             isCompleted = false,
-            titleStyle = TextStyle(fontFamily = FontFamily.Serif, fontStyle = FontStyle.Italic),
+            titleStyle = TextStyle(fontFamily = NotebookFontFamily, fontStyle = FontStyle.Italic),
             pills = {
                 Pill(Icons.Rounded.Schedule, formatRelativeTime(createdAt).lowercase().replaceFirstChar { it.uppercase() }, MaterialTheme.colorScheme.onSurfaceVariant)
             },

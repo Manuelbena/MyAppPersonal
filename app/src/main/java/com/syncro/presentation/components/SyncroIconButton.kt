@@ -26,7 +26,8 @@ fun SyncroIconButton(
     iconSize: Dp = 20.dp,
     backgroundColor: Color = MaterialTheme.colorScheme.surface,
     contentColor: Color = MaterialTheme.colorScheme.onSurface,
-    showBorder: Boolean = true
+    showBorder: Boolean = true,
+    contentDescription: String? = null
 ) {
     Box(
         modifier = modifier
@@ -42,7 +43,7 @@ fun SyncroIconButton(
     ) {
         Icon(
             imageVector = icon,
-            contentDescription = null,
+            contentDescription = contentDescription,
             modifier = Modifier.size(iconSize),
             tint = contentColor
         )

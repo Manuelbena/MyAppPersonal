@@ -4,6 +4,17 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!-- Avisos diarios (9:00 y 21:00) -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Reponer las alarmas tras reiniciar el móvil -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- Alarma exacta: hasta Android 12L se concede al instalar; desde Android 13, USE_EXACT_ALARM
+         (permitido por Google Play para apps de calendario, como esta) -->
+    <uses-permission
+        android:name="android.permission.SCHEDULE_EXACT_ALARM"
+        android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+
     <application
         android:name=".SyncroApp"
         android:allowBackup="true"
@@ -24,6 +35,24 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Suena a las 9:00 y a las 21:00 (solo lo lanza nuestra propia alarma) -->
+        <receiver
+            android:name=".data.notifications.DigestAlarmReceiver"
+            android:exported="false" />
+
+        <!-- Reprograma los avisos tras reiniciar, actualizar la app o cambiar la hora/zona.
+             Son emisiones protegidas del sistema: ninguna otra app puede enviarlas -->
+        <receiver
+            android:name=".data.notifications.DigestRescheduleReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+            </intent-filter>
+        </receiver>
     </application>
 
 </manifest>
