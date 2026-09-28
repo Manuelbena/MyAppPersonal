@@ -259,6 +259,27 @@ class GoogleSyncRepositoryImplTest {
     }
 
     @Test
+    fun `las categorias Deporte, Compras, Recados y Otro vuelven de Google con su categoria`() = runTest {
+        val categories = listOf("Deporte", "Compras", "Recados", "Otro")
+        categories.forEachIndexed { i, category ->
+            eventDao.insertEventWithSubtasks(
+                aSyncedEventEntity(id = "e$i", remoteId = null, pendingChanges = 1)
+                    .copy(title = "Plan $i", categoryText = category),
+                emptyList()
+            )
+            assertTrue(repository.pushEvent("e$i").isSuccess)
+        }
+        val colorIds = categories.indices.map { google.events.getValue(eventDao.getEventById("e$it")!!.remoteId!!).colorId }
+        assertEquals(listOf("4", "3", "7", "8"), colorIds)
+
+        repository.syncCalendar(DAY)
+
+        val downloaded = categories.indices.map { eventDao.getEventById("e$it")!! }
+        assertEquals(categories, downloaded.map { it.categoryText })
+        assertEquals(categories.size, downloaded.map { it.categoryColor }.toSet().size)
+    }
+
+    @Test
     fun `un titulo con marca de completado se limpia y el evento queda completado`() = runTest {
         google.addEvent(timedEvent("g-1", "✅ Cena", DAY, at("21:00"), at("22:00")))
 

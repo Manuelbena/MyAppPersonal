@@ -35,5 +35,10 @@ val Indigo50 = Color(0xFFEEF2FF)
 val Indigo500 = Color(0xFF6366F1)
 val Indigo900 = Color(0xFF312E81)
 
+// Categorías de eventos
+val Pink500 = Color(0xFFEC4899)
+val Violet500 = Color(0xFF8B5CF6)
+val Sky500 = Color(0xFF0EA5E9)
+
 // Green (Online Indicator)
 val Green500 = Color(0xFF22C55E)

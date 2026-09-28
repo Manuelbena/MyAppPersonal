@@ -350,11 +350,12 @@ class GoogleSyncRepositoryImpl @Inject constructor(
             matches("Salud", "Salud") -> "Salud" to 0xFFFF5252.toInt()
             matches("Ocio", "Ocio") -> "Ocio" to 0xFFF59E0B.toInt() // Amber500
             matches("Personal", "Personal", "Cita", "Médico") -> "Personal" to 0xFF10B981.toInt() // Emerald500
-            else -> {
-                val googleColor = GOOGLE_COLORS[colorId] ?: GOOGLE_DEFAULT_COLOR
-                // El gris de Google (colorId 8) se sustituye por Slate400
-                CATEGORY_GENERAL to if (colorId == "8") COLOR_SLATE_400 else googleColor
-            }
+            matches("Deporte", "Deporte", "Gimnasio") -> "Deporte" to 0xFFEC4899.toInt() // Pink500
+            matches("Compras", "Compras") -> "Compras" to 0xFF8B5CF6.toInt() // Violet500
+            matches("Recados", "Recados") -> "Recados" to 0xFF0EA5E9.toInt() // Sky500
+            // "Otro" solo por color: la palabra es demasiado común para buscarla en el título
+            colorId == CATEGORY_TO_GOOGLE_COLOR["Otro"] -> "Otro" to 0xFF64748B.toInt() // Slate500
+            else -> CATEGORY_GENERAL to (GOOGLE_COLORS[colorId] ?: GOOGLE_DEFAULT_COLOR)
         }
     }
 
@@ -449,7 +450,11 @@ class GoogleSyncRepositoryImpl @Inject constructor(
             "Trabajo" to "6",   // Mandarina
             "Personal" to "2",  // Salvia
             "Salud" to "11",    // Tomate
-            "Ocio" to "5"       // Plátano
+            "Ocio" to "5",      // Plátano
+            "Deporte" to "4",   // Flamenco
+            "Compras" to "3",   // Uva
+            "Recados" to "7",   // Pavo real
+            "Otro" to "8"       // Grafito
         )
 
         val GOOGLE_COLORS = mapOf(

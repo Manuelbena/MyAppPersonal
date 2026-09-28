@@ -125,7 +125,11 @@ fun AddEventContent(
         CategoryItem("Personal", Icons.Rounded.Person, Emerald500),
         CategoryItem("Trabajo", Icons.Rounded.Work, Indigo500),
         CategoryItem("Salud", Icons.Rounded.Favorite, Color(0xFFFF5252)),
-        CategoryItem("Ocio", Icons.Rounded.SportsEsports, Amber500)
+        CategoryItem("Ocio", Icons.Rounded.SportsEsports, Amber500),
+        CategoryItem("Deporte", Icons.Rounded.FitnessCenter, Pink500),
+        CategoryItem("Compras", Icons.Rounded.ShoppingCart, Violet500),
+        CategoryItem("Recados", Icons.Rounded.Checklist, Sky500),
+        CategoryItem("Otro", Icons.Rounded.MoreHoriz, Slate500)
     )
 
     val priorities = Priority.entries.toTypedArray()
