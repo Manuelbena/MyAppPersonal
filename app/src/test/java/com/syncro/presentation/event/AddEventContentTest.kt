@@ -9,7 +9,11 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.test.performImeAction
+import com.syncro.domain.model.ArgbColor
 import com.syncro.domain.model.SyncroItem
+import com.syncro.presentation.theme.toColor
 import com.syncro.testutil.DAY
 import com.syncro.testutil.anEvent
 import com.syncro.testutil.at
@@ -38,7 +42,10 @@ class AddEventContentTest {
         val date: LocalDate,
         val endDate: LocalDate,
         val start: LocalTime,
-        val end: LocalTime
+        val end: LocalTime,
+        val category: String = "",
+        val color: Color = Color.Unspecified,
+        val subtasks: List<String> = emptyList()
     )
 
     private var saved: Saved? = null
@@ -48,8 +55,8 @@ class AddEventContentTest {
             AddEventContent(
                 eventToEdit = eventToEdit,
                 onDismiss = {},
-                onSave = { title, _, _, date, endDate, start, end, _, _, _, _ ->
-                    saved = Saved(title, date, endDate, start, end)
+                onSave = { title, _, _, date, endDate, start, end, category, color, _, subtasks ->
+                    saved = Saved(title, date, endDate, start, end, category, color, subtasks)
                 }
             )
         }
@@ -110,5 +117,53 @@ class AddEventContentTest {
 
         assertEquals(LocalTime.MIDNIGHT, saved?.start)
         assertEquals(LocalTime.MIDNIGHT, saved?.end)
+    }
+
+    @Test
+    fun `Intro en el campo de subtarea la anade`() {
+        showForm(anEvent(title = "Mudanza"))
+
+        compose.onNodeWithText("Añadir subtarea").performScrollTo().performTextInput("Cajas")
+        compose.onNodeWithText("Cajas").performImeAction()
+        compose.onNodeWithText("Guardar").performScrollTo().performClick()
+
+        assertEquals(listOf("Cajas"), saved?.subtasks)
+    }
+
+    // Regresión: al editar un evento de Google con categoría "General" se guardaba con el verde de Personal
+    @Test
+    fun `editar un evento con una categoria que no esta en la lista conserva su color`() {
+        val googleBlue = ArgbColor(0xFF4285F4)
+        showForm(anEvent(title = "Del calendario", categoryText = "General", categoryColor = googleBlue))
+
+        compose.onNodeWithText("General").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Guardar").performScrollTo().performClick()
+
+        assertEquals("General", saved?.category)
+        assertEquals(googleBlue.toColor(), saved?.color)
+    }
+
+    // Regresión: a partir de las 23:00 el evento nuevo salía de 00:00 a 01:00 del mismo día (rango imposible)
+    @Test
+    fun `la hora por defecto es la proxima en punto y puede caer al dia siguiente`() {
+        assertEquals(DAY.atTime(11, 0), nextFullHour(DAY.atTime(10, 20)))
+        assertEquals(DAY.plusDays(1).atTime(0, 0), nextFullHour(DAY.atTime(23, 30)))
+    }
+
+    @Test
+    fun `mover el inicio conserva la duracion del evento`() {
+        val start = DAY.atTime(10, 0)
+        val end = DAY.atTime(11, 30)
+
+        assertEquals(DAY.atTime(18, 30), endAfterMovingStart(start, end, DAY.atTime(17, 0)))
+        // Si el rango no era válido, se deja la duración por defecto: una hora
+        assertEquals(DAY.atTime(18, 0), endAfterMovingStart(end, start, DAY.atTime(17, 0)))
+    }
+
+    @Test
+    fun `texto de duracion`() {
+        assertEquals("Dura 1 h 30 min", durationText(DAY.atTime(10, 0), DAY.atTime(11, 30), isAllDay = false))
+        assertEquals("1 día", durationText(DAY.atStartOfDay(), DAY.atStartOfDay(), isAllDay = true))
+        assertEquals("3 días", durationText(DAY.atStartOfDay(), DAY.plusDays(2).atStartOfDay(), isAllDay = true))
     }
 }
