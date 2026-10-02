@@ -1,9 +1,11 @@
 package com.syncro.presentation.calendar
 
+import com.syncro.domain.model.ArgbColor
 import com.syncro.domain.usecase.DeleteEventUseCase
 import com.syncro.domain.usecase.DeleteTaskUseCase
 import com.syncro.domain.usecase.GetEventsInRangeUseCase
 import com.syncro.domain.usecase.GetTasksInRangeUseCase
+import com.syncro.domain.usecase.SaveNoteUseCase
 import com.syncro.domain.usecase.SaveTaskUseCase
 import com.syncro.domain.usecase.SyncGoogleCalendarUseCase
 import com.syncro.domain.usecase.SyncGoogleTasksUseCase
@@ -13,6 +15,7 @@ import com.syncro.domain.usecase.ToggleTaskCompletionUseCase
 import com.syncro.testutil.CallLog
 import com.syncro.testutil.FakeEventRepository
 import com.syncro.testutil.FakeGoogleSyncRepository
+import com.syncro.testutil.FakeNoteRepository
 import com.syncro.testutil.FakeTaskRepository
 import com.syncro.testutil.MainDispatcherRule
 import com.syncro.testutil.aTask
@@ -28,6 +31,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
+import java.time.Clock
 import java.time.YearMonth
 
 /** [CalendarViewModel] agrupa por día lo que se pinta en la cuadrícula del mes. */
@@ -45,6 +49,8 @@ class CalendarViewModelTest {
     private lateinit var tasks: FakeTaskRepository
     private lateinit var events: FakeEventRepository
     private lateinit var google: FakeGoogleSyncRepository
+    private val notes = FakeNoteRepository()
+    private val clock = Clock.systemDefaultZone()
 
     @Before
     fun setUp() {
@@ -64,7 +70,8 @@ class CalendarViewModelTest {
         toggleTaskCompletionUseCase = ToggleTaskCompletionUseCase(tasks, google),
         deleteEventUseCase = DeleteEventUseCase(events, google),
         deleteTaskUseCase = DeleteTaskUseCase(tasks, google),
-        saveTaskUseCase = SaveTaskUseCase(tasks, google)
+        saveTaskUseCase = SaveTaskUseCase(tasks, google),
+        saveNoteUseCase = SaveNoteUseCase(notes, clock)
     )
 
     @Test
@@ -112,5 +119,15 @@ class CalendarViewModelTest {
 
         assertTrue(tasks.tasks.value.getValue("t1").isCompleted)
         assertTrue(google.pushedTaskIds.contains("t1"))
+    }
+
+    // Regresión: el "+" de Calendario abría la hoja de nota pero guardar no hacía nada
+    @Test
+    fun `una nota creada desde Calendario se guarda en la libreta`() = runTest {
+        val viewModel = createViewModel()
+
+        viewModel.saveNote("Ideas", "App de hábitos", ArgbColor(0xFFF59E0B))
+
+        assertEquals(listOf("Ideas"), notes.notes.value.values.map { it.title })
     }
 }

@@ -43,7 +43,9 @@ import java.util.Locale
 fun QuickTaskSheet(
     onDismiss: () -> Unit,
     onSave: (title: String, description: String, date: LocalDate) -> Unit,
-    initialDate: LocalDate = LocalDate.now()
+    initialDate: LocalDate = LocalDate.now(),
+    // Inicio pasa su "hoy" (del reloj inyectado) para que no se quede en ayer tras la medianoche
+    today: LocalDate = LocalDate.now()
 ) {
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -55,7 +57,7 @@ fun QuickTaskSheet(
         containerColor = MaterialTheme.colorScheme.surface,
         shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
     ) {
-        QuickTaskContent(initialDate = initialDate, onSave = onSave)
+        QuickTaskContent(initialDate = initialDate, onSave = onSave, today = today)
     }
 }
 

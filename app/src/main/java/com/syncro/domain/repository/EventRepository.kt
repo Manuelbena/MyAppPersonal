@@ -15,4 +15,7 @@ interface EventRepository {
     suspend fun toggleEventCompletion(eventId: String)
     /** Lo quita de la app al momento; el borrado en Google queda pendiente de subir. */
     suspend fun deleteEvent(eventId: String)
+
+    /** Deshace [deleteEvent] si el borrado aún no se ha subido a Google; false si ya no se puede. */
+    suspend fun restoreEvent(eventId: String): Boolean
 }

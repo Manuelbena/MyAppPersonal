@@ -2,12 +2,14 @@ package com.syncro.presentation.calendar
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.syncro.domain.model.ArgbColor
 import com.syncro.domain.model.SyncroItem
 import com.syncro.domain.model.sortedForDay
 import com.syncro.domain.usecase.DeleteEventUseCase
 import com.syncro.domain.usecase.DeleteTaskUseCase
 import com.syncro.domain.usecase.GetEventsInRangeUseCase
 import com.syncro.domain.usecase.GetTasksInRangeUseCase
+import com.syncro.domain.usecase.SaveNoteUseCase
 import com.syncro.domain.usecase.SaveTaskUseCase
 import com.syncro.domain.usecase.SyncGoogleCalendarUseCase
 import com.syncro.domain.usecase.SyncGoogleTasksUseCase
@@ -45,7 +47,8 @@ class CalendarViewModel @Inject constructor(
     private val toggleTaskCompletionUseCase: ToggleTaskCompletionUseCase,
     private val deleteEventUseCase: DeleteEventUseCase,
     private val deleteTaskUseCase: DeleteTaskUseCase,
-    private val saveTaskUseCase: SaveTaskUseCase
+    private val saveTaskUseCase: SaveTaskUseCase,
+    private val saveNoteUseCase: SaveNoteUseCase
 ) : ViewModel() {
 
     private val _selectedMonth = MutableStateFlow(YearMonth.now())
@@ -94,6 +97,11 @@ class CalendarViewModel @Inject constructor(
     }
 
     /** Las tareas solo tienen día: se guardan a las 00:00 ("todo el día"), igual que en Inicio. */
+    /** Nota nueva desde el "+" de Calendario (las notas no tienen día: van a la libreta). */
+    fun saveNote(title: String, content: String, color: ArgbColor) {
+        viewModelScope.launch { saveNoteUseCase(title = title, content = content, color = color) }
+    }
+
     fun saveTask(title: String, description: String, date: LocalDate) {
         viewModelScope.launch {
             saveTaskUseCase(title, description, date, LocalTime.MIDNIGHT)

@@ -3,6 +3,7 @@ package com.syncro.presentation.settings
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -29,9 +30,12 @@ import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.outlined.Logout
 import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material.icons.outlined.AutoAwesome
+import androidx.compose.material.icons.outlined.Backup
+import androidx.compose.material.icons.outlined.FileDownload
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Palette
+import androidx.compose.material.icons.outlined.Restore
 import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material.icons.outlined.WbSunny
 import androidx.compose.material3.*
@@ -61,6 +65,9 @@ import com.syncro.presentation.components.SyncroIconButton
 import com.syncro.presentation.components.UserAvatar
 import com.syncro.presentation.legal.LegalDocumentId
 import com.syncro.presentation.components.toDisplayTime
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.time.LocalDate
 import java.time.LocalTime
 
 @Composable
@@ -84,6 +91,17 @@ fun SettingsScreen(
     }
     LaunchedEffect(viewModel.messages) {
         viewModel.messages.collect { snackbarHostState.showSnackbar(it) }
+    }
+    // Tus datos: el usuario elige dónde guardar (móvil, Drive…) o qué copia abrir
+    val today = remember { LocalDate.now() }
+    val csvLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri ->
+        uri?.let { viewModel.exportMovementsCsv { text -> context.writeText(it, text) } }
+    }
+    val backupLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+        uri?.let { viewModel.createBackup { text -> context.writeText(it, text) } }
+    }
+    val restoreLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        uri?.let { viewModel.restoreBackup { context.readText(it) } }
     }
 
     Scaffold(
@@ -119,10 +137,44 @@ fun SettingsScreen(
             onLogoutConfirm = viewModel::confirmLogout,
             onLogoutDismiss = viewModel::dismissLogout,
             onOpenLegal = onOpenLegal,
+            onExportCsv = { csvLauncher.launch("syncro-movimientos-$today.csv") },
+            onBackup = { backupLauncher.launch("syncro-copia-$today.json") },
+            // Algunos gestores de archivos no reconocen .json y lo marcan como binario o texto
+            onRestore = { restoreLauncher.launch(arrayOf("application/json", "application/octet-stream", "text/*")) },
             modifier = Modifier.padding(padding)
         )
     }
 }
+
+/** Escribe el archivo que eligió el usuario (fuera del hilo principal). */
+private suspend fun Context.writeText(uri: Uri, text: String) = withContext(Dispatchers.IO) {
+    val stream = contentResolver.openOutputStream(uri, "wt") ?: error("No se pudo abrir el archivo")
+    stream.use { it.write(text.toByteArray(Charsets.UTF_8)) }
+}
+
+/** Lee la copia elegida; una copia de verdad pesa muy poco, así que se rechaza lo enorme. */
+private suspend fun Context.readText(uri: Uri): String = withContext(Dispatchers.IO) {
+    val stream = contentResolver.openInputStream(uri) ?: error("No se pudo abrir el archivo")
+    stream.use { input ->
+        val bytes = input.readNBytesCompat(MAX_BACKUP_BYTES + 1)
+        require(bytes.size <= MAX_BACKUP_BYTES) { "El archivo es demasiado grande para ser una copia" }
+        String(bytes, Charsets.UTF_8)
+    }
+}
+
+/** Lee como mucho [limit] bytes (readNBytes es de Java 11 y no está en todos los Android). */
+private fun java.io.InputStream.readNBytesCompat(limit: Int): ByteArray {
+    val out = java.io.ByteArrayOutputStream()
+    val buffer = ByteArray(8 * 1024)
+    while (out.size() < limit) {
+        val read = read(buffer, 0, minOf(buffer.size, limit - out.size()))
+        if (read < 0) break
+        out.write(buffer, 0, read)
+    }
+    return out.toByteArray()
+}
+
+private const val MAX_BACKUP_BYTES = 20 * 1024 * 1024
 
 /** La pantalla sin ViewModel ni sistema, para poder probarla. */
 @Composable
@@ -140,6 +192,9 @@ fun SettingsContent(
     onLogoutConfirm: () -> Unit,
     onLogoutDismiss: () -> Unit,
     onOpenLegal: (LegalDocumentId) -> Unit,
+    onExportCsv: () -> Unit = {},
+    onBackup: () -> Unit = {},
+    onRestore: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val digest = state.settings.digest
@@ -204,6 +259,8 @@ fun SettingsContent(
                             CategoryRow(SettingsPage.DIGEST, digestSummary(digest)) { page = it }
                             SettingsDivider()
                             CategoryRow(SettingsPage.ASSISTANT, assistantSummary(assistant)) { page = it }
+                            SettingsDivider()
+                            CategoryRow(SettingsPage.DATA, "Exportar y copias de seguridad") { page = it }
                             SettingsDivider()
                             CategoryRow(SettingsPage.APPEARANCE, themeLabel(state.themeMode)) { page = it }
                             SettingsDivider()
@@ -294,6 +351,13 @@ fun SettingsContent(
                             onCheckedChange = { on -> onAssistantChange { it.copy(dailyQuoteEnabled = on) } }
                         )
                         SettingsDivider()
+                        SwitchRow(
+                            title = "Ahorros en Inicio",
+                            subtitle = "El balance del mes y si algún presupuesto va justo, en la pantalla de Inicio",
+                            checked = assistant.homeSavingsEnabled,
+                            onCheckedChange = { on -> onAssistantChange { it.copy(homeSavingsEnabled = on) } }
+                        )
+                        SettingsDivider()
                         SettingsRow(
                             title = "Día de nómina",
                             subtitle = "El día que cobras te ayuda a organizar el dinero del mes",
@@ -306,6 +370,38 @@ fun SettingsContent(
                                     color = MaterialTheme.colorScheme.primary
                                 )
                             }
+                        )
+                    }
+
+                    SettingsPage.DATA -> Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        SettingsCard {
+                            SettingsRow(
+                                title = "Exportar ingresos y gastos",
+                                subtitle = "Un archivo CSV para abrir en Excel o Google Sheets",
+                                onClick = onExportCsv,
+                                trailing = { DataActionIcon(Icons.Outlined.FileDownload) }
+                            )
+                            SettingsDivider()
+                            SettingsRow(
+                                title = "Hacer copia de seguridad",
+                                subtitle = "Notas, ingresos, gastos y presupuestos en un archivo. Guárdalo en Drive o en tu móvil",
+                                onClick = onBackup,
+                                trailing = { DataActionIcon(Icons.Outlined.Backup) }
+                            )
+                            SettingsDivider()
+                            SettingsRow(
+                                title = "Restaurar una copia",
+                                subtitle = "No borra nada: añade lo que falte y actualiza lo que ya tienes",
+                                onClick = onRestore,
+                                trailing = { DataActionIcon(Icons.Outlined.Restore) }
+                            )
+                        }
+                        Text(
+                            "Tus tareas y eventos no hace falta copiarlos: ya están en tu cuenta de Google. " +
+                                "Las notas, ingresos, gastos y presupuestos solo están en este móvil.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 8.dp)
                         )
                     }
 
@@ -387,6 +483,7 @@ enum class SettingsPage(val title: String, val icon: ImageVector) {
     NOTIFICATIONS("Notificaciones", Icons.Outlined.Notifications),
     DIGEST("Resumen del día", Icons.Outlined.WbSunny),
     ASSISTANT("Asistente", Icons.Outlined.AutoAwesome),
+    DATA("Tus datos", Icons.Outlined.Backup),
     APPEARANCE("Apariencia", Icons.Outlined.Palette),
     LEGAL("Privacidad y legal", Icons.Outlined.Shield),
     ABOUT("Acerca de", Icons.Outlined.Info)
@@ -402,6 +499,7 @@ private fun assistantSummary(assistant: AssistantSettings): String = listOfNotNu
     "Pendientes".takeIf { assistant.leftoversEnabled },
     "Presupuestos".takeIf { assistant.budgetAlertsEnabled },
     "Frase".takeIf { assistant.dailyQuoteEnabled },
+    "Ahorros".takeIf { assistant.homeSavingsEnabled },
     assistant.paydayDay?.let { "Nómina día $it" }
 ).joinToString(" · ").ifEmpty { "Sin preguntas" }
 
@@ -636,6 +734,11 @@ private fun PaydayDialog(initial: Int?, onDismiss: () -> Unit, onConfirm: (Int?)
         confirmButton = { TextButton(onClick = { onConfirm(selected) }) { Text("Guardar") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } }
     )
+}
+
+@Composable
+private fun DataActionIcon(icon: ImageVector) {
+    Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
 }
 
 private fun paydayLabel(day: Int?): String = day?.let { "Día $it" } ?: "No tengo"

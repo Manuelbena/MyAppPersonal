@@ -68,3 +68,12 @@ val MIGRATION_14_15 = object : Migration(14, 15) {
         db.execSQL("CREATE TABLE IF NOT EXISTS `budgets` (`category` TEXT NOT NULL, `limitCents` INTEGER NOT NULL, PRIMARY KEY(`category`))")
     }
 }
+
+/**
+ * Todas las migraciones, en orden. AppModule y los tests las registran desde aquí: una migración
+ * nueva se añade a esta lista y no puede olvidarse en uno de los dos sitios.
+ */
+val ALL_MIGRATIONS = arrayOf(
+    MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12,
+    MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15
+)

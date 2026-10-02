@@ -34,6 +34,8 @@ data class AssistantSettings(
     val budgetAlertsEnabled: Boolean = true,
     /** Mostrar la frase del día en Inicio. */
     val dailyQuoteEnabled: Boolean = true,
+    /** Mostrar en Inicio el balance del mes y si algún presupuesto va justo. Apagado de fábrica: es dinero. */
+    val homeSavingsEnabled: Boolean = false,
     /**
      * Día del mes en que se cobra la nómina (1–31; en los meses más cortos, el último día). Null:
      * sin nómina (aún no trabaja, autónomo…), y el asistente no dice nada. Es lo de fábrica.

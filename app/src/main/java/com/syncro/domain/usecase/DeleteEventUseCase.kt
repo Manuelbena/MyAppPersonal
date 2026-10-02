@@ -12,8 +12,12 @@ class DeleteEventUseCase @Inject constructor(
     private val repository: EventRepository,
     private val googleSyncRepository: GoogleSyncRepository
 ) {
-    suspend operator fun invoke(eventId: String) {
+    /**
+     * Con [uploadNow] a false el borrado se queda solo en el móvil (pendiente) para poder
+     * deshacerlo; se sube con la siguiente subida de pendientes (`PushPendingChangesUseCase`).
+     */
+    suspend operator fun invoke(eventId: String, uploadNow: Boolean = true) {
         repository.deleteEvent(eventId)
-        googleSyncRepository.pushEvent(eventId)
+        if (uploadNow) googleSyncRepository.pushEvent(eventId)
     }
 }

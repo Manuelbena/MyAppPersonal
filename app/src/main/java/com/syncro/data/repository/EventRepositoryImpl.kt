@@ -100,4 +100,8 @@ class EventRepositoryImpl @Inject constructor(
     override suspend fun deleteEvent(eventId: String) {
         dao.markEventDeleted(eventId)
     }
+
+    override suspend fun restoreEvent(eventId: String): Boolean {
+        return dao.restoreEvent(eventId) > 0
+    }
 }

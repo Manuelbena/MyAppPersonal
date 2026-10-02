@@ -53,6 +53,8 @@ import java.util.Locale
 @Composable
 fun AddEventScreen(
     eventToEdit: SyncroItem.Event? = null,
+    // Evento nuevo: el día en que empieza (el que se está mirando); null = hoy
+    initialDate: LocalDate? = null,
     onDismiss: () -> Unit,
     viewModel: com.syncro.presentation.home.HomeViewModel = hiltViewModel()
 ) {
@@ -68,6 +70,7 @@ fun AddEventScreen(
     ) {
         AddEventContent(
             eventToEdit = eventToEdit,
+            initialDate = initialDate,
             onDismiss = onDismiss,
             onSave = { title, desc, loc, date, endDate, start, end, catText, catCol, priority, subs ->
                 viewModel.saveDetailedEvent(
@@ -111,6 +114,7 @@ private enum class PickerTarget { StartDate, StartTime, EndDate, EndTime }
 @Composable
 fun AddEventContent(
     eventToEdit: SyncroItem.Event? = null,
+    initialDate: LocalDate? = null,
     onDismiss: () -> Unit,
     onSave: (String, String?, String?, LocalDate, LocalDate, LocalTime, LocalTime, String, Color, Priority?, List<String>) -> Unit
 ) {
@@ -132,7 +136,7 @@ fun AddEventContent(
 
     // Evento nuevo: de la próxima hora en punto a la siguiente (con fechas reales: a las 23:30
     // eso es mañana de 00:00 a 01:00, no un rango imposible dentro de hoy)
-    val defaultStart = remember { nextFullHour(LocalDateTime.now()) }
+    val defaultStart = remember { defaultEventStart(LocalDateTime.now(), initialDate) }
     var startDate by remember { mutableStateOf(eventToEdit?.date ?: defaultStart.toLocalDate()) }
     var startTime by remember { mutableStateOf(eventToEdit?.startTime ?: defaultStart.toLocalTime()) }
     var endDate by remember { mutableStateOf(eventToEdit?.endDate ?: defaultStart.plusHours(1).toLocalDate()) }
@@ -643,6 +647,15 @@ private fun LocalDate.toFormDate(): String = format(FORM_DATE).replaceFirstChar 
 
 /** Próxima hora en punto: a las 10:20, las 11:00; a las 23:30, las 00:00 del día siguiente. */
 internal fun nextFullHour(now: LocalDateTime): LocalDateTime = now.truncatedTo(ChronoUnit.HOURS).plusHours(1)
+
+/**
+ * Inicio de un evento nuevo: hoy (o sin día elegido), la próxima hora en punto; otro día, esa
+ * misma hora pero en el día que se estaba mirando (como Google Calendar).
+ */
+internal fun defaultEventStart(now: LocalDateTime, day: LocalDate?): LocalDateTime {
+    val next = nextFullHour(now)
+    return if (day == null || day == now.toLocalDate()) next else day.atTime(next.toLocalTime())
+}
 
 /**
  * Fin del evento tras mover su inicio a [newStart]: se conserva la duración. Si el rango actual no

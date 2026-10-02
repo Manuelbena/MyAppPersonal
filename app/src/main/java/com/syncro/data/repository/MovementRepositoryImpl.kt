@@ -20,6 +20,8 @@ class MovementRepositoryImpl @Inject constructor(
         dao.observeForRange(month.atDay(1).toEpochDay(), month.atEndOfMonth().toEpochDay())
             .map { entities -> entities.mapNotNull { it.toDomain() } }
 
+    override suspend fun getAllMovements(): List<Movement> = dao.getAll().mapNotNull { it.toDomain() }
+
     override suspend fun insertMovement(movement: Movement) {
         require(movement.id.isNotBlank()) { "El movimiento necesita un id" }
         dao.insertMovement(

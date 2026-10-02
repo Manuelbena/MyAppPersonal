@@ -9,7 +9,10 @@ import com.syncro.domain.model.AssistantSettings
 import com.syncro.domain.model.DataLossSummary
 import com.syncro.domain.model.DigestSettings
 import com.syncro.domain.model.User
+import com.syncro.domain.usecase.CreateBackupUseCase
+import com.syncro.domain.usecase.ExportMovementsCsvUseCase
 import com.syncro.domain.usecase.GetDataLossSummaryUseCase
+import com.syncro.domain.usecase.RestoreBackupUseCase
 import com.syncro.domain.usecase.GetLocalUserUseCase
 import com.syncro.domain.usecase.GetSettingsUseCase
 import com.syncro.domain.usecase.LogoutUseCase
@@ -42,7 +45,10 @@ class SettingsViewModel @Inject constructor(
     private val updateSettings: UpdateSettingsUseCase,
     private val themePreferences: ThemePreferences,
     private val getDataLossSummary: GetDataLossSummaryUseCase,
-    private val logout: LogoutUseCase
+    private val logout: LogoutUseCase,
+    private val exportMovementsCsv: ExportMovementsCsvUseCase,
+    private val createBackup: CreateBackupUseCase,
+    private val restoreBackup: RestoreBackupUseCase
 ) : ViewModel() {
 
     private val dialog = MutableStateFlow(SettingsUiState())
@@ -66,6 +72,51 @@ class SettingsViewModel @Inject constructor(
             updateSettings(change).onFailure { _messages.send(it.message ?: "No se pudo guardar el ajuste") }
         }
     }
+
+    // region Tus datos: exportar y copias
+
+    /** Ingresos y gastos en CSV; [write] guarda el texto en el archivo que eligió el usuario. */
+    fun exportMovementsCsv(write: suspend (String) -> Unit) = fileJob {
+        write(exportMovementsCsv())
+        "Ingresos y gastos exportados ✅"
+    }
+
+    /** Copia de notas, movimientos y presupuestos; [write] la guarda donde eligió el usuario. */
+    fun createBackup(write: suspend (String) -> Unit) = fileJob {
+        write(createBackup())
+        "Copia de seguridad guardada ✅"
+    }
+
+    /** Recupera la copia que lee [read] (el archivo elegido), sin borrar nada. */
+    fun restoreBackup(read: suspend () -> String) = fileJob {
+        restoreBackup(read()).fold(
+            onSuccess = { restored ->
+                if (restored.isEmpty) "La copia estaba vacía"
+                else "Copia restaurada: ${count(restored.notes, "nota", "notas")}, " +
+                    "${count(restored.movements, "movimiento", "movimientos")} y " +
+                    "${count(restored.budgets, "presupuesto", "presupuestos")} ✅"
+            },
+            onFailure = { it.message ?: "No se pudo restaurar la copia" }
+        )
+    }
+
+    /** Lee o escribe un archivo y avisa del resultado; si el sistema falla (sin espacio, sin permiso), lo dice. */
+    private fun fileJob(job: suspend () -> String) {
+        viewModelScope.launch {
+            val message = try {
+                job()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                "No se pudo acceder al archivo. Inténtalo de nuevo."
+            }
+            _messages.send(message)
+        }
+    }
+
+    private fun count(n: Int, one: String, many: String) = if (n == 1) "1 $one" else "$n $many"
+
+    // endregion
 
     fun setThemeMode(mode: ThemeMode) {
         viewModelScope.launch { themePreferences.saveThemeMode(mode) }

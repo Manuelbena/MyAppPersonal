@@ -331,6 +331,23 @@ class GoogleSyncRepositoryImplTest {
 
     // endregion
 
+    // region Cambios pendientes (aviso de Inicio)
+
+    @Test
+    fun `se cuentan las tareas y eventos sin subir y el contador baja al subirlos`() = runTest {
+        taskDao.insertTask(aSyncedTaskEntity(id = "t-nueva", remoteId = null, pendingChanges = 1))
+        taskDao.insertTask(aSyncedTaskEntity(id = "t-al-dia", remoteId = "g-t"))
+        eventDao.insertEvent(aSyncedEventEntity(id = "e1", remoteId = "g-e"))
+        eventDao.markEventChanged("e1")
+        assertEquals(2, repository.observePendingChangesCount().first())
+
+        repository.pushPendingChanges()
+
+        assertEquals(0, repository.observePendingChangesCount().first())
+    }
+
+    // endregion
+
     // region Subida de tareas
 
     @Test

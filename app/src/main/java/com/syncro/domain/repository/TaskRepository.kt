@@ -13,6 +13,9 @@ interface TaskRepository {
     suspend fun toggleTaskCompletion(taskId: String)
     /** La quita de la app al momento; el borrado en Google queda pendiente de subir. */
     suspend fun deleteTask(taskId: String)
+
+    /** Deshace [deleteTask] si el borrado aún no se ha subido a Google; false si ya no se puede. */
+    suspend fun restoreTask(taskId: String): Boolean
     /** Pasa la tarea a otro día (misma hora); la nueva fecha queda pendiente de subir a Google. */
     suspend fun moveTask(taskId: String, date: LocalDate)
     /** Tareas sin hacer hasta ese día incluido, también las atrasadas. */

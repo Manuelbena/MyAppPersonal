@@ -5,6 +5,7 @@ import android.database.sqlite.SQLiteDatabase
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.syncro.testutil.DAY
+import com.syncro.testutil.createInMemoryDatabase
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -141,6 +142,18 @@ class MigrationTest {
         assertTrue(db.budgetDao.observeBudgets().first().isEmpty())
     }
 
+    // Sin borrado automático (solo para versiones 1–6), olvidar una migración haría fallar la
+    // app al actualizar: la cadena tiene que ir de la 7 a la versión actual sin huecos
+    @Test
+    fun `hay una migracion por cada version desde la 7 hasta la actual`() {
+        val current = createInMemoryDatabase().let { db ->
+            db.openHelper.readableDatabase.version.also { db.close() }
+        }
+
+        assertEquals((7 until current).toList(), ALL_MIGRATIONS.map { it.startVersion })
+        ALL_MIGRATIONS.forEach { assertEquals(it.startVersion + 1, it.endVersion) }
+    }
+
     private fun createVersion9Database(seed: SQLiteDatabase.() -> Unit) =
         createDatabase(Schema9.CREATE_STATEMENTS, Schema9.VERSION, seed)
 
@@ -165,7 +178,7 @@ class MigrationTest {
     /** Igual que en AppModule pero sin fallbackToDestructiveMigration: un fallo debe verse. */
     private fun openCurrentVersion(): SyncroDatabase =
         Room.databaseBuilder(context, SyncroDatabase::class.java, DB_NAME)
-            .addMigrations(MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15)
+            .addMigrations(*ALL_MIGRATIONS)
             .allowMainThreadQueries()
             .build()
             .also { database = it }

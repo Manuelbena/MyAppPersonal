@@ -14,3 +14,8 @@
 .cxx
 local.properties
 .kotlin
+
+# Firma de la versión release: claves y almacén, nunca en git
+keystore.properties
+*.jks
+*.keystore

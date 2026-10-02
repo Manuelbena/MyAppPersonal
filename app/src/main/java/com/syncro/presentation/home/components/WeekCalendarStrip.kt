@@ -20,23 +20,28 @@ import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.syncro.domain.model.DayMark
 import java.time.LocalDate
 import java.time.format.TextStyle
 import java.util.Locale
 
+/** Los días de la tira: 8 semanas de lunes a domingo, 4 antes de la de [today] y 3 después. */
+fun weekStripDates(today: LocalDate): List<LocalDate> {
+    val startMonday = today.minusWeeks(4).minusDays((today.dayOfWeek.value - 1).toLong())
+    return (0..55).map { startMonday.plusDays(it.toLong()) }
+}
+
 @Composable
 fun WeekCalendarStrip(
+    today: LocalDate,
     selectedDate: LocalDate,
     onDateSelected: (LocalDate) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    // Un punto bajo los días con tareas o eventos: de color si queda algo, gris si está todo hecho
+    dayMarks: Map<LocalDate, DayMark> = emptyMap()
 ) {
-    val today = remember { LocalDate.now() }
-    
-    // Generamos un rango de 8 semanas (4 atrás, 4 adelante)
-    val dates = remember {
-        val startMonday = today.minusWeeks(4).minusDays((today.dayOfWeek.value - 1).toLong())
-        (0..55).map { startMonday.plusDays(it.toLong()) }
-    }
+    // Se rehace si cambia el día
+    val dates = remember(today) { weekStripDates(today) }
 
     val screenWidth = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.width.toDp() }
     val horizontalPadding = 16.dp 
@@ -74,6 +79,7 @@ fun WeekCalendarStrip(
                 date = date,
                 isSelected = isSelected,
                 isToday = isToday,
+                mark = dayMarks[date],
                 width = itemWidth,
                 onClick = { onDateSelected(date) }
             )
@@ -86,6 +92,7 @@ private fun DayItem(
     date: LocalDate,
     isSelected: Boolean,
     isToday: Boolean,
+    mark: DayMark?,
     width: androidx.compose.ui.unit.Dp,
     onClick: () -> Unit
 ) {
@@ -143,14 +150,18 @@ private fun DayItem(
             )
         }
         
+        // Hoy ya se distingue por su fondo: el punto dice si el día tiene algo
         Box(modifier = Modifier.height(8.dp)) {
-            if (isToday && !isSelected) {
+            if (mark != null) {
                 Box(
                     modifier = Modifier
                         .align(Alignment.Center)
-                        .size(4.dp)
+                        .size(5.dp)
                         .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primary)
+                        .background(
+                            if (mark == DayMark.PENDING) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.outlineVariant
+                        )
                 )
             }
         }

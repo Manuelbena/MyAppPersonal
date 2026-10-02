@@ -1,21 +1,26 @@
-# Add project specific ProGuard rules here.
-# You can control the set of applied configuration files using the
-# proguardFiles setting in build.gradle.
-#
-# For more details, see
-#   http://developer.android.com/guide/developing/tools/proguard.html
+# Reglas de R8 para la versión release (isMinifyEnabled = true).
+# Room, Hilt, Compose, WorkManager, Glance y Credential Manager traen las suyas en sus librerías.
 
-# If your project uses WebView with JS, uncomment the following
-# and specify the fully qualified class name to the JavaScript interface
-# class:
-#-keepclassmembers class fqcn.of.javascript.interface.for.webview {
-#   public *;
-#}
+# Trazas de errores legibles (con número de línea) aunque el código esté ofuscado
+-keepattributes SourceFile,LineNumberTable
+-renamesourcefileattribute SourceFile
 
-# Uncomment this to preserve the line number information for
-# debugging stack traces.
-#-keepattributes SourceFile,LineNumberTable
+# Google API Client (Calendar y Tasks): rellena los modelos por reflexión a partir de los campos
+# anotados con @Key. Sin esto, los eventos y tareas llegan vacíos en release.
+-keepattributes Signature,RuntimeVisibleAnnotations,AnnotationDefault,EnclosingMethod,InnerClasses
+-keep class com.google.api.services.calendar.** { *; }
+-keep class com.google.api.services.tasks.** { *; }
+-keepclassmembers class * {
+    @com.google.api.client.util.Key <fields>;
+}
+-keep class com.google.api.client.** { *; }
 
-# If you keep the line number information, uncomment this to
-# hide the original source file name.
-#-renamesourcefileattribute SourceFile
+# Clases opcionales que esas librerías mencionan pero que Android no tiene (no se usan)
+-dontwarn com.google.api.client.extensions.android.**
+-dontwarn com.google.appengine.**
+-dontwarn javax.annotation.**
+-dontwarn javax.naming.**
+-dontwarn org.apache.http.**
+-dontwarn org.ietf.jgss.**
+-dontwarn org.joda.time.**
+-dontwarn sun.misc.Unsafe

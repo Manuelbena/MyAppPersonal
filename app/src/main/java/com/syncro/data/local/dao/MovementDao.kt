@@ -13,6 +13,9 @@ interface MovementDao {
     @Query("SELECT * FROM movements WHERE (date BETWEEN :start AND :end) OR (repeatsMonthly = 1 AND date <= :end)")
     fun observeForRange(start: Long, end: Long): Flow<List<MovementEntity>>
 
+    @Query("SELECT * FROM movements ORDER BY date")
+    suspend fun getAll(): List<MovementEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertMovement(movement: MovementEntity)
 

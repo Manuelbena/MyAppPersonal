@@ -2,14 +2,8 @@ package com.syncro.di
 
 import android.content.Context
 import androidx.room.Room
-import com.syncro.data.local.MIGRATION_7_8
-import com.syncro.data.local.MIGRATION_8_9
-import com.syncro.data.local.MIGRATION_9_10
-import com.syncro.data.local.MIGRATION_10_11
-import com.syncro.data.local.MIGRATION_11_12
-import com.syncro.data.local.MIGRATION_12_13
-import com.syncro.data.local.MIGRATION_13_14
-import com.syncro.data.local.MIGRATION_14_15
+import com.syncro.data.backup.JsonBackupCodec
+import com.syncro.data.local.ALL_MIGRATIONS
 import com.syncro.data.local.SyncroDatabase
 import com.syncro.data.local.dao.BudgetDao
 import com.syncro.data.local.dao.EventDao
@@ -30,10 +24,13 @@ import com.syncro.data.repository.TaskRepositoryImpl
 import com.syncro.data.repository.UserRepositoryImpl
 import com.syncro.data.remote.GoogleApiRemoteDataSource
 import com.syncro.data.remote.GoogleRemoteDataSource
+import com.syncro.data.sync.NetworkConnectivityRepository
 import com.syncro.data.sync.SyncScheduler
 import com.syncro.data.sync.WorkManagerSyncScheduler
 import com.syncro.domain.repository.AccountDataRepository
+import com.syncro.domain.repository.BackupCodec
 import com.syncro.domain.repository.BudgetRepository
+import com.syncro.domain.repository.ConnectivityRepository
 import com.syncro.domain.repository.DailyFocusRepository
 import com.syncro.domain.repository.DailyQuoteRepository
 import com.syncro.domain.repository.SettingsRepository
@@ -63,8 +60,12 @@ object AppModule {
             SyncroDatabase::class.java,
             "syncro_db"
         )
-            .addMigrations(MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15)
-            .fallbackToDestructiveMigration(true)
+            .addMigrations(*ALL_MIGRATIONS)
+            // Solo se borra desde versiones de antes de las migraciones (1–6), que no se pueden
+            // convertir. Desde la 7 cada cambio tiene su migración probada: si alguna faltara o
+            // fallara, mejor un error visible que borrar en silencio notas, movimientos y
+            // presupuestos, que solo existen en el móvil
+            .fallbackToDestructiveMigrationFrom(true, 1, 2, 3, 4, 5, 6)
             .build()
     }
 
@@ -148,12 +149,19 @@ object AppModule {
     fun provideDailyQuoteRepository(impl: DailyQuoteRepositoryImpl): DailyQuoteRepository = impl
 
     @Provides
+    fun provideBackupCodec(impl: JsonBackupCodec): BackupCodec = impl
+
+    @Provides
     @Singleton
     fun provideSettingsRepository(impl: SettingsRepositoryImpl): SettingsRepository = impl
 
     @Provides
     @Singleton
     fun provideAccountDataRepository(impl: AccountDataRepositoryImpl): AccountDataRepository = impl
+
+    @Provides
+    @Singleton
+    fun provideConnectivityRepository(impl: NetworkConnectivityRepository): ConnectivityRepository = impl
 
     @Provides
     @Singleton

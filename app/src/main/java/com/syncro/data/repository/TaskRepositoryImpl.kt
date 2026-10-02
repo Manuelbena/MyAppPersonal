@@ -60,6 +60,10 @@ class TaskRepositoryImpl @Inject constructor(
         dao.markTaskDeleted(taskId)
     }
 
+    override suspend fun restoreTask(taskId: String): Boolean {
+        return dao.restoreTask(taskId) > 0
+    }
+
     override suspend fun moveTask(taskId: String, date: LocalDate) {
         dao.moveTask(taskId, date.toEpochDay())
     }

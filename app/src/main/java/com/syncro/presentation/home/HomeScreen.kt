@@ -37,17 +37,18 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import com.syncro.presentation.event.AddEventScreen
 import com.syncro.presentation.event.EventDetailSheet
 import com.syncro.presentation.notes.NoteDetailSheet
 import com.syncro.presentation.task.TaskDetailSheet
 import com.syncro.presentation.home.components.*
 import com.syncro.domain.model.SyncroItem
+import com.syncro.domain.model.nextUp
+import kotlinx.coroutines.launch
 import com.syncro.presentation.navigation.AppScreen
 import kotlinx.coroutines.flow.collectLatest
 import java.time.LocalDate
-import java.time.format.TextStyle
-import java.util.*
 
 @Composable
 fun HomeScreen(
@@ -56,14 +57,24 @@ fun HomeScreen(
     openQuickTask: Boolean = false,
     onQuickTaskOpened: () -> Unit = {},
     onNavigateToNotes: () -> Unit = {},
+    onNavigateToSavings: () -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
     // La última frase mostrada: así la tarjeta no se queda vacía mientras se recoge al cerrarla
     var shownQuote by remember { mutableStateOf(uiState.quote) }
     uiState.quote?.let { shownQuote = it }
+    // Igual con el aviso de sincronización: se recoge con su último texto
+    var shownSyncNotice by remember { mutableStateOf(uiState.syncNotice) }
+    uiState.syncNotice?.let { shownSyncNotice = it }
     // Hora actual al minuto: mueve la línea "Ahora" y el progreso de los eventos en curso
     val now = rememberCurrentMinute()
+    // Si la app sigue abierta al pasar la medianoche (o vuelve a primer plano otro día), "hoy" avanza
+    LaunchedEffect(now.toLocalDate()) { viewModel.refreshToday() }
+    LifecycleResumeEffect(Unit) {
+        viewModel.refreshToday()
+        onPauseOrDispose { }
+    }
     val context = LocalContext.current
     val scrollState = rememberScrollState()
     // En tablet horizontal, la columna del resumen tiene su propio scroll
@@ -107,18 +118,32 @@ fun HomeScreen(
                         duration = SnackbarDuration.Short
                     )
                 }
+                // Aparte, para no frenar los demás avisos mientras se espera al "Deshacer"
+                is HomeEffect.OfferUndo -> launch {
+                    var undone = false
+                    try {
+                        val result = snackbarHostState.showSnackbar(
+                            message = effect.message,
+                            actionLabel = "Deshacer",
+                            duration = SnackbarDuration.Short
+                        )
+                        if (result == SnackbarResult.ActionPerformed) {
+                            undone = true
+                            viewModel.undo(effect.undo)
+                        }
+                    } finally {
+                        // También si se sale de Inicio con el aviso en pantalla: el borrado se sube
+                        if (!undone) viewModel.undoExpired(effect.undo)
+                    }
+                }
             }
         }
     }
     
-    // Formatear la fecha de hoy para el header
-    val today = LocalDate.now()
-    val formattedDate = today.dayOfWeek.getDisplayName(TextStyle.FULL, Locale("es", "ES"))
-        .replaceFirstChar { it.uppercase() } + ", " + 
-        today.dayOfMonth + " de " + 
-        today.month.getDisplayName(TextStyle.FULL, Locale("es", "ES"))
-
-    val dayTitle = "Agenda del día ${uiState.selectedDate.dayOfMonth}"
+    // La fecha de hoy para la cabecera y el título de la agenda del día que se mira
+    val today = uiState.today
+    val formattedDate = fullDayName(today, today)
+    val dayTitle = dayTitle(uiState.selectedDate, today)
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -139,16 +164,44 @@ fun HomeScreen(
                 currentDate = formattedDate,
                 userPhotoUrl = uiState.userPhotoUrl,
                 onOpenSettings = onOpenSettings,
-                onTodayClick = { viewModel.onDaySelected(LocalDate.now()) }
+                onTodayClick = viewModel::goToToday,
+                // Mirando hoy, el botón no haría nada: solo sale al ver otro día
+                showTodayButton = uiState.selectedDate != today
             )
+            // Sin conexión, sync fallida o cambios sin subir: se avisa bajo la cabecera
+            AnimatedVisibility(
+                visible = uiState.syncNotice != null,
+                enter = expandVertically() + fadeIn(),
+                exit = shrinkVertically() + fadeOut()
+            ) {
+                shownSyncNotice?.let { SyncNoticeBar(notice = it, onRetry = { viewModel.syncFromGoogle() }) }
+            }
         }
         val weekStrip: @Composable () -> Unit = {
             WeekCalendarStrip(
+                today = uiState.today,
                 selectedDate = uiState.selectedDate,
-                onDateSelected = { viewModel.onDaySelected(it) }
+                onDateSelected = { viewModel.onDaySelected(it) },
+                dayMarks = uiState.dayMarks
             )
         }
+        // Deslizar el contenido a los lados cambia de día
+        val daySwipe = Modifier.swipeBetweenDays(
+            onPreviousDay = { viewModel.onDaySelected(uiState.selectedDate.minusDays(1)) },
+            onNextDay = { viewModel.onDaySelected(uiState.selectedDate.plusDays(1)) }
+        )
         val summaryCards: @Composable () -> Unit = {
+            // Lo próximo de hoy (evento en curso, el siguiente y las tareas); solo mirando hoy
+            if (uiState.selectedDate == today) {
+                nextUp(uiState.timelineItems, now)?.let { next ->
+                    NextUpCard(
+                        nextUp = next,
+                        now = now,
+                        onEventClick = { selectedEventIdForDetail = it.id }
+                    )
+                }
+            }
+
             // La frase del día, si toca; al cerrarla se recoge en vez de desaparecer de golpe
             AnimatedVisibility(
                 visible = uiState.quote != null,
@@ -158,11 +211,16 @@ fun HomeScreen(
                 shownQuote?.let { DailyQuoteCard(quote = it.text, author = it.author, onClose = viewModel::hideDailyQuote) }
             }
 
+            // Ahorros del mes, si se activó en Ajustes > Asistente (es del mes: solo mirando hoy)
+            if (uiState.selectedDate == today) {
+                uiState.savings?.let { HomeSavingsCard(savings = it, onOpenSavings = onNavigateToSavings) }
+            }
+
             // Prioridades del día (se eligen en el chat del asistente)
             if (uiState.focusTasks.isNotEmpty()) {
                 FocusCard(
                     tasks = uiState.focusTasks,
-                    isToday = uiState.selectedDate == LocalDate.now(),
+                    isToday = uiState.selectedDate == uiState.today,
                     onToggle = { viewModel.toggleTaskCompletion(it.id) },
                     onClick = { selectedTaskIdForDetail = it.id }
                 )
@@ -183,7 +241,10 @@ fun HomeScreen(
         val emptyDay: @Composable () -> Unit = {
             Box(modifier = Modifier.padding(horizontal = 16.dp)) {
                 EmptyStateView(
-                    onAddEventClick = { showAddItemSheet = true }
+                    date = uiState.selectedDate,
+                    today = today,
+                    onAddTask = { showQuickTaskSheet = true },
+                    onAddEvent = { showDetailedEventSheet = true }
                 )
             }
         }
@@ -271,6 +332,7 @@ fun HomeScreen(
                             Column(
                                 modifier = Modifier
                                     .fillMaxSize()
+                                    .then(daySwipe)
                                     .verticalScroll(scrollState)
                             ) {
                                 dayHeading()
@@ -319,6 +381,7 @@ fun HomeScreen(
                             Column(
                                 modifier = Modifier
                                     .fillMaxSize()
+                                    .then(daySwipe)
                                     .verticalScroll(scrollState)
                             ) {
                                 Spacer(modifier = Modifier.height(16.dp))
@@ -393,6 +456,8 @@ fun HomeScreen(
     if (showDetailedEventSheet || selectedEventForEdit != null) {
         AddEventScreen(
             eventToEdit = selectedEventForEdit,
+            // Como las tareas: en el día que se mira (hoy, si se mira un día pasado)
+            initialDate = maxOf(uiState.selectedDate, uiState.today),
             onDismiss = { 
                 showDetailedEventSheet = false 
                 selectedEventForEdit = null
@@ -408,7 +473,8 @@ fun HomeScreen(
                 showQuickTaskSheet = false
             },
             // Se crea en el día que se está mirando (hoy, si se mira un día pasado)
-            initialDate = maxOf(uiState.selectedDate, LocalDate.now())
+            initialDate = maxOf(uiState.selectedDate, uiState.today),
+            today = uiState.today
         )
     }
 

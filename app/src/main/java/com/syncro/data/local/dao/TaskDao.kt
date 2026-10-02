@@ -31,6 +31,10 @@ interface TaskDao {
     @Query("UPDATE tasks SET isDeleted = 1, pendingChanges = pendingChanges + 1 WHERE id = :id")
     suspend fun markTaskDeleted(id: String)
 
+    /** Deshace [markTaskDeleted] mientras el borrado no se haya subido (la fila sigue ahí); 0 si ya no está. */
+    @Query("UPDATE tasks SET isDeleted = 0 WHERE id = :id AND isDeleted = 1")
+    suspend fun restoreTask(id: String): Int
+
     /** Cambia la tarea de día (misma hora) y marca que la nueva fecha debe subirse a Google. */
     @Query("UPDATE tasks SET date = :dateEpoch, dateChanged = 1, pendingChanges = pendingChanges + 1 WHERE id = :id")
     suspend fun moveTask(id: String, dateEpoch: Long)
@@ -44,6 +48,10 @@ interface TaskDao {
     /** Tareas con cambios locales sin subir o que nunca llegaron a Google. */
     @Query("SELECT id FROM tasks WHERE pendingChanges > 0 OR remoteId IS NULL")
     suspend fun getPendingTaskIds(): List<String>
+
+    /** Lo mismo que [getPendingTaskIds], contado y observable (aviso de cambios sin subir). */
+    @Query("SELECT COUNT(*) FROM tasks WHERE pendingChanges > 0 OR remoteId IS NULL")
+    fun observePendingCount(): Flow<Int>
 
     /** remoteIds de tareas sin cambios pendientes: las únicas que puede borrar la sync. */
     @Query("SELECT remoteId FROM tasks WHERE remoteId IS NOT NULL AND pendingChanges = 0")

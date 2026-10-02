@@ -9,6 +9,7 @@ import com.syncro.domain.model.MovementCategory
 import com.syncro.domain.model.SyncroItem
 import com.syncro.domain.repository.AccountDataRepository
 import com.syncro.domain.repository.BudgetRepository
+import com.syncro.domain.repository.ConnectivityRepository
 import com.syncro.domain.repository.DailyFocusRepository
 import com.syncro.domain.repository.DailyQuoteRepository
 import com.syncro.domain.repository.SettingsRepository
@@ -24,7 +25,11 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import java.io.IOException
+import java.time.Clock
+import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneId
+import java.time.ZoneOffset
 import java.time.YearMonth
 
 /*
@@ -66,9 +71,22 @@ class FakeTaskRepository(private val log: CallLog = CallLog()) : TaskRepository 
         }
     }
 
+    /** Las borradas siguen guardadas (como la marca isDeleted de Room) hasta que se suben. */
+    val deletedTasks = MutableStateFlow<Map<String, SyncroItem.Task>>(emptyMap())
+
     override suspend fun deleteTask(taskId: String) {
         log.calls += "deleteTask($taskId)"
+        val task = tasks.value[taskId] ?: return
+        deletedTasks.update { it + (taskId to task) }
         tasks.update { it - taskId }
+    }
+
+    override suspend fun restoreTask(taskId: String): Boolean {
+        log.calls += "restoreTask($taskId)"
+        val task = deletedTasks.value[taskId] ?: return false
+        deletedTasks.update { it - taskId }
+        tasks.update { it + (taskId to task) }
+        return true
     }
 
     override suspend fun moveTask(taskId: String, date: LocalDate) {
@@ -119,9 +137,21 @@ class FakeEventRepository(private val log: CallLog = CallLog()) : EventRepositor
         }
     }
 
+    val deletedEvents = MutableStateFlow<Map<String, SyncroItem.Event>>(emptyMap())
+
     override suspend fun deleteEvent(eventId: String) {
         log.calls += "deleteEvent($eventId)"
+        val event = events.value[eventId] ?: return
+        deletedEvents.update { it + (eventId to event) }
         events.update { it - eventId }
+    }
+
+    override suspend fun restoreEvent(eventId: String): Boolean {
+        log.calls += "restoreEvent($eventId)"
+        val event = deletedEvents.value[eventId] ?: return false
+        deletedEvents.update { it - eventId }
+        events.update { it + (eventId to event) }
+        return true
     }
 }
 
@@ -164,6 +194,24 @@ class FakeGoogleSyncRepository(private val log: CallLog = CallLog()) : GoogleSyn
         log.calls += "pushPendingChanges"
         return result()
     }
+
+    /** Lo que contaría Room; los tests lo fijan a mano. */
+    val pendingChanges = MutableStateFlow(0)
+
+    override fun observePendingChangesCount(): Flow<Int> = pendingChanges
+}
+
+class FakeConnectivityRepository : ConnectivityRepository {
+    val online = MutableStateFlow(true)
+
+    override val isOnline: Flow<Boolean> = online
+}
+
+/** Un reloj que el test puede adelantar (p. ej. para pasar la medianoche con la app abierta). */
+class MutableClock(var instant: Instant, private val zone: ZoneId = ZoneOffset.UTC) : Clock() {
+    override fun getZone(): ZoneId = zone
+    override fun withZone(zone: ZoneId): Clock = MutableClock(instant, zone)
+    override fun instant(): Instant = instant
 }
 
 class FakeUserRepository : UserRepository {
@@ -204,6 +252,8 @@ class FakeMovementRepository : MovementRepository {
     override fun observeForMonth(month: YearMonth): Flow<List<Movement>> = movements.map { all ->
         all.values.filter { YearMonth.from(it.date) == month || (it.repeatsMonthly && !it.date.isAfter(month.atEndOfMonth())) }
     }
+
+    override suspend fun getAllMovements(): List<Movement> = movements.value.values.sortedBy { it.date }
 
     override suspend fun insertMovement(movement: Movement) {
         movements.update { it + (movement.id to movement) }

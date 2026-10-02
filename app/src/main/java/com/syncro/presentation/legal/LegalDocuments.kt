@@ -16,14 +16,13 @@ package com.syncro.presentation.legal
 object LegalInfo {
     const val APP_NAME = "Syncro"
     const val OWNER_NAME = "[Nombre y apellidos o razón social del titular]"
-    const val OWNER_ID = "[NIF/CIF]"
     const val OWNER_ADDRESS = "[Domicilio]"
     const val CONTACT_EMAIL = "[Correo de contacto]"
     /** Fecha de la última revisión de los textos; cambiarla al modificarlos. */
     const val LAST_UPDATED = "2 de octubre de 2026"
 
     val isComplete: Boolean
-        get() = listOf(OWNER_NAME, OWNER_ID, OWNER_ADDRESS, CONTACT_EMAIL).none { it.startsWith("[") }
+        get() = listOf(OWNER_NAME, OWNER_ADDRESS, CONTACT_EMAIL).none { it.startsWith("[") }
 }
 
 enum class LegalDocumentId(val title: String, val summary: String) {
@@ -64,7 +63,7 @@ fun legalDocument(id: LegalDocumentId): LegalDocument = when (id) {
     LegalDocumentId.OPEN_SOURCE -> openSourceNotice
 }
 
-private val owner = "${LegalInfo.OWNER_NAME} (${LegalInfo.OWNER_ID}), con domicilio en ${LegalInfo.OWNER_ADDRESS}"
+private val owner = "${LegalInfo.OWNER_NAME}, con domicilio en ${LegalInfo.OWNER_ADDRESS}"
 
 // region Política de privacidad
 
@@ -119,6 +118,7 @@ private val privacyPolicy = LegalDocument(
                 "Solo con Google, que es quien presta el inicio de sesión y los servicios de Calendar y Tasks, y con quien ya tienes una relación como usuario. Google trata esos datos según su propia política de privacidad (policies.google.com/privacy).",
                 "Google puede tratar datos fuera del Espacio Económico Europeo, con las garantías que recoge su política, como el Marco de Privacidad de Datos UE-EE. UU. y las cláusulas contractuales tipo de la Comisión Europea.",
                 "Tickets y resúmenes: si compartes el ticket de un ingreso o gasto o el resumen de un mes, se crea una imagen con sus datos en el almacenamiento temporal de la app y se envía solo a la app que elijas en el menú de compartir de Android (por ejemplo WhatsApp o el correo), que la tratará según su propia política. La app no la envía a ningún otro sitio.",
+                "Exportaciones y copias: si exportas tus ingresos y gastos o haces una copia de seguridad, el archivo se guarda solo donde tú elijas (tu móvil, Google Drive u otro servicio que tengas instalado), que lo tratará según su propia política. Restaurar una copia solo lee el archivo que elijas.",
                 "Copias de seguridad: si tienes activada la copia de seguridad de Android, el sistema puede incluir los datos de la app (entre ellos las notas, los ingresos y gastos y la sesión) en la copia de tu cuenta de Google. Puedes desactivarla en los ajustes del móvil."
             )
         ),
@@ -143,6 +143,7 @@ private val privacyPolicy = LegalDocument(
             listOf(
                 "Puedes ejercer tus derechos de acceso, rectificación, supresión, oposición, limitación del tratamiento y portabilidad. Como tus datos están en tu móvil y en tu cuenta de Google, la mayoría los controlas directamente:",
                 "• Ver, corregir o borrar tus tareas, eventos, notas, ingresos y gastos desde la propia app, o tus eventos y tareas desde Google Calendar y Google Tasks.",
+                "• Llevarte tus datos (portabilidad): en Ajustes > Tus datos puedes exportar tus ingresos y gastos (CSV) y hacer una copia de tus notas, ingresos, gastos y presupuestos.",
                 "• Borrar los datos del móvil cerrando sesión (Ajustes > Cuenta) o desinstalando la app.",
                 "• Retirar el acceso de ${LegalInfo.APP_NAME} a tu cuenta de Google en myaccount.google.com/permissions.",
                 "• Retirar el permiso de notificaciones en Ajustes > Notificaciones o en los ajustes del móvil.",
@@ -251,7 +252,6 @@ private val legalNotice = LegalDocument(
             "Titular",
             listOf(
                 "• Nombre: ${LegalInfo.OWNER_NAME}",
-                "• NIF: ${LegalInfo.OWNER_ID}",
                 "• Domicilio: ${LegalInfo.OWNER_ADDRESS}",
                 "• Correo electrónico: ${LegalInfo.CONTACT_EMAIL}"
             )

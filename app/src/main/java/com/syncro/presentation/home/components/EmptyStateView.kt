@@ -7,21 +7,63 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Coffee
+import androidx.compose.material.icons.outlined.EventAvailable
+import androidx.compose.material.icons.outlined.History
+import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import java.time.LocalDate
 
+/** Lo que dice el día vacío según sea pasado, hoy o futuro. */
+internal data class EmptyDayMessage(
+    val icon: ImageVector,
+    val title: String,
+    val body: String,
+    /** En un día pasado no se ofrece crear nada: las tareas nuevas irían a hoy, no a ese día. */
+    val canAdd: Boolean
+)
+
+internal fun emptyDayMessage(date: LocalDate, today: LocalDate): EmptyDayMessage = when {
+    date.isBefore(today) -> EmptyDayMessage(
+        icon = Icons.Outlined.History,
+        title = "Un día tranquilo",
+        body = "No hubo tareas ni eventos este día.",
+        canAdd = false
+    )
+    date == today -> EmptyDayMessage(
+        icon = Icons.Filled.Coffee,
+        title = "Un día despejado",
+        body = "No tienes tareas ni eventos para hoy. ¡Disfruta de tu tiempo libre!",
+        canAdd = true
+    )
+    else -> EmptyDayMessage(
+        icon = Icons.Outlined.EventAvailable,
+        title = "Nada planeado todavía",
+        body = "Este día está libre. ¿Le apuntas algo?",
+        canAdd = true
+    )
+}
+
+/**
+ * El día que se mira no tiene tareas ni eventos. Hoy y los días futuros ofrecen crear una tarea
+ * o un evento directamente en ese día; los pasados solo lo cuentan.
+ */
 @Composable
 fun EmptyStateView(
-    onAddEventClick: () -> Unit,
+    date: LocalDate,
+    today: LocalDate,
+    onAddTask: () -> Unit,
+    onAddEvent: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val message = emptyDayMessage(date, today)
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -29,7 +71,6 @@ fun EmptyStateView(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        // Icono de café en círculo
         Box(
             modifier = Modifier
                 .size(100.dp)
@@ -38,7 +79,7 @@ fun EmptyStateView(
             contentAlignment = Alignment.Center
         ) {
             Icon(
-                imageVector = Icons.Default.Coffee,
+                imageVector = message.icon,
                 contentDescription = null,
                 modifier = Modifier.size(48.dp),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
@@ -47,9 +88,8 @@ fun EmptyStateView(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // Título
         Text(
-            text = "Un día despejado",
+            text = message.title,
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onBackground
@@ -57,37 +97,36 @@ fun EmptyStateView(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // Descripción
         Text(
-            text = "No tienes tareas ni eventos programados para este día. ¡Disfruta de tu tiempo libre!",
+            text = message.body,
             style = MaterialTheme.typography.bodyMedium,
             textAlign = TextAlign.Center,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(horizontal = 48.dp)
         )
 
-        Spacer(modifier = Modifier.height(32.dp))
-
-        // Botón Añadir evento
-        OutlinedButton(
-            onClick = onAddEventClick,
-            shape = RoundedCornerShape(12.dp),
-            border = BorderStroke(
-                width = 1.dp,
-                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
-            ),
-            colors = ButtonDefaults.outlinedButtonColors(
-                contentColor = MaterialTheme.colorScheme.primary
-            ),
-            modifier = Modifier
-                .height(48.dp)
-                .width(180.dp)
-        ) {
-            Text(
-                text = "Añadir evento",
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 16.sp
-            )
+        if (message.canAdd) {
+            Spacer(modifier = Modifier.height(32.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                EmptyDayButton("Nueva tarea", onAddTask)
+                EmptyDayButton("Nuevo evento", onAddEvent)
+            }
         }
+    }
+}
+
+@Composable
+private fun EmptyDayButton(text: String, onClick: () -> Unit) {
+    OutlinedButton(
+        onClick = onClick,
+        shape = RoundedCornerShape(12.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)),
+        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary),
+        contentPadding = PaddingValues(start = 12.dp, end = 16.dp),
+        modifier = Modifier.height(48.dp)
+    ) {
+        Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(6.dp))
+        Text(text = text, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
     }
 }

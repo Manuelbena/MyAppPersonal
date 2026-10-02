@@ -64,8 +64,8 @@ class SettingsContentTest {
 
         compose.onNodeWithText("09:00 · 21:00").assertIsDisplayed()
         compose.onNodeWithText("Sistema").performScrollTo().assertIsDisplayed()
-        compose.onNodeWithText("Notificaciones").performClick()
-        compose.onNodeWithText("Recibir notificaciones").assertIsDisplayed()
+        compose.onNodeWithText("Notificaciones").performScrollTo().performClick()
+        compose.onNodeWithText("Recibir notificaciones").performScrollTo().assertIsDisplayed()
 
         compose.onNodeWithContentDescription("Volver").performClick()
 
@@ -99,7 +99,7 @@ class SettingsContentTest {
     fun `las notificaciones se activan con un interruptor`() {
         show()
 
-        compose.onNodeWithText("Notificaciones").performClick()
+        compose.onNodeWithText("Notificaciones").performScrollTo().performClick()
         compose.onNodeWithText("Activadas", substring = true).assertIsDisplayed()
         compose.onNodeWithText("Recibir notificaciones").performClick()
 
@@ -149,6 +149,37 @@ class SettingsContentTest {
         compose.onNodeWithText("Guardar").performClick()
 
         assertEquals(null, settings.assistant.paydayDay)
+    }
+
+    @Test
+    fun `tus datos ofrece exportar, hacer copia y restaurar`() {
+        val actions = mutableListOf<String>()
+        compose.setContent {
+            SettingsContent(
+                state = SettingsUiState(user = User("ana@example.com", "Ana García", null)),
+                notificationsAllowed = true,
+                appVersion = "1.0",
+                onBack = {},
+                onNotificationsToggle = {},
+                onDigestChange = {},
+                onAssistantChange = {},
+                onThemeChange = {},
+                onLogoutClick = {},
+                onLogoutConfirm = {},
+                onLogoutDismiss = {},
+                onOpenLegal = {},
+                onExportCsv = { actions += "csv" },
+                onBackup = { actions += "copia" },
+                onRestore = { actions += "restaurar" }
+            )
+        }
+
+        compose.onNodeWithText("Tus datos").performScrollTo().performClick()
+        compose.onNodeWithText("Exportar ingresos y gastos").performClick()
+        compose.onNodeWithText("Hacer copia de seguridad").performClick()
+        compose.onNodeWithText("Restaurar una copia").performClick()
+
+        assertEquals(listOf("csv", "copia", "restaurar"), actions)
     }
 
     @Test

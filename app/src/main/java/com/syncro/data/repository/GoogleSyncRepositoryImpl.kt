@@ -18,6 +18,8 @@ import com.syncro.domain.model.isValidEventRange
 import com.syncro.domain.repository.GoogleSyncRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -209,6 +211,9 @@ class GoogleSyncRepositoryImpl @Inject constructor(
                 firstError?.let { throw it }
             }
         }.onFailure { syncScheduler.schedulePendingPush() }
+
+    override fun observePendingChangesCount(): Flow<Int> =
+        combine(taskDao.observePendingCount(), eventDao.observePendingCount()) { tasks, events -> tasks + events }
 
     private suspend fun pushTaskInternal(taskId: String) {
         val task = taskDao.getTaskById(taskId) ?: return

@@ -60,6 +60,10 @@ interface EventDao {
     @Query("UPDATE events SET isDeleted = 1, pendingChanges = pendingChanges + 1 WHERE id = :eventId")
     suspend fun markEventDeleted(eventId: String)
 
+    /** Ver [TaskDao.restoreTask]. */
+    @Query("UPDATE events SET isDeleted = 0 WHERE id = :eventId AND isDeleted = 1")
+    suspend fun restoreEvent(eventId: String): Int
+
     /** Las subtareas se sincronizan dentro de la descripción del evento: cambiar una marca el evento. */
     @Transaction
     suspend fun toggleSubtaskCompletion(eventId: String, subtaskTitle: String) {
@@ -72,6 +76,10 @@ interface EventDao {
     /** Eventos con cambios locales sin subir o que nunca llegaron a Google. */
     @Query("SELECT id FROM events WHERE pendingChanges > 0 OR remoteId IS NULL")
     suspend fun getPendingEventIds(): List<String>
+
+    /** Ver [TaskDao.observePendingCount]. */
+    @Query("SELECT COUNT(*) FROM events WHERE pendingChanges > 0 OR remoteId IS NULL")
+    fun observePendingCount(): Flow<Int>
 
     /** remoteIds sin cambios pendientes que empiezan en el rango: los únicos que puede borrar la sync. */
     @Query(

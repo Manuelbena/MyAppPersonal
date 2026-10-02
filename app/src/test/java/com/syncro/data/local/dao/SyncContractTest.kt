@@ -204,6 +204,31 @@ class SyncContractTest {
     }
 
     @Test
+    fun `deshacer un borrado aun no subido vuelve a mostrar la tarea y el evento`() = runTest {
+        taskDao.insertTask(aSyncedTaskEntity(id = "t1", remoteId = "g-t"))
+        eventDao.insertEvent(aSyncedEventEntity(id = "e1", remoteId = "g-e"))
+        taskDao.markTaskDeleted("t1")
+        eventDao.markEventDeleted("e1")
+
+        assertEquals(1, taskDao.restoreTask("t1"))
+        assertEquals(1, eventDao.restoreEvent("e1"))
+
+        assertEquals(listOf("t1"), taskDao.getTasksByDate(DAY.toEpochDay()).first().map { it.id })
+        assertEquals(listOf("e1"), eventDao.getEventsByDate(DAY.toEpochDay()).first().map { it.event.id })
+        // Conserva su id de Google: al subirse se actualiza, no se crea otra
+        assertEquals("g-t", taskDao.getTaskById("t1")!!.remoteId)
+    }
+
+    @Test
+    fun `no se puede deshacer lo que ya no esta o no estaba borrado`() = runTest {
+        taskDao.insertTask(aSyncedTaskEntity(id = "t1", remoteId = "g-t"))
+
+        assertEquals(0, taskDao.restoreTask("t1"))
+        assertEquals(0, taskDao.restoreTask("ya-subida-y-quitada"))
+        assertEquals(0, eventDao.restoreEvent("ya-subido-y-quitado"))
+    }
+
+    @Test
     fun `los eventos confirman la subida con la misma regla`() = runTest {
         eventDao.insertEvent(aSyncedEventEntity(id = "e1", remoteId = null, pendingChanges = 1))
         eventDao.toggleEventCompletion("e1")

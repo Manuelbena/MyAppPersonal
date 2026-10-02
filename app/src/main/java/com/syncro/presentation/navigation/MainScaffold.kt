@@ -245,7 +245,8 @@ fun MainScaffold(
                              onOpenSettings = { navController.navigate(AppScreen.Settings.route) },
                              openQuickTask = addTask && session is SessionState.LoggedIn,
                              onQuickTaskOpened = onAddTaskOpened,
-                             onNavigateToNotes = { navController.navigate(AppScreen.NotesList.route) }
+                             onNavigateToNotes = { navController.navigate(AppScreen.NotesList.route) },
+                             onNavigateToSavings = { navigateToTab(AppScreen.Savings) }
                          )
                     }
                     // La libreta es una página "encima" de Inicio: entra por la derecha y sale por ella

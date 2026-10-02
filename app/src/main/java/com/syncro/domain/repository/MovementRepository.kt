@@ -11,6 +11,8 @@ interface MovementRepository {
      * antes. Es un superconjunto; quien lo usa decide con `Movement.dateIn`.
      */
     fun observeForMonth(month: YearMonth): Flow<List<Movement>>
+    /** Todos, para exportarlos o guardarlos en una copia. */
+    suspend fun getAllMovements(): List<Movement>
     suspend fun insertMovement(movement: Movement)
     suspend fun deleteMovement(id: String)
 }

@@ -1,5 +1,10 @@
 package com.syncro.presentation.home.components
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -26,7 +31,8 @@ fun HomeHeader(
     currentDate: String,
     onOpenSettings: () -> Unit,
     onTodayClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    showTodayButton: Boolean = true
 ) {
     Row(
         modifier = modifier
@@ -49,12 +55,23 @@ fun HomeHeader(
             )
         }
 
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            SyncroIconButton(
-                icon = Icons.Outlined.Today,
-                onClick = onTodayClick,
-                contentColor = MaterialTheme.colorScheme.primary
-            )
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // "Volver a hoy": aparece al mirar otro día y se va al volver
+            AnimatedVisibility(
+                visible = showTodayButton,
+                enter = fadeIn() + scaleIn(),
+                exit = fadeOut() + scaleOut()
+            ) {
+                SyncroIconButton(
+                    icon = Icons.Outlined.Today,
+                    onClick = onTodayClick,
+                    contentColor = MaterialTheme.colorScheme.primary,
+                    contentDescription = "Volver a hoy"
+                )
+            }
             // La foto de perfil lleva a Ajustes (perfil, avisos, tema…)
             UserAvatar(
                 name = userName,

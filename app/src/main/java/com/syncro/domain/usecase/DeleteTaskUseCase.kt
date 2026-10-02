@@ -12,8 +12,12 @@ class DeleteTaskUseCase @Inject constructor(
     private val repository: TaskRepository,
     private val googleSyncRepository: GoogleSyncRepository
 ) {
-    suspend operator fun invoke(taskId: String) {
+    /**
+     * Con [uploadNow] a false el borrado se queda solo en el móvil (pendiente) para poder
+     * deshacerlo; se sube con la siguiente subida de pendientes (`PushPendingChangesUseCase`).
+     */
+    suspend operator fun invoke(taskId: String, uploadNow: Boolean = true) {
         repository.deleteTask(taskId)
-        googleSyncRepository.pushTask(taskId)
+        if (uploadNow) googleSyncRepository.pushTask(taskId)
     }
 }

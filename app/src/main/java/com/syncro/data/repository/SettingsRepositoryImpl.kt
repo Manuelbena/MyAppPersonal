@@ -37,6 +37,7 @@ class SettingsRepositoryImpl @Inject constructor(
     private val PAYDAY_DAY = intPreferencesKey("assistant_payday_day")
     private val BUDGET_ALERTS_ENABLED = booleanPreferencesKey("assistant_budget_alerts_enabled")
     private val DAILY_QUOTE_ENABLED = booleanPreferencesKey("assistant_daily_quote_enabled")
+    private val HOME_SAVINGS_ENABLED = booleanPreferencesKey("home_savings_enabled")
 
     override val settings: Flow<AppSettings> = context.settingsDataStore.data.map { prefs ->
         val defaults = AppSettings()
@@ -52,7 +53,8 @@ class SettingsRepositoryImpl @Inject constructor(
                 leftoversEnabled = prefs[LEFTOVERS_ENABLED] ?: defaults.assistant.leftoversEnabled,
                 paydayDay = prefs[PAYDAY_DAY]?.takeIf { it in 1..31 },
                 budgetAlertsEnabled = prefs[BUDGET_ALERTS_ENABLED] ?: defaults.assistant.budgetAlertsEnabled,
-                dailyQuoteEnabled = prefs[DAILY_QUOTE_ENABLED] ?: defaults.assistant.dailyQuoteEnabled
+                dailyQuoteEnabled = prefs[DAILY_QUOTE_ENABLED] ?: defaults.assistant.dailyQuoteEnabled,
+                homeSavingsEnabled = prefs[HOME_SAVINGS_ENABLED] ?: defaults.assistant.homeSavingsEnabled
             )
         )
     }
@@ -67,6 +69,7 @@ class SettingsRepositoryImpl @Inject constructor(
             prefs[LEFTOVERS_ENABLED] = settings.assistant.leftoversEnabled
             prefs[BUDGET_ALERTS_ENABLED] = settings.assistant.budgetAlertsEnabled
             prefs[DAILY_QUOTE_ENABLED] = settings.assistant.dailyQuoteEnabled
+            prefs[HOME_SAVINGS_ENABLED] = settings.assistant.homeSavingsEnabled
             // Sin nómina no se guarda nada: así lo de fábrica (null) vuelve tal cual
             val payday = settings.assistant.paydayDay
             if (payday != null) prefs[PAYDAY_DAY] = payday else prefs.remove(PAYDAY_DAY)

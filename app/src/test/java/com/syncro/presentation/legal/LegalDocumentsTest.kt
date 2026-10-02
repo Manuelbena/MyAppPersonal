@@ -58,7 +58,7 @@ class LegalDocumentsTest {
     fun `el aviso legal identifica al titular`() {
         val text = legalDocument(LegalDocumentId.LEGAL_NOTICE).fullText()
 
-        listOf(LegalInfo.OWNER_NAME, LegalInfo.OWNER_ID, LegalInfo.OWNER_ADDRESS, LegalInfo.CONTACT_EMAIL).forEach {
+        listOf(LegalInfo.OWNER_NAME, LegalInfo.OWNER_ADDRESS, LegalInfo.CONTACT_EMAIL).forEach {
             assertTrue("Falta \"$it\" en el aviso legal", it in text)
         }
     }

@@ -8,6 +8,7 @@ import com.syncro.presentation.components.LocalWidthClass
 import com.syncro.presentation.components.WidthClass
 import com.syncro.presentation.event.EventDetailSheet
 import com.syncro.presentation.task.TaskDetailSheet
+import com.syncro.presentation.theme.toArgbColor
 import com.syncro.presentation.theme.toColor
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -230,11 +231,13 @@ fun CalendarScreen(
     }
 
     if (showAddNoteSheet) {
-        // En CalendarScreen de momento no manejamos guardado de notas, 
-        // pero mostramos el modal para consistencia UI
+        // Regresión: guardar aquí solo cerraba la hoja y la nota se perdía
         AddNoteSheet(
             onDismiss = { showAddNoteSheet = false },
-            onSave = { _, _, _, _ -> showAddNoteSheet = false }
+            onSave = { _, title, content, color ->
+                viewModel.saveNote(title, content, color.toArgbColor())
+                showAddNoteSheet = false
+            }
         )
     }
 

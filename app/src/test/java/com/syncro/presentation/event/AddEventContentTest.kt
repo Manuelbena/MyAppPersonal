@@ -151,6 +151,14 @@ class AddEventContentTest {
     }
 
     @Test
+    fun `un evento nuevo desde otro dia empieza ese dia a la proxima hora en punto`() {
+        assertEquals(DAY.plusDays(3).atTime(11, 0), defaultEventStart(DAY.atTime(10, 20), DAY.plusDays(3)))
+        // Hoy o sin día: igual que antes, y a las 23:30 cae al día siguiente
+        assertEquals(DAY.atTime(11, 0), defaultEventStart(DAY.atTime(10, 20), DAY))
+        assertEquals(DAY.plusDays(1).atTime(0, 0), defaultEventStart(DAY.atTime(23, 30), null))
+    }
+
+    @Test
     fun `mover el inicio conserva la duracion del evento`() {
         val start = DAY.atTime(10, 0)
         val end = DAY.atTime(11, 30)

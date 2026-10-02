@@ -1,5 +1,6 @@
 package com.syncro.domain.repository
 
+import kotlinx.coroutines.flow.Flow
 import java.time.LocalDate
 
 interface GoogleSyncRepository {
@@ -27,4 +28,7 @@ interface GoogleSyncRepository {
 
     /** Sube todos los cambios locales pendientes, de cualquier fecha. */
     suspend fun pushPendingChanges(): Result<Unit>
+
+    /** Cuántas tareas y eventos tienen cambios sin subir a Google o nunca se subieron. */
+    fun observePendingChangesCount(): Flow<Int>
 }
