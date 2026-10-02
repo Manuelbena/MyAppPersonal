@@ -4,6 +4,8 @@ import android.content.Intent
 import androidx.compose.ui.graphics.Color
 import com.google.android.gms.auth.UserRecoverableAuthException
 import com.google.api.client.googleapis.extensions.android.gms.auth.UserRecoverableAuthIOException
+import com.syncro.domain.model.AppSettings
+import com.syncro.domain.model.AssistantSettings
 import com.syncro.domain.model.User
 import com.syncro.domain.usecase.DeleteEventUseCase
 import com.syncro.domain.usecase.DeleteTaskUseCase
@@ -12,6 +14,8 @@ import com.syncro.domain.model.DailyFocus
 import com.syncro.domain.model.FocusedTask
 import com.syncro.domain.usecase.GetDailyFocusUseCase
 import com.syncro.domain.usecase.GetDailyQuoteUseCase
+import com.syncro.domain.usecase.HideDailyQuoteUseCase
+import com.syncro.domain.usecase.ObserveDailyQuoteUseCase
 import com.syncro.domain.usecase.GetLocalUserUseCase
 import com.syncro.domain.usecase.GetNotesUseCase
 import com.syncro.domain.usecase.GetTimelineUseCase
@@ -27,6 +31,8 @@ import com.syncro.domain.usecase.ToggleTaskCompletionUseCase
 import com.syncro.testutil.CallLog
 import com.syncro.testutil.DAY
 import com.syncro.testutil.FakeDailyFocusRepository
+import com.syncro.testutil.FakeDailyQuoteRepository
+import com.syncro.testutil.FakeSettingsRepository
 import com.syncro.testutil.FakeEventRepository
 import com.syncro.testutil.FakeGoogleSyncRepository
 import com.syncro.testutil.FakeNoteRepository
@@ -68,6 +74,8 @@ class HomeViewModelTest {
     val mainDispatcherRule = MainDispatcherRule()
 
     private val clock = Clock.fixed(DAY.atTime(9, 0).toInstant(ZoneOffset.UTC), ZoneOffset.UTC)
+    private val settings = FakeSettingsRepository()
+    private val quotes = FakeDailyQuoteRepository()
 
     private lateinit var log: CallLog
     private lateinit var tasks: FakeTaskRepository
@@ -101,7 +109,8 @@ class HomeViewModelTest {
         pushPendingChangesUseCase = PushPendingChangesUseCase(google),
         getNotesUseCase = GetNotesUseCase(notes),
         getLocalUserUseCase = GetLocalUserUseCase(users),
-        getDailyQuoteUseCase = GetDailyQuoteUseCase(clock),
+        observeDailyQuoteUseCase = ObserveDailyQuoteUseCase(settings, quotes, GetDailyQuoteUseCase(clock), clock),
+        hideDailyQuoteUseCase = HideDailyQuoteUseCase(quotes, clock),
         saveNoteUseCase = SaveNoteUseCase(notes, clock),
         deleteNoteUseCase = DeleteNoteUseCase(notes),
         getDailyFocusUseCase = GetDailyFocusUseCase(focus, tasks)
@@ -154,8 +163,27 @@ class HomeViewModelTest {
 
         val state = createViewModel().uiState.value
 
-        assertEquals(expected.text, state.quote)
-        assertEquals(expected.author, state.quoteAuthor)
+        assertEquals(expected, state.quote)
+    }
+
+    @Test
+    fun `cerrar la frase la oculta hoy, y manana vuelve`() = runTest {
+        val viewModel = createViewModel()
+
+        viewModel.hideDailyQuote()
+
+        assertEquals(null, viewModel.uiState.value.quote)
+        assertEquals(DAY, quotes.hiddenOn.value)
+        // Ocultada ayer: hoy vuelve a salir
+        quotes.hiddenOn.value = DAY.minusDays(1)
+        assertEquals(GetDailyQuoteUseCase(clock)(), viewModel.uiState.value.quote)
+    }
+
+    @Test
+    fun `con la frase apagada en Ajustes no sale`() = runTest {
+        settings.current.value = AppSettings(assistant = AssistantSettings(dailyQuoteEnabled = false))
+
+        assertEquals(null, createViewModel().uiState.value.quote)
     }
 
     // endregion

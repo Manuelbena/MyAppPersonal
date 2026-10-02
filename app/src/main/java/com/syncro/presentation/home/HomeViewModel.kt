@@ -8,6 +8,7 @@ import androidx.lifecycle.viewModelScope
 import com.google.api.client.googleapis.extensions.android.gms.auth.UserRecoverableAuthIOException
 import androidx.compose.ui.graphics.Color
 import com.syncro.domain.model.Priority
+import com.syncro.domain.model.Quote
 import com.syncro.domain.model.SyncroItem
 import com.syncro.domain.usecase.GetTimelineUseCase
 import com.syncro.domain.usecase.SaveEventUseCase
@@ -22,7 +23,8 @@ import com.syncro.domain.usecase.DeleteTaskUseCase
 import com.syncro.domain.usecase.DeleteNoteUseCase
 import com.syncro.domain.usecase.GetNotesUseCase
 import com.syncro.domain.usecase.GetDailyFocusUseCase
-import com.syncro.domain.usecase.GetDailyQuoteUseCase
+import com.syncro.domain.usecase.HideDailyQuoteUseCase
+import com.syncro.domain.usecase.ObserveDailyQuoteUseCase
 import com.syncro.domain.usecase.GetLocalUserUseCase
 import com.syncro.domain.usecase.SaveNoteUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -41,8 +43,8 @@ data class HomeUiState(
     val userName: String = "",
     val userPhotoUrl: String? = null,
     val selectedDate: LocalDate = LocalDate.now(),
-    val quote: String = "",
-    val quoteAuthor: String = "",
+    /** La frase del día; null si no toca (apagada en Ajustes o cerrada hoy). */
+    val quote: Quote? = null,
     /** Todo lo del día seleccionado, en orden `sortedForDay`. */
     val timelineItems: List<SyncroItem> = emptyList(),
     /** Las prioridades elegidas para el día seleccionado (en el orden en que se eligieron). */
@@ -73,7 +75,8 @@ class HomeViewModel @Inject constructor(
     private val pushPendingChangesUseCase: com.syncro.domain.usecase.PushPendingChangesUseCase,
     getNotesUseCase: GetNotesUseCase,
     getLocalUserUseCase: GetLocalUserUseCase,
-    getDailyQuoteUseCase: GetDailyQuoteUseCase,
+    observeDailyQuoteUseCase: ObserveDailyQuoteUseCase,
+    private val hideDailyQuoteUseCase: HideDailyQuoteUseCase,
     private val saveNoteUseCase: SaveNoteUseCase,
     private val deleteNoteUseCase: DeleteNoteUseCase,
     getDailyFocusUseCase: GetDailyFocusUseCase
@@ -88,8 +91,9 @@ class HomeViewModel @Inject constructor(
     private var syncJob: Job? = null
 
     init {
-        val dailyQuote = getDailyQuoteUseCase()
-        _uiState.update { it.copy(quote = dailyQuote.text, quoteAuthor = dailyQuote.author) }
+        observeDailyQuoteUseCase()
+            .onEach { quote -> _uiState.update { it.copy(quote = quote) } }
+            .launchIn(viewModelScope)
 
         // Observar cambios en la fecha seleccionada
         _uiState
@@ -171,6 +175,11 @@ class HomeViewModel @Inject constructor(
         } else {
             Log.e("HomeViewModel", "Error de sincronización", throwable)
         }
+    }
+
+    /** La ✕ de la frase del día: no se vuelve a ver hasta mañana. */
+    fun hideDailyQuote() {
+        viewModelScope.launch { hideDailyQuoteUseCase() }
     }
 
     fun onDaySelected(date: LocalDate) {

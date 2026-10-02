@@ -119,7 +119,9 @@ class SettingsContentTest {
         assertEquals(DigestSettings(morningEnabled = false), settings.digest)
         compose.onNodeWithText("Avisos de presupuesto").performClick()
 
-        assertEquals(AssistantSettings(focusEnabled = false, budgetAlertsEnabled = false), settings.assistant)
+        compose.onNodeWithText("Frase del día").performScrollTo().performClick()
+
+        assertEquals(AssistantSettings(focusEnabled = false, budgetAlertsEnabled = false, dailyQuoteEnabled = false), settings.assistant)
     }
 
     @Test
@@ -127,8 +129,8 @@ class SettingsContentTest {
         show()
         compose.onNodeWithText("Asistente").performScrollTo().performClick()
 
-        compose.onNodeWithText("No tengo").assertIsDisplayed()
-        compose.onNodeWithText("Día de nómina").performClick()
+        compose.onNodeWithText("No tengo").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Día de nómina").performScrollTo().performClick()
         compose.onNodeWithContentDescription("Día 28").performScrollTo().performClick()
         compose.onNodeWithText("Guardar").performClick()
 
@@ -141,8 +143,8 @@ class SettingsContentTest {
         show()
         compose.onNodeWithText("Asistente").performScrollTo().performClick()
 
-        compose.onNodeWithText("Día 28").assertIsDisplayed()
-        compose.onNodeWithText("Día de nómina").performClick()
+        compose.onNodeWithText("Día 28").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Día de nómina").performScrollTo().performClick()
         compose.onNodeWithText("No tengo nómina").performClick()
         compose.onNodeWithText("Guardar").performClick()
 

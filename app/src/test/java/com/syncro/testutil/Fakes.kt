@@ -10,6 +10,7 @@ import com.syncro.domain.model.SyncroItem
 import com.syncro.domain.repository.AccountDataRepository
 import com.syncro.domain.repository.BudgetRepository
 import com.syncro.domain.repository.DailyFocusRepository
+import com.syncro.domain.repository.DailyQuoteRepository
 import com.syncro.domain.repository.SettingsRepository
 import com.syncro.domain.repository.EventRepository
 import com.syncro.domain.repository.GoogleSyncRepository
@@ -210,6 +211,14 @@ class FakeMovementRepository : MovementRepository {
 
     override suspend fun deleteMovement(id: String) {
         movements.update { it - id }
+    }
+}
+
+class FakeDailyQuoteRepository : DailyQuoteRepository {
+    override val hiddenOn = MutableStateFlow<LocalDate?>(null)
+
+    override suspend fun hide(date: LocalDate) {
+        hiddenOn.value = date
     }
 }
 

@@ -38,6 +38,7 @@ import com.syncro.domain.model.MovementOccurrence
 import com.syncro.domain.model.MovementType
 import com.syncro.presentation.components.AddFab
 import com.syncro.presentation.components.EdgeFades
+import com.syncro.presentation.components.SyncroIconButton
 import com.syncro.presentation.event.IconBadge
 import com.syncro.presentation.home.components.AddOptionItem
 import com.syncro.presentation.home.components.AddOptionsSheet
@@ -289,34 +290,45 @@ fun AddMovementSheet(onDismiss: () -> Unit, onSelect: (MovementType) -> Unit) {
     }
 }
 
-/** Título y el mes que se ve, con flechas para ir al anterior o al siguiente. */
+/**
+ * Título y el mes que se ve, con flechas para ir al anterior o al siguiente. Sin margen propio
+ * para la barra de estado: ya lo deja el Scaffold de la pantalla (con los dos el hueco de arriba
+ * salía doble y la cabecera no quedaba a la altura de las demás).
+ */
 @Composable
 private fun SavingsHeader(month: YearMonth, onPrevious: () -> Unit, onNext: () -> Unit) {
-    Column(
+    // Misma cabecera que Asistente: título y subtítulo a la izquierda, botones redondos a la derecha
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .statusBarsPadding()
-            .padding(horizontal = 24.dp, vertical = 16.dp)
+            .padding(horizontal = 24.dp, vertical = 16.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.Top
     ) {
-        Text(
-            "Ahorros",
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onBackground
-        )
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                "Ahorros",
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onBackground
+            )
             Text(
                 month.month.getDisplayName(TextStyle.FULL_STANDALONE, SPANISH).replaceFirstChar { it.uppercase() } + " ${month.year}",
                 style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.weight(1f)
+                color = MaterialTheme.colorScheme.primary
             )
-            IconButton(onClick = onPrevious) {
-                Icon(Icons.AutoMirrored.Rounded.KeyboardArrowLeft, contentDescription = "Mes anterior")
-            }
-            IconButton(onClick = onNext) {
-                Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = "Mes siguiente")
-            }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            SyncroIconButton(
+                icon = Icons.AutoMirrored.Rounded.KeyboardArrowLeft,
+                onClick = onPrevious,
+                contentDescription = "Mes anterior"
+            )
+            SyncroIconButton(
+                icon = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                onClick = onNext,
+                contentDescription = "Mes siguiente"
+            )
         }
     }
 }

@@ -32,6 +32,8 @@ data class AssistantSettings(
     val leftoversEnabled: Boolean = true,
     /** Avisar en el chat al llegar al 80 % de un presupuesto y al pasarse. */
     val budgetAlertsEnabled: Boolean = true,
+    /** Mostrar la frase del día en Inicio. */
+    val dailyQuoteEnabled: Boolean = true,
     /**
      * Día del mes en que se cobra la nómina (1–31; en los meses más cortos, el último día). Null:
      * sin nómina (aún no trabaja, autónomo…), y el asistente no dice nada. Es lo de fábrica.

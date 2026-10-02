@@ -287,6 +287,13 @@ fun SettingsContent(
                             onCheckedChange = { on -> onAssistantChange { it.copy(budgetAlertsEnabled = on) } }
                         )
                         SettingsDivider()
+                        SwitchRow(
+                            title = "Frase del día",
+                            subtitle = "Una frase para empezar el día en Inicio. Con la ✕ la ocultas solo hasta mañana",
+                            checked = assistant.dailyQuoteEnabled,
+                            onCheckedChange = { on -> onAssistantChange { it.copy(dailyQuoteEnabled = on) } }
+                        )
+                        SettingsDivider()
                         SettingsRow(
                             title = "Día de nómina",
                             subtitle = "El día que cobras te ayuda a organizar el dinero del mes",
@@ -394,6 +401,7 @@ private fun assistantSummary(assistant: AssistantSettings): String = listOfNotNu
     "Prioridades".takeIf { assistant.focusEnabled },
     "Pendientes".takeIf { assistant.leftoversEnabled },
     "Presupuestos".takeIf { assistant.budgetAlertsEnabled },
+    "Frase".takeIf { assistant.dailyQuoteEnabled },
     assistant.paydayDay?.let { "Nómina día $it" }
 ).joinToString(" · ").ifEmpty { "Sin preguntas" }
 

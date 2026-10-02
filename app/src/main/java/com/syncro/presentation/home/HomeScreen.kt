@@ -11,6 +11,11 @@ import com.syncro.presentation.components.WidthClass
 import android.app.Activity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -54,6 +59,9 @@ fun HomeScreen(
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    // La última frase mostrada: así la tarjeta no se queda vacía mientras se recoge al cerrarla
+    var shownQuote by remember { mutableStateOf(uiState.quote) }
+    uiState.quote?.let { shownQuote = it }
     // Hora actual al minuto: mueve la línea "Ahora" y el progreso de los eventos en curso
     val now = rememberCurrentMinute()
     val context = LocalContext.current
@@ -141,10 +149,14 @@ fun HomeScreen(
             )
         }
         val summaryCards: @Composable () -> Unit = {
-            AssistantCard(
-                quote = uiState.quote,
-                author = uiState.quoteAuthor
-            )
+            // La frase del día, si toca; al cerrarla se recoge en vez de desaparecer de golpe
+            AnimatedVisibility(
+                visible = uiState.quote != null,
+                enter = expandVertically() + fadeIn(),
+                exit = shrinkVertically() + fadeOut()
+            ) {
+                shownQuote?.let { DailyQuoteCard(quote = it.text, author = it.author, onClose = viewModel::hideDailyQuote) }
+            }
 
             // Prioridades del día (se eligen en el chat del asistente)
             if (uiState.focusTasks.isNotEmpty()) {

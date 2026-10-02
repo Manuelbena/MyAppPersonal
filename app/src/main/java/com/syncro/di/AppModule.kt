@@ -20,6 +20,7 @@ import com.syncro.data.local.dao.UserDao
 import com.syncro.data.repository.AccountDataRepositoryImpl
 import com.syncro.data.repository.BudgetRepositoryImpl
 import com.syncro.data.repository.DailyFocusRepositoryImpl
+import com.syncro.data.repository.DailyQuoteRepositoryImpl
 import com.syncro.data.repository.SettingsRepositoryImpl
 import com.syncro.data.repository.EventRepositoryImpl
 import com.syncro.data.repository.GoogleSyncRepositoryImpl
@@ -34,6 +35,7 @@ import com.syncro.data.sync.WorkManagerSyncScheduler
 import com.syncro.domain.repository.AccountDataRepository
 import com.syncro.domain.repository.BudgetRepository
 import com.syncro.domain.repository.DailyFocusRepository
+import com.syncro.domain.repository.DailyQuoteRepository
 import com.syncro.domain.repository.SettingsRepository
 import com.syncro.domain.repository.EventRepository
 import com.syncro.domain.repository.GoogleSyncRepository
@@ -140,6 +142,10 @@ object AppModule {
     @Provides
     @Singleton
     fun provideDailyFocusRepository(impl: DailyFocusRepositoryImpl): DailyFocusRepository = impl
+
+    @Provides
+    @Singleton
+    fun provideDailyQuoteRepository(impl: DailyQuoteRepositoryImpl): DailyQuoteRepository = impl
 
     @Provides
     @Singleton
