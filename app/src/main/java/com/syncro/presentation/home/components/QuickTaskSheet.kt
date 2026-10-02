@@ -20,6 +20,8 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.syncro.presentation.components.SheetDragHandle
+import com.syncro.presentation.components.GradientSheetInsets
 import com.syncro.presentation.components.DetailCard
 import com.syncro.presentation.event.FieldRow
 import com.syncro.presentation.event.IconBadge
@@ -48,6 +50,8 @@ fun QuickTaskSheet(
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         // La raya se dibuja dentro de la cabecera para que el degradado empiece en el borde del sheet
         dragHandle = null,
+        // Sin el hueco de arriba de Material: lo pone la cabecera, dentro del degradado
+        contentWindowInsets = { GradientSheetInsets },
         containerColor = MaterialTheme.colorScheme.surface,
         shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
     ) {
@@ -86,7 +90,7 @@ fun QuickTaskContent(
                 .padding(horizontal = 24.dp)
                 .padding(bottom = 8.dp)
         ) {
-            BottomSheetDefaults.DragHandle(modifier = Modifier.align(Alignment.CenterHorizontally))
+            SheetDragHandle(modifier = Modifier.align(Alignment.CenterHorizontally))
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically

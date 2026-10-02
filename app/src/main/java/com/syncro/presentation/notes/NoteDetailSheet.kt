@@ -35,6 +35,8 @@ fun NoteDetailSheet(
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         // La raya se dibuja dentro de la cabecera para que el degradado empiece en el borde del sheet
         dragHandle = null,
+        // Sin el hueco de arriba de Material: lo pone la cabecera, dentro del degradado
+        contentWindowInsets = { GradientSheetInsets },
         containerColor = MaterialTheme.colorScheme.surface,
         shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
     ) {

@@ -529,7 +529,7 @@ private fun LogoutDialog(loss: DataLossSummary, isLoggingOut: Boolean, onConfirm
         title = { Text("¿Cerrar sesión?") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Se borrarán de este móvil tus tareas, eventos, notas y el chat del asistente. Lo que ya está en Google volverá al entrar de nuevo.")
+                Text("Se borrarán de este móvil tus tareas, eventos, notas, ingresos y gastos, y el chat del asistente. Lo que ya está en Google volverá al entrar de nuevo.")
                 if (loss.unsyncedChanges > 0) {
                     Text(
                         "⚠️ ${changes(loss.unsyncedChanges)} aún sin subir a Google: se perderán.",
@@ -540,6 +540,13 @@ private fun LogoutDialog(loss: DataLossSummary, isLoggingOut: Boolean, onConfirm
                 if (loss.notes > 0) {
                     Text(
                         "⚠️ Las notas solo se guardan en el móvil: perderás ${notes(loss.notes)}.",
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+                if (loss.movements > 0) {
+                    Text(
+                        "⚠️ Los ingresos y gastos solo se guardan en el móvil: perderás ${movements(loss.movements)}.",
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.error
                     )
@@ -557,6 +564,7 @@ private fun LogoutDialog(loss: DataLossSummary, isLoggingOut: Boolean, onConfirm
 
 private fun changes(n: Int) = if (n == 1) "Tienes 1 cambio" else "Tienes $n cambios"
 private fun notes(n: Int) = if (n == 1) "1 nota" else "$n notas"
+private fun movements(n: Int) = if (n == 1) "1 movimiento" else "$n movimientos"
 
 // endregion
 

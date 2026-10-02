@@ -117,6 +117,18 @@ class MigrationTest {
         assertFalse(task.isDeleted)
     }
 
+    @Test
+    fun `migrar de la version 13 conserva todo y crea Ahorros vacio`() = runTest {
+        createDatabase(Schema13.CREATE_STATEMENTS, Schema13.VERSION) {
+            execSQL("INSERT INTO notes (id, title, content, color, createdAt) VALUES ('n1', 'Ideas', 'Contenido', -1, 1790000000000)")
+        }
+
+        val db = openCurrentVersion()
+
+        assertNotNull(db.noteDao.getNoteById("n1"))
+        assertEquals(0, db.movementDao.count())
+    }
+
     private fun createVersion9Database(seed: SQLiteDatabase.() -> Unit) =
         createDatabase(Schema9.CREATE_STATEMENTS, Schema9.VERSION, seed)
 
@@ -141,7 +153,7 @@ class MigrationTest {
     /** Igual que en AppModule pero sin fallbackToDestructiveMigration: un fallo debe verse. */
     private fun openCurrentVersion(): SyncroDatabase =
         Room.databaseBuilder(context, SyncroDatabase::class.java, DB_NAME)
-            .addMigrations(MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13)
+            .addMigrations(MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14)
             .allowMainThreadQueries()
             .build()
             .also { database = it }

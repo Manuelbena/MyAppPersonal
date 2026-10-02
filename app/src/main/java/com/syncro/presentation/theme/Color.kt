@@ -42,3 +42,4 @@ val Sky500 = Color(0xFF0EA5E9)
 
 // Green (Online Indicator)
 val Green500 = Color(0xFF22C55E)
+val Rose500 = Color(0xFFF43F5E)

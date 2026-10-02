@@ -3,6 +3,7 @@ package com.syncro.presentation.calendar
 import androidx.compose.ui.platform.LocalContext
 import com.syncro.presentation.components.rememberCurrentMinute
 import com.syncro.presentation.components.shareEvent
+import com.syncro.presentation.components.AddFab
 import com.syncro.presentation.components.LocalWidthClass
 import com.syncro.presentation.components.WidthClass
 import com.syncro.presentation.event.EventDetailSheet
@@ -100,23 +101,7 @@ fun CalendarScreen(
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = { showAddItemSheet = true },
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-                shape = RoundedCornerShape(18.dp),
-                modifier = Modifier
-                    .padding(bottom = 110.dp)
-                    .size(56.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Add,
-                    contentDescription = "Añadir",
-                    modifier = Modifier.size(32.dp)
-                )
-            }
-        },
+        floatingActionButton = { AddFab(onClick = { showAddItemSheet = true }) },
         floatingActionButtonPosition = FabPosition.End
     ) { padding ->
         Column(

@@ -3,12 +3,14 @@ package com.syncro.testutil
 import com.syncro.domain.model.AppSettings
 import com.syncro.domain.model.DailyFocus
 import com.syncro.domain.model.DataLossSummary
+import com.syncro.domain.model.Movement
 import com.syncro.domain.model.SyncroItem
 import com.syncro.domain.repository.AccountDataRepository
 import com.syncro.domain.repository.DailyFocusRepository
 import com.syncro.domain.repository.SettingsRepository
 import com.syncro.domain.repository.EventRepository
 import com.syncro.domain.repository.GoogleSyncRepository
+import com.syncro.domain.repository.MovementRepository
 import com.syncro.domain.repository.NoteRepository
 import com.syncro.domain.repository.TaskRepository
 import com.syncro.domain.repository.UserRepository
@@ -19,6 +21,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import java.io.IOException
 import java.time.LocalDate
+import java.time.YearMonth
 
 /*
  * Dobles de prueba para los casos de uso.
@@ -188,6 +191,23 @@ class FakeNoteRepository : NoteRepository {
     }
 
     override suspend fun getNoteById(id: String): SyncroItem.Note? = notes.value[id]
+}
+
+/** Como el DAO real: devuelve los del mes y los mensuales que empezaron antes (un superconjunto). */
+class FakeMovementRepository : MovementRepository {
+    val movements = MutableStateFlow<Map<String, Movement>>(emptyMap())
+
+    override fun observeForMonth(month: YearMonth): Flow<List<Movement>> = movements.map { all ->
+        all.values.filter { YearMonth.from(it.date) == month || (it.repeatsMonthly && !it.date.isAfter(month.atEndOfMonth())) }
+    }
+
+    override suspend fun insertMovement(movement: Movement) {
+        movements.update { it + (movement.id to movement) }
+    }
+
+    override suspend fun deleteMovement(id: String) {
+        movements.update { it - id }
+    }
 }
 
 class FakeDailyFocusRepository : DailyFocusRepository {

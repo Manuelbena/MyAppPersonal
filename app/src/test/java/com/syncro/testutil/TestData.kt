@@ -7,6 +7,9 @@ import androidx.test.core.app.ApplicationProvider
 import com.syncro.data.local.SyncroDatabase
 import com.syncro.data.local.entity.EventEntity
 import com.syncro.data.local.entity.TaskEntity
+import com.syncro.domain.model.Movement
+import com.syncro.domain.model.MovementCategory
+import com.syncro.domain.model.MovementType
 import com.syncro.domain.model.Priority
 import com.syncro.domain.model.Subtask
 import com.syncro.domain.model.SyncroItem
@@ -92,6 +95,16 @@ fun aNote(
     color: ArgbColor = ArgbColor(0xFFF59E0B),
     createdAt: LocalDateTime = LocalDateTime.of(2026, 9, 26, 10, 0)
 ) = SyncroItem.Note(id = id, title = title, content = content, color = color, createdAt = createdAt)
+
+fun aMovement(
+    id: String = "mov-1",
+    type: MovementType = MovementType.EXPENSE,
+    amountCents: Long = 1_250,
+    category: MovementCategory = MovementCategory.GROCERIES,
+    date: LocalDate = DAY,
+    note: String? = "Mercadona",
+    repeatsMonthly: Boolean = false
+) = Movement(id, type, amountCents, category, date, note, repeatsMonthly)
 
 /** Tarea tal como queda tras sincronizarse con Google: con remoteId y sin cambios pendientes. */
 fun aSyncedTaskEntity(

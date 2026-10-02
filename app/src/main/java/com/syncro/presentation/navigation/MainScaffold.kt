@@ -41,13 +41,13 @@ import com.syncro.presentation.assistant.AssistantMainScreen
 import com.syncro.presentation.assistant.AssistantViewModel
 import com.syncro.presentation.assistant.TrackAssistantOnResume
 import com.syncro.presentation.calendar.CalendarScreen
-import com.syncro.presentation.components.ComingSoonScreen
 import com.syncro.presentation.components.ProvideWidthClass
 import com.syncro.presentation.components.ReadableWidth
 import com.syncro.presentation.event.AddEventScreen
 import com.syncro.presentation.home.HomeScreen
 import com.syncro.presentation.login.LoginScreen
 import com.syncro.presentation.notes.NotesListScreen
+import com.syncro.presentation.savings.SavingsScreen
 import com.syncro.presentation.settings.SettingsScreen
 import com.syncro.presentation.legal.LegalDocumentId
 import com.syncro.presentation.legal.LegalDocumentScreen
@@ -286,11 +286,7 @@ fun MainScaffold(
                          CalendarScreen()
                     }
                     composable(AppScreen.Savings.route) {
-                        ComingSoonScreen(
-                            icon = AppScreen.Savings.icon,
-                            title = "Ahorros",
-                            description = "Controla tus objetivos de ahorro junto a tus tareas y eventos."
-                        )
+                        ReadableWidth(maxWidth = 720.dp) { SavingsScreen() }
                     }
                     composable(AppScreen.Assistant.route) {
                         ReadableWidth {

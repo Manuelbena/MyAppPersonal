@@ -8,8 +8,10 @@ import com.syncro.data.local.MIGRATION_9_10
 import com.syncro.data.local.MIGRATION_10_11
 import com.syncro.data.local.MIGRATION_11_12
 import com.syncro.data.local.MIGRATION_12_13
+import com.syncro.data.local.MIGRATION_13_14
 import com.syncro.data.local.SyncroDatabase
 import com.syncro.data.local.dao.EventDao
+import com.syncro.data.local.dao.MovementDao
 import com.syncro.data.local.dao.NoteDao
 import com.syncro.data.local.dao.TaskDao
 import com.syncro.data.local.dao.UserDao
@@ -18,6 +20,7 @@ import com.syncro.data.repository.DailyFocusRepositoryImpl
 import com.syncro.data.repository.SettingsRepositoryImpl
 import com.syncro.data.repository.EventRepositoryImpl
 import com.syncro.data.repository.GoogleSyncRepositoryImpl
+import com.syncro.data.repository.MovementRepositoryImpl
 import com.syncro.data.repository.NoteRepositoryImpl
 import com.syncro.data.repository.TaskRepositoryImpl
 import com.syncro.data.repository.UserRepositoryImpl
@@ -30,6 +33,7 @@ import com.syncro.domain.repository.DailyFocusRepository
 import com.syncro.domain.repository.SettingsRepository
 import com.syncro.domain.repository.EventRepository
 import com.syncro.domain.repository.GoogleSyncRepository
+import com.syncro.domain.repository.MovementRepository
 import com.syncro.domain.repository.NoteRepository
 import com.syncro.domain.repository.TaskRepository
 import com.syncro.domain.repository.UserRepository
@@ -53,7 +57,7 @@ object AppModule {
             SyncroDatabase::class.java,
             "syncro_db"
         )
-            .addMigrations(MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13)
+            .addMigrations(MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14)
             .fallbackToDestructiveMigration(true)
             .build()
     }
@@ -93,6 +97,17 @@ object AppModule {
     @Singleton
     fun provideNoteRepository(dao: NoteDao): NoteRepository {
         return NoteRepositoryImpl(dao)
+    }
+
+    @Provides
+    fun provideMovementDao(db: SyncroDatabase): MovementDao {
+        return db.movementDao
+    }
+
+    @Provides
+    @Singleton
+    fun provideMovementRepository(dao: MovementDao): MovementRepository {
+        return MovementRepositoryImpl(dao)
     }
 
     @Provides

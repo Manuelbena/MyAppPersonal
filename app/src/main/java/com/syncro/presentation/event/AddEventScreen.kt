@@ -28,6 +28,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.syncro.presentation.components.SheetDragHandle
+import com.syncro.presentation.components.GradientSheetInsets
 import com.syncro.domain.model.Priority
 import com.syncro.domain.model.SyncroItem
 import com.syncro.domain.model.isValidEventRange
@@ -59,6 +61,8 @@ fun AddEventScreen(
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         // La raya se dibuja dentro de la cabecera para que el degradado empiece en el borde del sheet
         dragHandle = null,
+        // Sin el hueco de arriba de Material: lo pone la cabecera, dentro del degradado
+        contentWindowInsets = { GradientSheetInsets },
         containerColor = MaterialTheme.colorScheme.surface,
         shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
     ) {
@@ -177,7 +181,7 @@ fun AddEventContent(
                 .padding(horizontal = 24.dp)
                 .padding(bottom = 8.dp)
         ) {
-            BottomSheetDefaults.DragHandle(modifier = Modifier.align(Alignment.CenterHorizontally))
+            SheetDragHandle(modifier = Modifier.align(Alignment.CenterHorizontally))
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically

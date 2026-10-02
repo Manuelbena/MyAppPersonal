@@ -1,5 +1,7 @@
 package com.syncro.presentation.home.components
 
+import com.syncro.presentation.components.SheetDragHandle
+import com.syncro.presentation.components.GradientSheetInsets
 import com.syncro.presentation.theme.NotebookFontFamily
 import com.syncro.presentation.theme.toColor
 import androidx.compose.animation.animateColorAsState
@@ -58,6 +60,8 @@ fun AddNoteSheet(
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         // La raya se dibuja dentro de la cabecera para que el degradado empiece en el borde del sheet
         dragHandle = null,
+        // Sin el hueco de arriba de Material: lo pone la cabecera, dentro del degradado
+        contentWindowInsets = { GradientSheetInsets },
         containerColor = MaterialTheme.colorScheme.surface,
         shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
     ) {
@@ -74,7 +78,7 @@ fun AddNoteSheet(
                     .background(Brush.verticalGradient(listOf(accent.copy(alpha = 0.22f), Color.Transparent)))
                     .padding(horizontal = 24.dp)
             ) {
-                BottomSheetDefaults.DragHandle(modifier = Modifier.align(Alignment.CenterHorizontally))
+                SheetDragHandle(modifier = Modifier.align(Alignment.CenterHorizontally))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically

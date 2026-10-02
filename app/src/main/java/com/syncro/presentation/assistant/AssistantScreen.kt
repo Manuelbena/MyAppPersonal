@@ -4,6 +4,7 @@ import android.Manifest
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.layout.*
@@ -29,6 +30,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
@@ -164,7 +166,7 @@ fun AssistantChatContent(
                     Column(
                         modifier = Modifier
                             .animateItem()
-                            .padding(top = if (startsRun) 8.dp else 0.dp)
+                            .padding(top = if (startsRun) 12.dp else 0.dp)
                     ) {
                         // Tareas marcadas en este mensaje (prioridades); solo mientras se contesta
                         val selected = selections[message.id].orEmpty()
@@ -311,7 +313,14 @@ private fun ChatBubble(
                 if (message.tasks.isNotEmpty()) {
                     Spacer(Modifier.height(8.dp))
                     val selectable = message.maxSelectable > 0
-                    message.tasks.forEach { task ->
+                    message.tasks.forEachIndexed { index, task ->
+                        // Con acciones, cada tarea es un bloque: una línea las separa para que no se mezclen
+                        if (index > 0 && message.taskTarget != null) {
+                            HorizontalDivider(
+                                modifier = Modifier.padding(vertical = 6.dp),
+                                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
+                            )
+                        }
                         val isSelected = task.id in selected
                         TaskRow(
                             task = task,
@@ -346,7 +355,6 @@ private data class TaskSelection(val selected: Boolean, val enabled: Boolean)
  * Una tarea dentro de la burbuja. En el modo "una a una" lleva debajo sus tres acciones; al elegir
  * prioridades se marca con una estrella tocando la fila.
  */
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun TaskRow(
     task: ChatTask,
@@ -393,49 +401,92 @@ private fun TaskRow(
             }
         }
         if (target != null) {
-            FlowRow(
-                modifier = Modifier.padding(start = 28.dp, top = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            // Las tres acciones en una sola fila y a todo el ancho de la burbuja: antes "Hecha" se
+            // caía a otra línea y se mezclaba con la tarea siguiente
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                TaskActionChip(target.label, Icons.Outlined.Schedule) { onAction(TaskAction.MOVE_TO_TARGET) }
-                TaskActionChip("Otro día", Icons.Outlined.CalendarMonth) { onAction(TaskAction.OTHER_DAY) }
-                TaskActionChip("Hecha", Icons.Outlined.CheckCircle) { onAction(TaskAction.DONE) }
+                TaskActionChip(target.label, Icons.Outlined.Schedule, Modifier.weight(1f)) { onAction(TaskAction.MOVE_TO_TARGET) }
+                TaskActionChip("Otro día", Icons.Outlined.CalendarMonth, Modifier.weight(1f)) { onAction(TaskAction.OTHER_DAY) }
+                TaskActionChip("Hecha", Icons.Outlined.CheckCircle, Modifier.weight(1f)) { onAction(TaskAction.DONE) }
             }
         }
     }
 }
 
 @Composable
-private fun TaskActionChip(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, onClick: () -> Unit) {
-    AssistChip(
+private fun TaskActionChip(
+    label: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    OutlinedButton(
         onClick = onClick,
-        label = { Text(label) },
-        leadingIcon = { Icon(icon, contentDescription = null, modifier = Modifier.size(AssistChipDefaults.IconSize)) },
-        shape = RoundedCornerShape(12.dp)
-    )
+        modifier = modifier.heightIn(min = 40.dp),
+        shape = RoundedCornerShape(12.dp),
+        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 6.dp)
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
+            Text(
+                label,
+                style = MaterialTheme.typography.labelMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
 }
 
-/** Las opciones de un mensaje, del lado del usuario: la principal rellena y las demás en texto. */
-@OptIn(ExperimentalLayoutApi::class)
+/**
+ * Las opciones de un mensaje, del lado del usuario: apiladas y del mismo ancho, la principal arriba
+ * y rellena. En una fila se partían de cualquier manera con textos largos o letra grande.
+ */
 @Composable
 private fun ReplyOptions(
     options: List<ChatOption>,
     isEnabled: (ChatReply) -> Boolean,
     onReply: (ChatReply) -> Unit
 ) {
-    FlowRow(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
-        verticalArrangement = Arrangement.spacedBy(4.dp)
+            .padding(top = 10.dp, bottom = 6.dp),
+        horizontalAlignment = Alignment.End,
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        options.drop(1).reversed().forEach { option ->
-            TextButton(onClick = { onReply(option.reply) }, enabled = isEnabled(option.reply)) { Text(option.label) }
-        }
-        options.firstOrNull()?.let { option ->
-            Button(onClick = { onReply(option.reply) }, enabled = isEnabled(option.reply), shape = RoundedCornerShape(14.dp)) {
-                Text(option.label, fontWeight = FontWeight.Bold)
+        val buttonModifier = Modifier
+            .widthIn(max = 280.dp)
+            .fillMaxWidth()
+        options.forEachIndexed { index, option ->
+            val label: @Composable () -> Unit = {
+                Text(
+                    option.label,
+                    fontWeight = if (index == 0) FontWeight.Bold else FontWeight.SemiBold,
+                    textAlign = TextAlign.Center
+                )
+            }
+            if (index == 0) {
+                Button(
+                    onClick = { onReply(option.reply) },
+                    enabled = isEnabled(option.reply),
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = buttonModifier
+                ) { label() }
+            } else {
+                // Con el color principal: en gris parecían desactivados
+                OutlinedButton(
+                    onClick = { onReply(option.reply) },
+                    enabled = isEnabled(option.reply),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)),
+                    modifier = buttonModifier
+                ) { label() }
             }
         }
     }

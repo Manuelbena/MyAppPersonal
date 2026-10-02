@@ -11,7 +11,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Borra lo que pertenece a la cuenta: la base de datos (tareas, eventos, notas, sesión), el chat
+ * Borra lo que pertenece a la cuenta: la base de datos (tareas, eventos, notas, movimientos, sesión), el chat
  * del asistente y las prioridades. Los ajustes y el tema se quedan: son del móvil, no de la cuenta.
  */
 @Singleton
@@ -23,7 +23,8 @@ class AccountDataRepositoryImpl @Inject constructor(
 
     override suspend fun dataLossSummary(): DataLossSummary = DataLossSummary(
         unsyncedChanges = database.taskDao.getPendingTaskIds().size + database.eventDao.getPendingEventIds().size,
-        notes = database.noteDao.getAllNotes().first().size
+        notes = database.noteDao.getAllNotes().first().size,
+        movements = database.movementDao.count()
     )
 
     override suspend fun clearAccountData() {

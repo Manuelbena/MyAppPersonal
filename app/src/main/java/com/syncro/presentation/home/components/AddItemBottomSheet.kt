@@ -24,13 +24,54 @@ import com.syncro.presentation.theme.Cyan400
 import com.syncro.presentation.theme.Emerald500
 import com.syncro.presentation.theme.Amber500
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddItemBottomSheet(
     onDismiss: () -> Unit,
     onQuickTaskClick: () -> Unit,
     onDetailedEventClick: () -> Unit,
     onNoteClick: () -> Unit
+) {
+    AddOptionsSheet(title = "Crear nuevo", onDismiss = onDismiss) {
+        AddOptionItem(
+            title = "Tarea rápida",
+            description = "Solo un título y el día. Ej: Tirar la basura.",
+            icon = Icons.Outlined.FlashOn,
+            iconColor = Cyan400,
+            onClick = onQuickTaskClick
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        AddOptionItem(
+            title = "Evento detallado",
+            description = "Añade duración, categoría, prioridad y subtareas.",
+            icon = Icons.Outlined.CalendarMonth,
+            iconColor = Emerald500,
+            onClick = onDetailedEventClick
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        AddOptionItem(
+            title = "Nota personal",
+            description = "Guarda ideas, libros o pensamientos en tu libreta.",
+            icon = Icons.Outlined.EditNote,
+            iconColor = Amber500,
+            onClick = onNoteClick
+        )
+    }
+}
+
+/**
+ * Hoja que sale al tocar el "+": un título y la lista de cosas que se pueden crear
+ * ([AddOptionItem]). La usan Inicio, Calendario y Ahorros.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AddOptionsSheet(
+    title: String,
+    onDismiss: () -> Unit,
+    options: @Composable ColumnScope.() -> Unit
 ) {
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -59,7 +100,7 @@ fun AddItemBottomSheet(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Crear nuevo",
+                    text = title,
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
@@ -81,39 +122,13 @@ fun AddItemBottomSheet(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            AddOptionItem(
-                title = "Tarea rápida",
-                description = "Solo un título y la hora. Ej: Tirar la basura.",
-                icon = Icons.Outlined.FlashOn,
-                iconColor = Cyan400,
-                onClick = onQuickTaskClick
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            AddOptionItem(
-                title = "Evento detallado",
-                description = "Añade duración, categoría, prioridad y subtareas.",
-                icon = Icons.Outlined.CalendarMonth,
-                iconColor = Emerald500,
-                onClick = onDetailedEventClick
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            AddOptionItem(
-                title = "Nota personal",
-                description = "Guarda ideas, libros o pensamientos en tu libreta.",
-                icon = Icons.Outlined.EditNote,
-                iconColor = Amber500,
-                onClick = onNoteClick
-            )
+            options()
         }
     }
 }
 
 @Composable
-private fun AddOptionItem(
+fun AddOptionItem(
     title: String,
     description: String,
     icon: ImageVector,

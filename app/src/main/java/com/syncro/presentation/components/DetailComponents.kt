@@ -58,6 +58,29 @@ fun Pill(icon: ImageVector, text: String, color: Color, compact: Boolean = false
 }
 
 /**
+ * Márgenes de los sheets que dibujan su propia raya sobre un degradado: solo abajo. Material, por
+ * defecto, también deja arriba el alto de la barra de estado cuando el sheet llega al borde de la
+ * pantalla (formularios largos), y esa franja quedaba sin degradado; ese hueco lo pone
+ * [SheetDragHandle] dentro de la cabecera.
+ */
+val GradientSheetInsets: WindowInsets
+    @Composable get() = WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom)
+
+/**
+ * La raya de arrastre de los sheets con degradado. Si el sheet llega hasta arriba, deja antes el
+ * hueco de la barra de estado (dentro del degradado), para que la raya no quede debajo de la hora.
+ * El sheet descuenta lo que no tapa, así que con el sheet más abajo el hueco es 0.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SheetDragHandle(modifier: Modifier = Modifier) {
+    Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+        Spacer(Modifier.windowInsetsTopHeight(WindowInsets.statusBars))
+        BottomSheetDefaults.DragHandle()
+    }
+}
+
+/**
  * Cabecera de un sheet de detalle: la raya de arrastre, las píldoras, el título y las acciones,
  * sobre un degradado de [accent] que empieza en el mismo borde del sheet (por eso el sheet se crea
  * con `dragHandle = null` y la raya se dibuja aquí).
@@ -79,7 +102,7 @@ fun DetailHeader(
             .padding(horizontal = 24.dp)
             .padding(bottom = 20.dp)
     ) {
-        BottomSheetDefaults.DragHandle(modifier = Modifier.align(Alignment.CenterHorizontally))
+        SheetDragHandle(modifier = Modifier.align(Alignment.CenterHorizontally))
         Spacer(Modifier.height(8.dp))
         FlowRow(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
