@@ -3,9 +3,12 @@ package com.syncro.presentation.calendar
 import androidx.compose.ui.platform.LocalContext
 import com.syncro.presentation.components.rememberCurrentMinute
 import com.syncro.presentation.components.shareEvent
+import com.syncro.presentation.components.LocalWidthClass
+import com.syncro.presentation.components.WidthClass
 import com.syncro.presentation.event.EventDetailSheet
 import com.syncro.presentation.task.TaskDetailSheet
 import com.syncro.presentation.theme.toColor
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -31,6 +34,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -52,6 +56,12 @@ import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.TextStyle
 import java.util.*
+
+/** Alto de la fila con los nombres de los días (MonthHeader). */
+private val MONTH_HEADER_HEIGHT = 36.dp
+
+/** Hueco abajo para la barra de navegación flotante. */
+private val BOTTOM_NAV_SPACE = 120.dp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -79,6 +89,10 @@ fun CalendarScreen(
     var selectedEventForEdit by remember { mutableStateOf<com.syncro.domain.model.SyncroItem.Event?>(null) }
     var showQuickTaskSheet by remember { mutableStateOf(false) }
     var showAddNoteSheet by remember { mutableStateOf(false) }
+
+    val widthClass = LocalWidthClass.current
+    val isExpanded = widthClass == WidthClass.Expanded
+    val panelDate = uiState.selectedDate ?: LocalDate.now()
 
     LaunchedEffect(state.firstVisibleMonth) {
         viewModel.onMonthChanged(state.firstVisibleMonth.yearMonth)
@@ -140,28 +154,65 @@ fun CalendarScreen(
                 Spacer(modifier = Modifier.height(2.dp))
             }
 
-            // Contenedor con degradados
-            Box(modifier = Modifier.fillMaxSize()) {
-                HorizontalCalendar(
-                    state = state,
-                    modifier = Modifier.fillMaxSize(),
-                    dayContent = { day ->
-                        Day(
-                            day = day,
-                            items = uiState.events[day.date] ?: emptyList(),
-                            onClick = { viewModel.onDateSelected(day.date) }
+            Row(modifier = Modifier.fillMaxSize()) {
+                BoxWithConstraints(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                ) {
+                    // En el móvil las casillas son altas y estrechas (proporción fija); en tablet esa
+                    // proporción haría el mes enorme, así que las 6 filas se reparten la altura
+                    // disponible, dejando sitio a la cabecera de días y a la barra flotante
+                    val cellHeight = if (widthClass == WidthClass.Compact) null
+                    else ((maxHeight - MONTH_HEADER_HEIGHT - BOTTOM_NAV_SPACE) / 6).coerceAtLeast(72.dp)
+                    HorizontalCalendar(
+                        state = state,
+                        modifier = Modifier.fillMaxSize(),
+                        dayContent = { day ->
+                            Day(
+                                day = day,
+                                items = uiState.events[day.date] ?: emptyList(),
+                                onClick = { viewModel.onDateSelected(day.date) },
+                                cellHeight = cellHeight,
+                                isSelected = isExpanded && day.date == panelDate
+                            )
+                        },
+                        monthHeader = { _ ->
+                            MonthHeader(daysOfWeek = daysOfWeek)
+                        }
+                    )
+                }
+
+                // Tablet en horizontal: el detalle del día seleccionado (hoy, si no hay ninguno)
+                // queda fijo a la derecha en vez de abrirse en un diálogo
+                if (isExpanded) {
+                    Surface(
+                        shape = RoundedCornerShape(28.dp),
+                        color = MaterialTheme.colorScheme.surface,
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)),
+                        modifier = Modifier
+                            .width(380.dp)
+                            .fillMaxHeight()
+                            .padding(start = 8.dp, end = 16.dp, top = 8.dp, bottom = BOTTOM_NAV_SPACE)
+                    ) {
+                        DayDetailsContent(
+                            date = panelDate,
+                            items = uiState.events[panelDate] ?: emptyList(),
+                            onClose = null,
+                            onEditEvent = { selectedEventForEdit = it },
+                            viewModel = viewModel,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(20.dp)
                         )
-                    },
-                    monthHeader = { _ ->
-                        MonthHeader(daysOfWeek = daysOfWeek)
                     }
-                )
+                }
             }
         }
     }
 
-    // Modal de detalle del día
-    uiState.selectedDate?.let { date ->
+    // Modal de detalle del día (en tablet horizontal ya está en el panel lateral)
+    uiState.selectedDate?.takeUnless { isExpanded }?.let { date ->
         DayDetailsDialog(
             date = date,
             items = uiState.events[date] ?: emptyList(),
@@ -234,6 +285,48 @@ fun DayDetailsDialog(
     onEditEvent: (SyncroItem.Event) -> Unit,
     viewModel: CalendarViewModel
 ) {
+    BasicAlertDialog(
+        onDismissRequest = onDismiss,
+        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false),
+        // En tablet vertical no se estira de lado a lado
+        modifier = Modifier
+            .padding(24.dp)
+            .widthIn(max = 560.dp),
+        content = {
+            Surface(
+                shape = RoundedCornerShape(28.dp),
+                color = MaterialTheme.colorScheme.surface,
+                tonalElevation = 0.dp
+            ) {
+                DayDetailsContent(
+                    date = date,
+                    items = items,
+                    onClose = onDismiss,
+                    onEditEvent = onEditEvent,
+                    viewModel = viewModel,
+                    modifier = Modifier
+                        .padding(24.dp)
+                        .fillMaxWidth()
+                        .heightIn(max = 500.dp)
+                )
+            }
+        }
+    )
+}
+
+/**
+ * Lo que hay un día: en el móvil dentro de un diálogo y en tablet horizontal en el panel lateral
+ * (sin botón de cerrar, [onClose] null). Tocar un elemento abre su hoja de detalle.
+ */
+@Composable
+fun DayDetailsContent(
+    date: LocalDate,
+    items: List<SyncroItem>,
+    onClose: (() -> Unit)?,
+    onEditEvent: (SyncroItem.Event) -> Unit,
+    viewModel: CalendarViewModel,
+    modifier: Modifier = Modifier
+) {
     val context = LocalContext.current
     val now = rememberCurrentMinute()
     // Se guarda el id y no el elemento para que el detalle refleje los cambios (subtareas, completar)
@@ -274,103 +367,87 @@ fun DayDetailsDialog(
             )
         }
 
-    BasicAlertDialog(
-        onDismissRequest = onDismiss,
-        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false),
-        modifier = Modifier.padding(24.dp),
-        content = {
-            Surface(
-                shape = RoundedCornerShape(28.dp),
-                color = MaterialTheme.colorScheme.surface,
-                tonalElevation = 0.dp
-            ) {
-                Column(
+    Column(modifier = modifier) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = date.format(java.time.format.DateTimeFormatter.ofPattern("d 'de' MMMM", Locale.forLanguageTag("es-ES"))),
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+
+            if (onClose != null) {
+                IconButton(
+                    onClick = onClose,
                     modifier = Modifier
-                        .padding(24.dp)
-                        .fillMaxWidth()
-                        .heightIn(max = 500.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = date.format(java.time.format.DateTimeFormatter.ofPattern("d 'de' MMMM", Locale.forLanguageTag("es-ES"))),
-                            style = MaterialTheme.typography.headlineSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
+                        .size(32.dp)
+                        .background(
+                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f),
+                            RoundedCornerShape(16.dp)
                         )
-                        
-                        IconButton(
-                            onClick = onDismiss,
-                            modifier = Modifier
-                                .size(32.dp)
-                                .background(
-                                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f), 
-                                    RoundedCornerShape(16.dp)
-                                )
-                        ) {
-                            Icon(
-                                imageVector = Icons.Rounded.Close,
-                                contentDescription = "Cerrar",
-                                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                                modifier = Modifier.size(18.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Close,
+                        contentDescription = "Cerrar",
+                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        if (items.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 40.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "No hay eventos ni tareas para este día",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        } else {
+            Column(
+                modifier = Modifier
+                    .verticalScroll(rememberScrollState())
+                    .padding(bottom = 8.dp)
+            ) {
+                items.forEach { item ->
+                    when (item) {
+                        is SyncroItem.Event -> {
+                            EventCard(
+                                event = item,
+                                onSubtaskToggle = { subtaskTitle ->
+                                    viewModel.toggleSubtaskCompletion(item.id, subtaskTitle)
+                                },
+                                onToggleEvent = {
+                                    viewModel.toggleEventCompletion(item.id)
+                                },
+                                onClick = { selectedEventId = item.id },
+                                now = now
                             )
                         }
-                    }
-                    
-                    Spacer(modifier = Modifier.height(16.dp))
-                    
-                    if (items.isEmpty()) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 40.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "No hay eventos ni tareas para este día",
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                        is SyncroItem.Task -> {
+                            TaskRow(
+                                task = item,
+                                onToggle = { viewModel.toggleTaskCompletion(item.id) },
+                                onClick = { selectedTaskId = item.id }
                             )
                         }
-                    } else {
-                        Column(
-                            modifier = Modifier
-                                .verticalScroll(rememberScrollState())
-                                .padding(bottom = 8.dp)
-                        ) {
-                            items.forEach { item ->
-                                when (item) {
-                                    is SyncroItem.Event -> {
-                                        EventCard(
-                                            event = item,
-                                            onSubtaskToggle = { subtaskTitle ->
-                                                viewModel.toggleSubtaskCompletion(item.id, subtaskTitle)
-                                            },
-                                            onToggleEvent = {
-                                                viewModel.toggleEventCompletion(item.id)
-                                            },
-                                            onClick = { selectedEventId = item.id },
-                                            now = now
-                                        )
-                                    }
-                                    is SyncroItem.Task -> {
-                                        TaskRow(
-                                            task = item,
-                                            onToggle = { viewModel.toggleTaskCompletion(item.id) },
-                                            onClick = { selectedTaskId = item.id }
-                                        )
-                                    }
-                                    is SyncroItem.Note -> {}
-                                }
-                            }
-                        }
+                        is SyncroItem.Note -> {}
                     }
                 }
             }
         }
-    )
+    }
 }
 
 @Composable
@@ -431,7 +508,18 @@ fun MonthHeader(daysOfWeek: List<DayOfWeek>) {
 }
 
 @Composable
-fun Day(day: CalendarDay, items: List<SyncroItem>, onClick: () -> Unit) {
+fun Day(
+    day: CalendarDay,
+    items: List<SyncroItem>,
+    onClick: () -> Unit,
+    // En tablet la casilla tiene una altura fija (las filas se reparten la pantalla); null = móvil
+    cellHeight: Dp? = null,
+    // El día que se ve en el panel lateral (tablet horizontal)
+    isSelected: Boolean = false
+) {
+    val large = cellHeight != null
+    // Cuántas etiquetas caben: en el móvil 4; en tablet, las que quepan bajo el número
+    val maxItems = cellHeight?.let { ((it - 36.dp) / 20.dp).toInt().coerceAtLeast(1) } ?: 4
     val isToday = day.date == LocalDate.now()
     
     // Obtener el color del primer evento o tarea para el fondo
@@ -452,7 +540,7 @@ fun Day(day: CalendarDay, items: List<SyncroItem>, onClick: () -> Unit) {
 
     Box(
         modifier = Modifier
-            .aspectRatio(0.6f)
+            .then(if (cellHeight != null) Modifier.height(cellHeight) else Modifier.aspectRatio(0.6f))
             .padding(2.dp)
             .clip(RoundedCornerShape(8.dp))
             .background(
@@ -463,7 +551,8 @@ fun Day(day: CalendarDay, items: List<SyncroItem>, onClick: () -> Unit) {
                 }
             )
             .then(
-                if (allDayEventColor != null) Modifier.border(2.dp, allDayEventColor, RoundedCornerShape(8.dp))
+                if (isSelected) Modifier.border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(8.dp))
+                else if (allDayEventColor != null) Modifier.border(2.dp, allDayEventColor, RoundedCornerShape(8.dp))
                 else Modifier
             )
             .clickable(onClick = onClick),
@@ -490,17 +579,17 @@ fun Day(day: CalendarDay, items: List<SyncroItem>, onClick: () -> Unit) {
 
             Spacer(modifier = Modifier.height(4.dp))
 
-            // Items (máximo 4)
-            val visibleItems = items.take(4)
+            // Items (los que quepan)
+            val visibleItems = items.take(maxItems)
             visibleItems.forEach { item ->
                 when (item) {
-                    is SyncroItem.Event -> EventSnippet(item)
-                    is SyncroItem.Task -> TaskSnippet(item)
+                    is SyncroItem.Event -> EventSnippet(item, large)
+                    is SyncroItem.Task -> TaskSnippet(item, large)
                     is SyncroItem.Note -> {}
                 }
                 Spacer(modifier = Modifier.height(2.dp))
             }
-            if (items.size > 4) {
+            if (items.size > maxItems) {
                 Text(
                     text = "...",
                     fontSize = 10.sp,
@@ -514,8 +603,8 @@ fun Day(day: CalendarDay, items: List<SyncroItem>, onClick: () -> Unit) {
 }
 
 @Composable
-fun EventSnippet(event: SyncroItem.Event) {
-    ItemSnippet(title = event.title, color = event.categoryColor.toColor())
+fun EventSnippet(event: SyncroItem.Event, large: Boolean = false) {
+    ItemSnippet(title = event.title, color = event.categoryColor.toColor(), large = large)
 }
 
 /**
@@ -523,7 +612,7 @@ fun EventSnippet(event: SyncroItem.Event) {
  * confundan con los eventos.
  */
 @Composable
-fun TaskSnippet(task: SyncroItem.Task) {
+fun TaskSnippet(task: SyncroItem.Task, large: Boolean = false) {
     val color = task.categoryColor?.toColor() ?: MaterialTheme.colorScheme.secondary
     Box(
         modifier = Modifier
@@ -537,17 +626,18 @@ fun TaskSnippet(task: SyncroItem.Task) {
                 imageVector = if (task.isCompleted) Icons.Rounded.CheckCircle else Icons.Rounded.RadioButtonUnchecked,
                 contentDescription = if (task.isCompleted) "Tarea completada" else "Tarea",
                 tint = color,
-                modifier = Modifier.size(9.dp)
+                modifier = Modifier.size(if (large) 12.dp else 9.dp)
             )
             Spacer(modifier = Modifier.width(3.dp))
             Text(
                 text = task.title,
-                fontSize = 8.sp,
+                // En tablet las casillas son más anchas: texto legible en vez de 8 sp
+                fontSize = if (large) 11.sp else 8.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 color = MaterialTheme.colorScheme.onSurface,
                 textDecoration = if (task.isCompleted) TextDecoration.LineThrough else null,
-                lineHeight = 10.sp
+                lineHeight = if (large) 14.sp else 10.sp
             )
         }
     }
@@ -558,7 +648,7 @@ fun TaskSnippet(task: SyncroItem.Task) {
  * el día se señalan con el borde de la casilla entera (ver [Day]).
  */
 @Composable
-private fun ItemSnippet(title: String, color: Color) {
+private fun ItemSnippet(title: String, color: Color, large: Boolean) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -569,18 +659,19 @@ private fun ItemSnippet(title: String, color: Color) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(
                 modifier = Modifier
-                    .size(4.dp, 12.dp)
+                    .size(4.dp, if (large) 16.dp else 12.dp)
                     .clip(RoundedCornerShape(2.dp))
                     .background(color)
             )
             Spacer(modifier = Modifier.width(4.dp))
             Text(
                 text = title,
-                fontSize = 8.sp,
+                // En tablet las casillas son más anchas: texto legible en vez de 8 sp
+                fontSize = if (large) 11.sp else 8.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 color = MaterialTheme.colorScheme.onSurface,
-                lineHeight = 10.sp
+                lineHeight = if (large) 14.sp else 10.sp
             )
         }
     }

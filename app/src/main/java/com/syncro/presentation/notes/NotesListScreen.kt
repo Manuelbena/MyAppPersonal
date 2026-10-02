@@ -23,6 +23,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.syncro.domain.model.SyncroItem
+import com.syncro.presentation.components.LocalWidthClass
+import com.syncro.presentation.components.WidthClass
 import com.syncro.presentation.home.components.AddNoteSheet
 import com.syncro.presentation.home.components.CountBadge
 import com.syncro.presentation.home.components.NoteCard
@@ -93,7 +95,14 @@ fun NotesListScreen(
             )
         } else {
             LazyVerticalStaggeredGrid(
-                columns = StaggeredGridCells.Fixed(2),
+                // Dos columnas en el móvil; en tablet, tres o cuatro para no estirar las notas
+                columns = StaggeredGridCells.Fixed(
+                    when (LocalWidthClass.current) {
+                        WidthClass.Compact -> 2
+                        WidthClass.Medium -> 3
+                        WidthClass.Expanded -> 4
+                    }
+                ),
                 modifier = Modifier.fillMaxSize().padding(padding),
                 // Hueco abajo para que el botón flotante no tape la última fila
                 contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 96.dp),

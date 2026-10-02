@@ -26,8 +26,10 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -40,6 +42,8 @@ import com.syncro.presentation.assistant.AssistantViewModel
 import com.syncro.presentation.assistant.TrackAssistantOnResume
 import com.syncro.presentation.calendar.CalendarScreen
 import com.syncro.presentation.components.ComingSoonScreen
+import com.syncro.presentation.components.ProvideWidthClass
+import com.syncro.presentation.components.ReadableWidth
 import com.syncro.presentation.event.AddEventScreen
 import com.syncro.presentation.home.HomeScreen
 import com.syncro.presentation.login.LoginScreen
@@ -97,188 +101,203 @@ fun MainScaffold(
     if (bottomNavItems.any { it.route == currentRoute }) lastBottomRoute = currentRoute
 
     SyncroTheme(darkTheme = isDarkTheme) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background)
-        ) {
-            // Mientras se lee la sesión no se muestra nada: evita el parpadeo del login
-            if (session == SessionState.Loading) return@Box
-            // Se decide una sola vez; después, login -> inicio lo gestiona la propia navegación
-            val startDestination = remember {
-                if (session is SessionState.LoggedIn) AppScreen.Home.route else AppScreen.Login.route
-            }
-            val navigateToTab: (AppScreen) -> Unit = { screen ->
-                navController.navigate(screen.route) {
-                    popUpTo(navController.graph.startDestinationId) {
-                        saveState = true
-                    }
-                    launchSingleTop = true
-                    restoreState = true
+        ProvideWidthClass {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.background)
+            ) {
+                // Mientras se lee la sesión no se muestra nada: evita el parpadeo del login
+                if (session == SessionState.Loading) return@Box
+                // Se decide una sola vez; después, login -> inicio lo gestiona la propia navegación
+                val startDestination = remember {
+                    if (session is SessionState.LoggedIn) AppScreen.Home.route else AppScreen.Login.route
                 }
-            }
-            // Tras montar el NavHost (los efectos van después de la composición); sin sesión no hay chat
-            // Al cerrar sesión (desde Ajustes) se vuelve al login y no se puede volver atrás
-            LaunchedEffect(session) {
-                if (session == SessionState.LoggedOut && navController.currentDestination?.route != AppScreen.Login.route) {
-                    navController.navigate(AppScreen.Login.route) {
-                        popUpTo(navController.graph.id) { inclusive = true }
+                val navigateToTab: (AppScreen) -> Unit = { screen ->
+                    navController.navigate(screen.route) {
+                        popUpTo(navController.graph.startDestinationId) {
+                            saveState = true
+                        }
+                        launchSingleTop = true
+                        restoreState = true
                     }
                 }
-            }
-            LaunchedEffect(addTask, session) {
-                if (addTask && session is SessionState.LoggedIn && navController.currentDestination?.route != AppScreen.Home.route) {
-                    navigateToTab(AppScreen.Home)
-                }
-            }
-            LaunchedEffect(openAssistant, session) {
-                if (openAssistant && session is SessionState.LoggedIn) {
-                    navigateToTab(AppScreen.Assistant)
-                    onAssistantOpened()
-                }
-            }
-
-            Scaffold(
-                bottomBar = {
-                    // Entra y sale deslizándose al ritmo de la pantalla, en vez de aparecer de golpe
-                    AnimatedVisibility(
-                        visible = showBottomBar,
-                        enter = slideInVertically(pushSpec()) { it } + fadeIn(pushSpec()),
-                        exit = slideOutVertically(pushSpec()) { it } + fadeOut(pushSpec())
-                    ) {
-                        FloatingBottomNav(
-                            items = bottomNavItems,
-                            currentRoute = lastBottomRoute,
-                            badges = mapOf(AppScreen.Assistant.route to assistantUnread),
-                            onItemClick = navigateToTab
-                        )
+                // Tras montar el NavHost (los efectos van después de la composición); sin sesión no hay chat
+                // Al cerrar sesión (desde Ajustes) se vuelve al login y no se puede volver atrás
+                LaunchedEffect(session) {
+                    if (session == SessionState.LoggedOut && navController.currentDestination?.route != AppScreen.Login.route) {
+                        navController.navigate(AppScreen.Login.route) {
+                            popUpTo(navController.graph.id) { inclusive = true }
+                        }
                     }
-                },
-                containerColor = Color.Transparent,
-                contentWindowInsets = WindowInsets(0, 0, 0, 0)
-            ) { _ ->
-                // Sin padding a propósito: el contenido va a pantalla completa y la barra flota encima
-                NavHost(
-                    navController = navController,
-                    startDestination = startDestination,
-                    modifier = Modifier.fillMaxSize(),
-                    enterTransition = {
-                        val initialRoute = initialState.destination.route
-                        val targetRoute = targetState.destination.route
+                }
+                LaunchedEffect(addTask, session) {
+                    if (addTask && session is SessionState.LoggedIn && navController.currentDestination?.route != AppScreen.Home.route) {
+                        navigateToTab(AppScreen.Home)
+                    }
+                }
+                LaunchedEffect(openAssistant, session) {
+                    if (openAssistant && session is SessionState.LoggedIn) {
+                        navigateToTab(AppScreen.Assistant)
+                        onAssistantOpened()
+                    }
+                }
 
-                        val initialIndex = bottomNavItems.indexOfFirst { it.route == initialRoute }
-                        val targetIndex = bottomNavItems.indexOfFirst { it.route == targetRoute }
-
-                        if (initialRoute in PAGE_ROUTES) {
-                            // Volviendo de la libreta: Inicio regresa desde la izquierda
-                            slideInHorizontally(pushSpec()) { -it / 4 } + fadeIn(pushSpec())
-                        } else if (initialIndex != -1 && targetIndex != -1 && initialIndex != targetIndex) {
-                            if (targetIndex > initialIndex) {
-                                slideInHorizontally(
-                                    initialOffsetX = { it / 3 },
-                                    animationSpec = tween(900, easing = EaseOutQuart)
-                                ) + fadeIn(animationSpec = tween(800, easing = EaseInOutQuart))
-                            } else {
-                                slideInHorizontally(
-                                    initialOffsetX = { -it / 3 },
-                                    animationSpec = tween(900, easing = EaseOutQuart)
-                                ) + fadeIn(animationSpec = tween(800, easing = EaseInOutQuart))
+                Scaffold(
+                    bottomBar = {
+                        // Entra y sale deslizándose al ritmo de la pantalla, en vez de aparecer de golpe
+                        AnimatedVisibility(
+                            visible = showBottomBar,
+                            enter = slideInVertically(pushSpec()) { it } + fadeIn(pushSpec()),
+                            exit = slideOutVertically(pushSpec()) { it } + fadeOut(pushSpec())
+                        ) {
+                            // En tablet no se estira de lado a lado: queda centrada con el ancho de un móvil
+                            Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                                FloatingBottomNav(
+                                    items = bottomNavItems,
+                                    currentRoute = lastBottomRoute,
+                                    badges = mapOf(AppScreen.Assistant.route to assistantUnread),
+                                    onItemClick = navigateToTab,
+                                    modifier = Modifier.widthIn(max = 560.dp)
+                                )
                             }
-                        } else {
-                            fadeIn(animationSpec = tween(900, easing = EaseInOutQuart)) + 
-                            scaleIn(initialScale = 0.95f, animationSpec = tween(900, easing = EaseOutQuart))
                         }
                     },
-                    exitTransition = {
-                        val initialRoute = initialState.destination.route
-                        val targetRoute = targetState.destination.route
-                        
-                        val initialIndex = bottomNavItems.indexOfFirst { it.route == initialRoute }
-                        val targetIndex = bottomNavItems.indexOfFirst { it.route == targetRoute }
+                    containerColor = Color.Transparent,
+                    contentWindowInsets = WindowInsets(0, 0, 0, 0)
+                ) { _ ->
+                    // Sin padding a propósito: el contenido va a pantalla completa y la barra flota encima
+                    NavHost(
+                        navController = navController,
+                        startDestination = startDestination,
+                        modifier = Modifier.fillMaxSize(),
+                        enterTransition = {
+                            val initialRoute = initialState.destination.route
+                            val targetRoute = targetState.destination.route
 
-                        if (targetRoute in PAGE_ROUTES) {
-                            // Abriendo la libreta: Inicio se aparta un poco hacia la izquierda
-                            slideOutHorizontally(pushSpec()) { -it / 4 } + fadeOut(pushSpec())
-                        } else if (initialIndex != -1 && targetIndex != -1 && initialIndex != targetIndex) {
-                            if (targetIndex > initialIndex) {
-                                slideOutHorizontally(
-                                    targetOffsetX = { -it / 3 },
-                                    animationSpec = tween(900, easing = EaseOutQuart)
-                                ) + fadeOut(animationSpec = tween(700, easing = EaseInOutQuart))
+                            val initialIndex = bottomNavItems.indexOfFirst { it.route == initialRoute }
+                            val targetIndex = bottomNavItems.indexOfFirst { it.route == targetRoute }
+
+                            if (initialRoute in PAGE_ROUTES) {
+                                // Volviendo de la libreta: Inicio regresa desde la izquierda
+                                slideInHorizontally(pushSpec()) { -it / 4 } + fadeIn(pushSpec())
+                            } else if (initialIndex != -1 && targetIndex != -1 && initialIndex != targetIndex) {
+                                if (targetIndex > initialIndex) {
+                                    slideInHorizontally(
+                                        initialOffsetX = { it / 3 },
+                                        animationSpec = tween(900, easing = EaseOutQuart)
+                                    ) + fadeIn(animationSpec = tween(800, easing = EaseInOutQuart))
+                                } else {
+                                    slideInHorizontally(
+                                        initialOffsetX = { -it / 3 },
+                                        animationSpec = tween(900, easing = EaseOutQuart)
+                                    ) + fadeIn(animationSpec = tween(800, easing = EaseInOutQuart))
+                                }
                             } else {
-                                slideOutHorizontally(
-                                    targetOffsetX = { it / 3 },
-                                    animationSpec = tween(900, easing = EaseOutQuart)
-                                ) + fadeOut(animationSpec = tween(700, easing = EaseInOutQuart))
+                                fadeIn(animationSpec = tween(900, easing = EaseInOutQuart)) + 
+                                scaleIn(initialScale = 0.95f, animationSpec = tween(900, easing = EaseOutQuart))
                             }
-                        } else {
-                            fadeOut(animationSpec = tween(700, easing = EaseInOutQuart))
+                        },
+                        exitTransition = {
+                            val initialRoute = initialState.destination.route
+                            val targetRoute = targetState.destination.route
+                            
+                            val initialIndex = bottomNavItems.indexOfFirst { it.route == initialRoute }
+                            val targetIndex = bottomNavItems.indexOfFirst { it.route == targetRoute }
+
+                            if (targetRoute in PAGE_ROUTES) {
+                                // Abriendo la libreta: Inicio se aparta un poco hacia la izquierda
+                                slideOutHorizontally(pushSpec()) { -it / 4 } + fadeOut(pushSpec())
+                            } else if (initialIndex != -1 && targetIndex != -1 && initialIndex != targetIndex) {
+                                if (targetIndex > initialIndex) {
+                                    slideOutHorizontally(
+                                        targetOffsetX = { -it / 3 },
+                                        animationSpec = tween(900, easing = EaseOutQuart)
+                                    ) + fadeOut(animationSpec = tween(700, easing = EaseInOutQuart))
+                                } else {
+                                    slideOutHorizontally(
+                                        targetOffsetX = { it / 3 },
+                                        animationSpec = tween(900, easing = EaseOutQuart)
+                                    ) + fadeOut(animationSpec = tween(700, easing = EaseInOutQuart))
+                                }
+                            } else {
+                                fadeOut(animationSpec = tween(700, easing = EaseInOutQuart))
+                            }
+                        }
+                    ) {
+                    // Login, ajustes, textos legales y chat son de lectura: en tablet van centrados
+                    composable(AppScreen.Login.route) {
+                        ReadableWidth {
+                            LoginScreen(
+                                onOpenLegal = { navController.navigate(legalRoute(it)) },
+                                onLoginSuccess = {
+                                    navController.navigate(AppScreen.Home.route) {
+                                        popUpTo(AppScreen.Login.route) { inclusive = true }
+                                    }
+                                }
+                            )
                         }
                     }
-                ) {
-                composable(AppScreen.Login.route) {
-                    LoginScreen(
-                        onOpenLegal = { navController.navigate(legalRoute(it)) },
-                        onLoginSuccess = {
-                            navController.navigate(AppScreen.Home.route) {
-                                popUpTo(AppScreen.Login.route) { inclusive = true }
-                            }
+                    composable(AppScreen.Home.route) {
+                         HomeScreen(
+                             onOpenSettings = { navController.navigate(AppScreen.Settings.route) },
+                             openQuickTask = addTask && session is SessionState.LoggedIn,
+                             onQuickTaskOpened = onAddTaskOpened,
+                             onNavigateToNotes = { navController.navigate(AppScreen.NotesList.route) }
+                         )
+                    }
+                    // La libreta es una página "encima" de Inicio: entra por la derecha y sale por ella
+                    composable(
+                        AppScreen.NotesList.route,
+                        enterTransition = { slideInHorizontally(pushSpec()) { it } },
+                        popExitTransition = { slideOutHorizontally(pushSpec()) { it } }
+                    ) {
+                        NotesListScreen(
+                            onBack = { navController.popBackStack() }
+                        )
+                    }
+                    // Ajustes, igual que la libreta: una página encima de Inicio
+                    composable(
+                        AppScreen.Settings.route,
+                        enterTransition = { slideInHorizontally(pushSpec()) { it } },
+                        popExitTransition = { slideOutHorizontally(pushSpec()) { it } }
+                    ) {
+                        ReadableWidth {
+                            SettingsScreen(
+                                onBack = { navController.popBackStack() },
+                                onOpenLegal = { navController.navigate(legalRoute(it)) }
+                            )
                         }
-                    )
-                }
-                composable(AppScreen.Home.route) {
-                     HomeScreen(
-                         onOpenSettings = { navController.navigate(AppScreen.Settings.route) },
-                         openQuickTask = addTask && session is SessionState.LoggedIn,
-                         onQuickTaskOpened = onAddTaskOpened,
-                         onNavigateToNotes = { navController.navigate(AppScreen.NotesList.route) }
-                     )
-                }
-                // La libreta es una página "encima" de Inicio: entra por la derecha y sale por ella
-                composable(
-                    AppScreen.NotesList.route,
-                    enterTransition = { slideInHorizontally(pushSpec()) { it } },
-                    popExitTransition = { slideOutHorizontally(pushSpec()) { it } }
-                ) {
-                    NotesListScreen(
-                        onBack = { navController.popBackStack() }
-                    )
-                }
-                // Ajustes, igual que la libreta: una página encima de Inicio
-                composable(
-                    AppScreen.Settings.route,
-                    enterTransition = { slideInHorizontally(pushSpec()) { it } },
-                    popExitTransition = { slideOutHorizontally(pushSpec()) { it } }
-                ) {
-                    SettingsScreen(
-                        onBack = { navController.popBackStack() },
-                        onOpenLegal = { navController.navigate(legalRoute(it)) }
-                    )
-                }
-                // Documentos legales: desde Ajustes y desde el inicio de sesión (sin sesión)
-                composable(
-                    AppScreen.Legal.route,
-                    enterTransition = { slideInHorizontally(pushSpec()) { it } },
-                    popExitTransition = { slideOutHorizontally(pushSpec()) { it } }
-                ) { entry ->
-                    val document = entry.arguments?.getString("doc")
-                        ?.let { name -> LegalDocumentId.entries.firstOrNull { it.name == name } }
-                        ?: LegalDocumentId.PRIVACY
-                    LegalDocumentScreen(documentId = document, onBack = { navController.popBackStack() })
-                }
-                composable(AppScreen.Calendar.route) {
-                     CalendarScreen()
-                }
-                composable(AppScreen.Savings.route) {
-                    ComingSoonScreen(
-                        icon = AppScreen.Savings.icon,
-                        title = "Ahorros",
-                        description = "Controla tus objetivos de ahorro junto a tus tareas y eventos."
-                    )
-                }
-                composable(AppScreen.Assistant.route) {
-                     AssistantMainScreen(viewModel = assistantViewModel)
-                }
+                    }
+                    // Documentos legales: desde Ajustes y desde el inicio de sesión (sin sesión)
+                    composable(
+                        AppScreen.Legal.route,
+                        enterTransition = { slideInHorizontally(pushSpec()) { it } },
+                        popExitTransition = { slideOutHorizontally(pushSpec()) { it } }
+                    ) { entry ->
+                        val document = entry.arguments?.getString("doc")
+                            ?.let { name -> LegalDocumentId.entries.firstOrNull { it.name == name } }
+                            ?: LegalDocumentId.PRIVACY
+                        ReadableWidth {
+                            LegalDocumentScreen(documentId = document, onBack = { navController.popBackStack() })
+                        }
+                    }
+                    composable(AppScreen.Calendar.route) {
+                         CalendarScreen()
+                    }
+                    composable(AppScreen.Savings.route) {
+                        ComingSoonScreen(
+                            icon = AppScreen.Savings.icon,
+                            title = "Ahorros",
+                            description = "Controla tus objetivos de ahorro junto a tus tareas y eventos."
+                        )
+                    }
+                    composable(AppScreen.Assistant.route) {
+                        ReadableWidth {
+                            AssistantMainScreen(viewModel = assistantViewModel)
+                        }
+                    }
+                    }
                 }
             }
         }
