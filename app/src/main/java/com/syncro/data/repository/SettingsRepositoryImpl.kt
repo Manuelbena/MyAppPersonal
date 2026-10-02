@@ -35,6 +35,7 @@ class SettingsRepositoryImpl @Inject constructor(
     private val FOCUS_ENABLED = booleanPreferencesKey("assistant_focus_enabled")
     private val LEFTOVERS_ENABLED = booleanPreferencesKey("assistant_leftovers_enabled")
     private val PAYDAY_DAY = intPreferencesKey("assistant_payday_day")
+    private val BUDGET_ALERTS_ENABLED = booleanPreferencesKey("assistant_budget_alerts_enabled")
 
     override val settings: Flow<AppSettings> = context.settingsDataStore.data.map { prefs ->
         val defaults = AppSettings()
@@ -48,7 +49,8 @@ class SettingsRepositoryImpl @Inject constructor(
             assistant = AssistantSettings(
                 focusEnabled = prefs[FOCUS_ENABLED] ?: defaults.assistant.focusEnabled,
                 leftoversEnabled = prefs[LEFTOVERS_ENABLED] ?: defaults.assistant.leftoversEnabled,
-                paydayDay = prefs[PAYDAY_DAY]?.takeIf { it in 1..31 }
+                paydayDay = prefs[PAYDAY_DAY]?.takeIf { it in 1..31 },
+                budgetAlertsEnabled = prefs[BUDGET_ALERTS_ENABLED] ?: defaults.assistant.budgetAlertsEnabled
             )
         )
     }
@@ -61,6 +63,7 @@ class SettingsRepositoryImpl @Inject constructor(
             prefs[EVENING_TIME] = settings.digest.eveningTime.toStoredTime()
             prefs[FOCUS_ENABLED] = settings.assistant.focusEnabled
             prefs[LEFTOVERS_ENABLED] = settings.assistant.leftoversEnabled
+            prefs[BUDGET_ALERTS_ENABLED] = settings.assistant.budgetAlertsEnabled
             // Sin nómina no se guarda nada: así lo de fábrica (null) vuelve tal cual
             val payday = settings.assistant.paydayDay
             if (payday != null) prefs[PAYDAY_DAY] = payday else prefs.remove(PAYDAY_DAY)

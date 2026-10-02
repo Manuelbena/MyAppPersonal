@@ -9,13 +9,16 @@ import com.syncro.data.local.MIGRATION_10_11
 import com.syncro.data.local.MIGRATION_11_12
 import com.syncro.data.local.MIGRATION_12_13
 import com.syncro.data.local.MIGRATION_13_14
+import com.syncro.data.local.MIGRATION_14_15
 import com.syncro.data.local.SyncroDatabase
+import com.syncro.data.local.dao.BudgetDao
 import com.syncro.data.local.dao.EventDao
 import com.syncro.data.local.dao.MovementDao
 import com.syncro.data.local.dao.NoteDao
 import com.syncro.data.local.dao.TaskDao
 import com.syncro.data.local.dao.UserDao
 import com.syncro.data.repository.AccountDataRepositoryImpl
+import com.syncro.data.repository.BudgetRepositoryImpl
 import com.syncro.data.repository.DailyFocusRepositoryImpl
 import com.syncro.data.repository.SettingsRepositoryImpl
 import com.syncro.data.repository.EventRepositoryImpl
@@ -29,6 +32,7 @@ import com.syncro.data.remote.GoogleRemoteDataSource
 import com.syncro.data.sync.SyncScheduler
 import com.syncro.data.sync.WorkManagerSyncScheduler
 import com.syncro.domain.repository.AccountDataRepository
+import com.syncro.domain.repository.BudgetRepository
 import com.syncro.domain.repository.DailyFocusRepository
 import com.syncro.domain.repository.SettingsRepository
 import com.syncro.domain.repository.EventRepository
@@ -57,7 +61,7 @@ object AppModule {
             SyncroDatabase::class.java,
             "syncro_db"
         )
-            .addMigrations(MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14)
+            .addMigrations(MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15)
             .fallbackToDestructiveMigration(true)
             .build()
     }
@@ -108,6 +112,17 @@ object AppModule {
     @Singleton
     fun provideMovementRepository(dao: MovementDao): MovementRepository {
         return MovementRepositoryImpl(dao)
+    }
+
+    @Provides
+    fun provideBudgetDao(db: SyncroDatabase): BudgetDao {
+        return db.budgetDao
+    }
+
+    @Provides
+    @Singleton
+    fun provideBudgetRepository(dao: BudgetDao): BudgetRepository {
+        return BudgetRepositoryImpl(dao)
     }
 
     @Provides

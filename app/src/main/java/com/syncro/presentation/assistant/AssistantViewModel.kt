@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.syncro.data.preferences.AssistantPreferences
 import com.syncro.domain.model.AssistantConversation
+import com.syncro.domain.model.BudgetAlert
 import com.syncro.domain.model.ChatReply
 import com.syncro.domain.model.DailyFocus
 import com.syncro.domain.model.DigestAnswer
@@ -16,11 +17,13 @@ import com.syncro.domain.model.Payday
 import com.syncro.domain.model.PaydayAnswer
 import com.syncro.domain.model.TaskAction
 import com.syncro.domain.model.assistantConversation
+import com.syncro.domain.model.budgetAlerts
 import com.syncro.domain.model.lastPayday
 import com.syncro.domain.model.salaryCents
 import com.syncro.domain.usecase.ChooseDailyFocusUseCase
 import com.syncro.domain.usecase.GetFocusCandidatesUseCase
 import com.syncro.domain.usecase.GetFocusHistoryUseCase
+import com.syncro.domain.usecase.GetBudgetsUseCase
 import com.syncro.domain.usecase.GetLeftoverTasksUseCase
 import com.syncro.domain.usecase.GetMonthMovementsUseCase
 import com.syncro.domain.usecase.GetSettingsUseCase
@@ -60,6 +63,7 @@ class AssistantViewModel @Inject constructor(
     private val getFocusHistory: GetFocusHistoryUseCase,
     private val chooseDailyFocus: ChooseDailyFocusUseCase,
     private val getMonthMovements: GetMonthMovementsUseCase,
+    getBudgets: GetBudgetsUseCase,
     getSettings: GetSettingsUseCase,
     private val clock: Clock
 ) : ViewModel() {
@@ -98,16 +102,33 @@ class AssistantViewModel @Inject constructor(
         }
     }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
-    private data class Tasks(val leftovers: LeftoverTasks, val focus: Focus, val focusHistory: List<DailyFocus>, val payday: Payday?)
+    // Avisos de presupuesto de esta semana: el mes actual y, a principios de mes, también el anterior
+    private val budgetAlerts = combine(refreshTick, getSettings(), getBudgets()) { _, settings, budgets ->
+        budgets.takeIf { settings.assistant.budgetAlertsEnabled }.orEmpty()
+    }.flatMapLatest { budgets ->
+        if (budgets.isEmpty()) return@flatMapLatest flowOf(emptyList())
+        val today = LocalDate.now(clock)
+        val since = historySince
+        val months = listOf(YearMonth.from(since), YearMonth.from(today)).distinct()
+        combine(months.map { getMonthMovements(it) }) { monthly ->
+            monthly.flatMap { it.budgetAlerts(budgets, today) }.filter { !it.date.isBefore(since) }
+        }
+    }
+
+    // Lo de dinero, junto: nómina y presupuestos
+    private data class Money(val payday: Payday?, val budgetAlerts: List<BudgetAlert>)
+    private val money = combine(payday.filterNotNull(), budgetAlerts) { payday, alerts -> Money(payday.payday, alerts) }
+
+    private data class Tasks(val leftovers: LeftoverTasks, val focus: Focus, val focusHistory: List<DailyFocus>, val money: Money)
     private val tasks = combine(
-        leftovers.filterNotNull(), focus.filterNotNull(), focusHistory, getSettings(), payday.filterNotNull()
-    ) { leftovers, focus, history, settings, payday ->
+        leftovers.filterNotNull(), focus.filterNotNull(), focusHistory, getSettings(), money
+    ) { leftovers, focus, history, settings, money ->
         // Con una pregunta apagada en Ajustes no se hace; lo ya contestado sigue en el historial
         Tasks(
             leftovers = if (settings.assistant.leftoversEnabled) leftovers else leftovers.copy(tasks = emptyList()),
             focus = if (settings.assistant.focusEnabled) focus else Focus(null),
             focusHistory = history,
-            payday = payday.payday
+            money = money
         )
     }
 
@@ -125,7 +146,8 @@ class AssistantViewModel @Inject constructor(
             outcomes = outcomes.filter { !it.reviewDate.isBefore(historySince) },
             focus = tasks.focus.candidates,
             focusHistory = tasks.focusHistory,
-            payday = tasks.payday,
+            payday = tasks.money.payday,
+            budgetAlerts = tasks.money.budgetAlerts,
             clearedIds = clearedIds
         )
     }

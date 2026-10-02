@@ -61,3 +61,10 @@ val MIGRATION_13_14 = object : Migration(13, 14) {
         db.execSQL("CREATE INDEX IF NOT EXISTS `index_movements_date` ON `movements` (`date`)")
     }
 }
+
+/** Ahorros: presupuestos mensuales por categoría (solo locales). */
+val MIGRATION_14_15 = object : Migration(14, 15) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("CREATE TABLE IF NOT EXISTS `budgets` (`category` TEXT NOT NULL, `limitCents` INTEGER NOT NULL, PRIMARY KEY(`category`))")
+    }
+}

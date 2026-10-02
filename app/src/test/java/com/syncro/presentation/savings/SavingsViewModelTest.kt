@@ -2,9 +2,13 @@ package com.syncro.presentation.savings
 
 import com.syncro.domain.model.MovementCategory
 import com.syncro.domain.model.MovementType
+import com.syncro.domain.usecase.DeleteBudgetUseCase
 import com.syncro.domain.usecase.DeleteMovementUseCase
+import com.syncro.domain.usecase.GetBudgetsUseCase
+import com.syncro.domain.usecase.SaveBudgetUseCase
 import com.syncro.domain.usecase.GetMonthMovementsUseCase
 import com.syncro.domain.usecase.SaveMovementUseCase
+import com.syncro.testutil.FakeBudgetRepository
 import com.syncro.testutil.FakeMovementRepository
 import com.syncro.testutil.MainDispatcherRule
 import com.syncro.testutil.aMovement
@@ -34,11 +38,15 @@ class SavingsViewModelTest {
     private val today = LocalDate.of(2026, 10, 2)
     private val clock = Clock.fixed(today.atTime(9, 0).toInstant(ZoneOffset.UTC), ZoneOffset.UTC)
     private val repository = FakeMovementRepository()
+    private val budgets = FakeBudgetRepository()
 
     private fun createViewModel() = SavingsViewModel(
         getMonthMovementsUseCase = GetMonthMovementsUseCase(repository),
         saveMovementUseCase = SaveMovementUseCase(repository),
         deleteMovementUseCase = DeleteMovementUseCase(repository),
+        getBudgetsUseCase = GetBudgetsUseCase(budgets),
+        saveBudgetUseCase = SaveBudgetUseCase(budgets),
+        deleteBudgetUseCase = DeleteBudgetUseCase(budgets),
         clock = clock
     )
 
@@ -97,6 +105,22 @@ class SavingsViewModelTest {
 
         assertEquals(listOf("Gasto actualizado"), messages)
         assertEquals(2_000L, repository.movements.value.getValue("m1").amountCents)
+    }
+
+    @Test
+    fun `guardar un presupuesto confirma y lo muestra`() = runTest {
+        val viewModel = createViewModel()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.budgets.collect {} }
+        val messages = collectMessages(viewModel)
+
+        viewModel.saveBudget(MovementCategory.GROCERIES, 30_000)
+        viewModel.saveBudget(MovementCategory.SALARY, 30_000)
+
+        assertEquals(listOf("Presupuesto guardado", "Los presupuestos son para gastos"), messages)
+        assertEquals(listOf(MovementCategory.GROCERIES), viewModel.budgets.value.map { it.category })
+
+        viewModel.deleteBudget(MovementCategory.GROCERIES)
+        assertTrue(viewModel.budgets.value.isEmpty())
     }
 
     @Test

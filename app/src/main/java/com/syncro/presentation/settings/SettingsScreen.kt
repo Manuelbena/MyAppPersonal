@@ -280,6 +280,13 @@ fun SettingsContent(
                             onCheckedChange = { on -> onAssistantChange { it.copy(leftoversEnabled = on) } }
                         )
                         SettingsDivider()
+                        SwitchRow(
+                            title = "Avisos de presupuesto",
+                            subtitle = "Te avisa al llegar al 80 % de un presupuesto y si te pasas",
+                            checked = assistant.budgetAlertsEnabled,
+                            onCheckedChange = { on -> onAssistantChange { it.copy(budgetAlertsEnabled = on) } }
+                        )
+                        SettingsDivider()
                         SettingsRow(
                             title = "Día de nómina",
                             subtitle = "El día que cobras te ayuda a organizar el dinero del mes",
@@ -386,6 +393,7 @@ private fun digestSummary(digest: DigestSettings): String = listOfNotNull(
 private fun assistantSummary(assistant: AssistantSettings): String = listOfNotNull(
     "Prioridades".takeIf { assistant.focusEnabled },
     "Pendientes".takeIf { assistant.leftoversEnabled },
+    "Presupuestos".takeIf { assistant.budgetAlertsEnabled },
     assistant.paydayDay?.let { "Nómina día $it" }
 ).joinToString(" · ").ifEmpty { "Sin preguntas" }
 
@@ -631,7 +639,7 @@ private fun LogoutDialog(loss: DataLossSummary, isLoggingOut: Boolean, onConfirm
         title = { Text("¿Cerrar sesión?") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Se borrarán de este móvil tus tareas, eventos, notas, ingresos y gastos, y el chat del asistente. Lo que ya está en Google volverá al entrar de nuevo.")
+                Text("Se borrarán de este móvil tus tareas, eventos, notas, ingresos, gastos y presupuestos, y el chat del asistente. Lo que ya está en Google volverá al entrar de nuevo.")
                 if (loss.unsyncedChanges > 0) {
                     Text(
                         "⚠️ ${changes(loss.unsyncedChanges)} aún sin subir a Google: se perderán.",

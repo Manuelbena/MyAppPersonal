@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.syncro.presentation.components.SheetDragHandle
 import com.syncro.presentation.components.GradientSheetInsets
+import com.syncro.domain.model.label
 import com.syncro.domain.model.Movement
 import com.syncro.domain.model.MovementCategory
 import com.syncro.domain.model.MovementType
@@ -47,7 +48,7 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 /** Lo que se teclea en el importe: hasta 10 cifras y, como mucho, dos decimales con coma o punto. */
-private val AMOUNT_INPUT = Regex("""^\d{0,10}([.,]\d{0,2})?$""")
+internal val AMOUNT_INPUT = Regex("""^\d{0,10}([.,]\d{0,2})?$""")
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -321,7 +322,7 @@ fun MovementContent(
 }
 
 /** Muestra " €" detrás de lo tecleado sin que forme parte del texto (el cursor nunca pasa del número). */
-private object EuroSuffix : VisualTransformation {
+internal object EuroSuffix : VisualTransformation {
     override fun filter(text: AnnotatedString): TransformedText {
         if (text.isEmpty()) return TransformedText(text, OffsetMapping.Identity)
         return TransformedText(

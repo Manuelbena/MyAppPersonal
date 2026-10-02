@@ -1,11 +1,14 @@
 package com.syncro.testutil
 
 import com.syncro.domain.model.AppSettings
+import com.syncro.domain.model.Budget
 import com.syncro.domain.model.DailyFocus
 import com.syncro.domain.model.DataLossSummary
 import com.syncro.domain.model.Movement
+import com.syncro.domain.model.MovementCategory
 import com.syncro.domain.model.SyncroItem
 import com.syncro.domain.repository.AccountDataRepository
+import com.syncro.domain.repository.BudgetRepository
 import com.syncro.domain.repository.DailyFocusRepository
 import com.syncro.domain.repository.SettingsRepository
 import com.syncro.domain.repository.EventRepository
@@ -207,6 +210,20 @@ class FakeMovementRepository : MovementRepository {
 
     override suspend fun deleteMovement(id: String) {
         movements.update { it - id }
+    }
+}
+
+class FakeBudgetRepository : BudgetRepository {
+    val budgets = MutableStateFlow<Map<MovementCategory, Budget>>(emptyMap())
+
+    override fun observeBudgets(): Flow<List<Budget>> = budgets.map { it.values.toList() }
+
+    override suspend fun saveBudget(budget: Budget) {
+        budgets.update { it + (budget.category to budget) }
+    }
+
+    override suspend fun deleteBudget(category: MovementCategory) {
+        budgets.update { it - category }
     }
 }
 

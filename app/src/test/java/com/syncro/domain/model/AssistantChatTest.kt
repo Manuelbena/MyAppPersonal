@@ -318,6 +318,28 @@ class AssistantChatTest {
     }
 
     @Test
+    fun `los avisos de presupuesto dicen la categoria, lo gastado y lo que queda`() {
+        val budget = Budget(MovementCategory.GROCERIES, 30_000)
+        val chat = assistantConversation(
+            DigestAnswer.ACCEPTED, true,
+            budgetAlerts = listOf(
+                BudgetAlert(budget, BudgetLevel.WARNING, DAY, 25_500),
+                BudgetAlert(budget, BudgetLevel.EXCEEDED, DAY.plusDays(2), 32_000)
+            )
+        )
+
+        val warning = chat.byId("budget-2026-09-GROCERIES-warning")!!.text
+        assertTrue(warning.contains("🛒 Supermercado"))
+        assertTrue(warning.contains("255,00 € de 300,00 € (85 %)"))
+        assertTrue(warning.contains("Te quedan 45,00 €"))
+        val exceeded = chat.byId("budget-2026-09-GROCERIES-exceeded")!!.text
+        assertTrue(exceeded.contains("Te has pasado"))
+        assertTrue(exceeded.contains("320,00 € de 300,00 €"))
+        // El de "te has pasado" va después: es de un día más tarde
+        assertTrue(chat.messages.indexOfFirst { it.id.endsWith("warning") } < chat.messages.indexOfFirst { it.id.endsWith("exceeded") })
+    }
+
+    @Test
     fun `sin nomina en Ajustes no hay mensajes de nomina`() {
         val chat = assistantConversation(DigestAnswer.ACCEPTED, true)
 

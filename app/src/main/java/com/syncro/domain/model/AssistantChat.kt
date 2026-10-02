@@ -1,6 +1,7 @@
 package com.syncro.domain.model
 
 import java.time.LocalDate
+import java.time.YearMonth
 
 /** Lo que el usuario contestó a "¿Te recuerdo tu día?". */
 enum class DigestAnswer { ACCEPTED, DECLINED }
@@ -62,6 +63,7 @@ data class AssistantConversation(val messages: List<ChatMessage>) {
  * @param focus las tareas de hoy entre las que elegir prioridades (null desde las 21:00)
  * @param focusHistory las prioridades ya elegidas (la de hoy y las recientes)
  * @param payday el último día de nómina si fue hace poco (null sin nómina en Ajustes)
+ * @param budgetAlerts los presupuestos que llegaron al 80 % o se pasaron hace poco
  * @param clearedIds mensajes que el usuario borró al vaciar el chat (no vuelven a salir)
  */
 fun assistantConversation(
@@ -72,6 +74,7 @@ fun assistantConversation(
     focus: FocusCandidates? = null,
     focusHistory: List<DailyFocus> = emptyList(),
     payday: Payday? = null,
+    budgetAlerts: List<BudgetAlert> = emptyList(),
     clearedIds: Set<String> = emptySet()
 ): AssistantConversation {
     val messages = digestMessages(answer, notificationsAllowed)
@@ -98,6 +101,8 @@ fun assistantConversation(
     }
     // La nómina, lo primero de su día: es lo que marca cómo se organiza el mes
     payday?.let { blocks += Moment(it.date, PAYDAY_ORDER) to paydayMessages(it) }
+    // Los avisos de presupuesto, el día en que se cruzó el umbral (detrás de lo demás de ese día)
+    budgetAlerts.forEach { blocks += Moment(it.date, BUDGET_ORDER) to listOf(budgetAlertMessage(it)) }
     blocks.sortedWith(compareBy({ it.first.day }, { it.first.order })).forEach { messages += it.second }
 
     return AssistantConversation(messages.filter { it.id !in clearedIds })
@@ -108,6 +113,7 @@ private data class Moment(val day: LocalDate, val order: Int)
 private const val PAYDAY_ORDER = -1
 private const val LEFTOVERS_ORDER = 0
 private const val FOCUS_ORDER = 1
+private const val BUDGET_ORDER = 2
 
 // region Avisos diarios
 
@@ -287,6 +293,31 @@ private fun salaryPlanText(salaryCents: Long): String {
 private fun pickFor(date: LocalDate, vararg options: String): String = options[date.dayOfYear % options.size]
 
 private fun paydayId(date: LocalDate) = "payday-$date"
+
+// endregion
+
+// region Presupuestos
+
+/**
+ * Aviso de un presupuesto: al 80 %, con lo que queda hasta fin de mes; al pasarse, sin sermones y
+ * con una salida (revisar en qué se ha ido o ajustar el límite).
+ */
+private fun budgetAlertMessage(alert: BudgetAlert): ChatMessage {
+    val budget = alert.budget
+    val name = "${budget.category.emoji} ${budget.category.label}"
+    val text = when (alert.level) {
+        BudgetLevel.EXCEEDED ->
+            "🚨 Te has pasado del presupuesto de $name: llevas ${euros(alert.spentCents)} de ${euros(budget.limitCents)}. " +
+                "No pasa nada: mira en Ahorros en qué se ha ido y, si hace falta, ajusta el límite para el mes que viene. 💪"
+        else -> {
+            val percent = alert.spentCents * 100 / budget.limitCents
+            "⚠️ Ojo con $name: llevas ${euros(alert.spentCents)} de ${euros(budget.limitCents)} ($percent %). " +
+                "Te quedan ${euros(budget.limitCents - alert.spentCents)} hasta fin de mes. 💡"
+        }
+    }
+    val level = if (alert.level == BudgetLevel.EXCEEDED) "exceeded" else "warning"
+    return assistant("budget-${YearMonth.from(alert.date)}-${budget.category.name}-$level", text)
+}
 
 // endregion
 

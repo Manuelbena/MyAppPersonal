@@ -28,7 +28,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.syncro.domain.model.label
+import com.syncro.domain.model.Budget
 import com.syncro.domain.model.MonthMovements
+import com.syncro.domain.model.budgetStatuses
 import com.syncro.domain.model.Movement
 import com.syncro.domain.model.MovementCategory
 import com.syncro.domain.model.MovementOccurrence
@@ -59,6 +62,7 @@ fun SavingsScreen(
 ) {
     val state by viewModel.state.collectAsState()
     val month by viewModel.currentMonth.collectAsState()
+    val budgets by viewModel.budgets.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -78,10 +82,16 @@ fun SavingsScreen(
         onDelete = viewModel::delete,
         openSalaryForm = openSalaryForm,
         onSalaryFormOpened = onSalaryFormOpened,
+        budgets = budgets,
+        onSaveBudget = viewModel::saveBudget,
+        onDeleteBudget = viewModel::deleteBudget,
         onShare = { scope.launch { context.shareMovementTicket(it, LocalDateTime.now()) } },
-        onShareMonth = { scope.launch { context.shareMonthStatement(it, LocalDateTime.now()) } }
+        onShareMonth = { scope.launch { context.shareMonthStatement(it, budgets, LocalDateTime.now()) } }
     )
 }
+
+/** El presupuesto que se abre en la hoja; [budget] null = crear uno nuevo. */
+private data class BudgetSheetTarget(val budget: Budget?)
 
 /** Qué movimiento se está viendo en detalle: el id y el día (un mensual sale en varios meses). */
 private data class SelectedOccurrence(val id: String, val date: LocalDate)
@@ -102,6 +112,9 @@ fun SavingsContent(
     onDelete: (id: String) -> Unit,
     onShare: (MovementOccurrence) -> Unit = {},
     onShareMonth: (MonthMovements) -> Unit = {},
+    budgets: List<Budget> = emptyList(),
+    onSaveBudget: (MovementCategory, Long) -> Unit = { _, _ -> },
+    onDeleteBudget: (MovementCategory) -> Unit = {},
     openSalaryForm: Boolean = false,
     onSalaryFormOpened: () -> Unit = {},
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() }
@@ -120,6 +133,8 @@ fun SavingsContent(
     // Se guarda el id y no el movimiento para que el detalle refleje los cambios al editarlo
     var selected by remember { mutableStateOf<SelectedOccurrence?>(null) }
     var editing by remember { mutableStateOf<Movement?>(null) }
+    // Presupuesto abierto: uno existente para cambiarlo, o null dentro para crear uno nuevo
+    var budgetSheet by remember { mutableStateOf<BudgetSheetTarget?>(null) }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -145,6 +160,14 @@ fun SavingsContent(
                 ) {
                     if (movements != null) {
                         item(key = "summary") { MonthSummaryCard(movements, onShare = { onShareMonth(movements) }) }
+                        item(key = "budgets") {
+                            BudgetsCard(
+                                statuses = movements.budgetStatuses(budgets),
+                                canAddMore = categoriesWithoutBudget(budgets).isNotEmpty(),
+                                onAdd = { budgetSheet = BudgetSheetTarget(null) },
+                                onOpen = { budgetSheet = BudgetSheetTarget(it) }
+                            )
+                        }
 
                         if (movements.occurrences.isEmpty()) {
                             item(key = "empty") { EmptyMonth() }
@@ -203,6 +226,22 @@ fun SavingsContent(
             onSave = { amountCents, category, date, note, repeatsMonthly ->
                 editing = null
                 onSave(movement.type, amountCents, category, date, note, repeatsMonthly, movement.id)
+            }
+        )
+    }
+
+    budgetSheet?.let { target ->
+        BudgetSheet(
+            existing = target.budget,
+            available = categoriesWithoutBudget(budgets),
+            onDismiss = { budgetSheet = null },
+            onSave = { category, limitCents ->
+                budgetSheet = null
+                onSaveBudget(category, limitCents)
+            },
+            onDelete = { category ->
+                budgetSheet = null
+                onDeleteBudget(category)
             }
         )
     }

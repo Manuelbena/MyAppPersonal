@@ -1,7 +1,12 @@
 package com.syncro.presentation.savings
 
 import android.content.Context
+import com.syncro.domain.model.emoji
+import com.syncro.domain.model.label
+import com.syncro.domain.model.Budget
+import com.syncro.domain.model.BudgetLevel
 import com.syncro.domain.model.MonthMovements
+import com.syncro.domain.model.budgetStatuses
 import com.syncro.domain.model.Movement
 import com.syncro.domain.model.MovementOccurrence
 import com.syncro.domain.model.MovementType
@@ -96,7 +101,7 @@ suspend fun Context.shareMovementTicket(occurrence: MovementOccurrence, issuedAt
  * por categoría (gastos e ingresos, con su %) y todos los movimientos. Los que aún no han llegado
  * a fecha de [issuedAt] se marcan con "*" (previstos).
  */
-fun monthStatement(month: MonthMovements, issuedAt: LocalDateTime): TicketContent {
+fun monthStatement(month: MonthMovements, issuedAt: LocalDateTime, budgets: List<Budget> = emptyList()): TicketContent {
     val today = issuedAt.toLocalDate()
     val hasUpcoming = month.occurrences.any { it.date.isAfter(today) }
     return TicketContent(
@@ -119,6 +124,23 @@ fun monthStatement(month: MonthMovements, issuedAt: LocalDateTime): TicketConten
                         totals.forEach { add(TicketBlock.Row(it.category.label, "${formatEuros(it.cents)} · ${it.percent} %")) }
                     }
                 }
+
+            // Presupuestos: lo gastado frente al límite de cada uno; "PASADO" si se superó
+            val statuses = month.budgetStatuses(budgets)
+            if (statuses.isNotEmpty()) {
+                add(TicketBlock.Rule)
+                add(TicketBlock.Heading("PRESUPUESTOS"))
+                statuses.forEach { status ->
+                    val over = if (status.level == BudgetLevel.EXCEEDED) " · PASADO" else ""
+                    add(
+                        TicketBlock.Row(
+                            status.budget.category.label,
+                            "${formatEuros(status.spentCents)} / ${formatEuros(status.budget.limitCents)} · ${status.percent} %$over",
+                            labelWeight = 0.35f
+                        )
+                    )
+                }
+            }
 
             add(TicketBlock.Rule)
             add(TicketBlock.Heading("MOVIMIENTOS (${month.occurrences.size})"))
@@ -155,7 +177,7 @@ fun monthStatement(month: MonthMovements, issuedAt: LocalDateTime): TicketConten
  * 🏆 Mayor gasto: 🏠 Vivienda (75 %)
  * ✨ _Enviado con Syncro_
  */
-fun monthShareText(month: MonthMovements): String = buildString {
+fun monthShareText(month: MonthMovements, budgets: List<Budget> = emptyList()): String = buildString {
     appendLine("/// 📊 *RESUMEN DE ${month.monthName().uppercase(SPANISH)}* ///")
     appendLine("💰 Ingresos: *${formatSignedEuros(month.incomeCents, MovementType.INCOME)}*")
     appendLine("💸 Gastos: *${formatSignedEuros(month.expenseCents, MovementType.EXPENSE)}*")
@@ -171,13 +193,20 @@ fun monthShareText(month: MonthMovements): String = buildString {
     month.totalsByCategory(MovementType.EXPENSE).firstOrNull()?.let { top ->
         appendLine("🏆 Mayor gasto: ${top.category.emoji} ${top.category.label} (${top.percent} %)")
     }
+    val statuses = month.budgetStatuses(budgets)
+    if (statuses.isNotEmpty()) {
+        val ok = statuses.count { it.level != BudgetLevel.EXCEEDED }
+        val exceeded = statuses.filter { it.level == BudgetLevel.EXCEEDED }
+        append("🎯 Presupuestos: *$ok de ${statuses.size}* dentro del límite")
+        appendLine(if (exceeded.isEmpty()) " ✅" else " (🚨 ${exceeded.joinToString(", ") { it.budget.category.label }})")
+    }
     append(SIGNATURE)
 }
 
-suspend fun Context.shareMonthStatement(month: MonthMovements, issuedAt: LocalDateTime) =
+suspend fun Context.shareMonthStatement(month: MonthMovements, budgets: List<Budget>, issuedAt: LocalDateTime) =
     shareTicket(
-        ticket = monthStatement(month, issuedAt),
-        caption = monthShareText(month),
+        ticket = monthStatement(month, issuedAt, budgets),
+        caption = monthShareText(month, budgets),
         fileName = "resumen-${month.month}",
         chooserTitle = "Compartir resumen del mes"
     )

@@ -129,6 +129,18 @@ class MigrationTest {
         assertEquals(0, db.movementDao.count())
     }
 
+    @Test
+    fun `migrar de la version 14 conserva los movimientos y crea presupuestos vacios`() = runTest {
+        createDatabase(Schema14.CREATE_STATEMENTS, Schema14.VERSION) {
+            execSQL("INSERT INTO movements (id, type, amountCents, category, date, note, repeatsMonthly) VALUES ('m1', 'EXPENSE', 4590, 'GROCERIES', ${DAY.toEpochDay()}, 'Mercadona', 0)")
+        }
+
+        val db = openCurrentVersion()
+
+        assertEquals(1, db.movementDao.count())
+        assertTrue(db.budgetDao.observeBudgets().first().isEmpty())
+    }
+
     private fun createVersion9Database(seed: SQLiteDatabase.() -> Unit) =
         createDatabase(Schema9.CREATE_STATEMENTS, Schema9.VERSION, seed)
 
@@ -153,7 +165,7 @@ class MigrationTest {
     /** Igual que en AppModule pero sin fallbackToDestructiveMigration: un fallo debe verse. */
     private fun openCurrentVersion(): SyncroDatabase =
         Room.databaseBuilder(context, SyncroDatabase::class.java, DB_NAME)
-            .addMigrations(MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14)
+            .addMigrations(MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15)
             .allowMainThreadQueries()
             .build()
             .also { database = it }

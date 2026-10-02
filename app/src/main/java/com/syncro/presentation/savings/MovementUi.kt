@@ -13,30 +13,9 @@ import com.syncro.domain.model.euros
 import com.syncro.presentation.theme.*
 
 /*
- * Cómo se ven los movimientos: nombre, icono y color de cada categoría, y los importes en euros.
+ * Cómo se ven los movimientos: icono y color de cada categoría (el nombre y el emoji están en el
+ * dominio, MovementLabels.kt) y los importes en euros.
  */
-
-val MovementCategory.label: String
-    get() = when (this) {
-        HOUSING -> "Vivienda"
-        BILLS -> "Facturas"
-        GROCERIES -> "Supermercado"
-        TRANSPORT -> "Transporte"
-        RESTAURANTS -> "Restaurantes"
-        LEISURE -> "Ocio"
-        SUBSCRIPTIONS -> "Suscripciones"
-        HEALTH -> "Salud"
-        SHOPPING -> "Compras"
-        EDUCATION -> "Educación"
-        OTHER_EXPENSE -> "Otros"
-        SALARY -> "Nómina"
-        EXTRA_WORK -> "Trabajos extra"
-        SALES -> "Ventas"
-        REFUNDS -> "Devoluciones"
-        GIFTS -> "Regalos"
-        INVESTMENTS -> "Inversiones"
-        OTHER_INCOME -> "Otros"
-    }
 
 val MovementCategory.icon: ImageVector
     get() = when (this) {
@@ -79,28 +58,6 @@ val MovementCategory.color: Color
         GIFTS -> Pink500
         INVESTMENTS -> Violet500
         OTHER_EXPENSE, OTHER_INCOME -> Slate500
-    }
-
-/** Emoji de la categoría, para los textos que se comparten (WhatsApp no muestra iconos). */
-val MovementCategory.emoji: String
-    get() = when (this) {
-        HOUSING -> "🏠"
-        BILLS -> "⚡"
-        GROCERIES -> "🛒"
-        TRANSPORT -> "🚗"
-        RESTAURANTS -> "🍽️"
-        LEISURE -> "🎮"
-        SUBSCRIPTIONS -> "🔁"
-        HEALTH -> "💊"
-        SHOPPING -> "🛍️"
-        EDUCATION -> "🎓"
-        SALARY -> "💼"
-        EXTRA_WORK -> "🛠️"
-        SALES -> "🏷️"
-        REFUNDS -> "↩️"
-        GIFTS -> "🎁"
-        INVESTMENTS -> "📈"
-        OTHER_EXPENSE, OTHER_INCOME -> "📦"
     }
 
 /** Verde lo que entra, rojo lo que sale. */

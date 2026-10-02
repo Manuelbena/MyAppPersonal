@@ -117,7 +117,9 @@ class SettingsContentTest {
         compose.onNodeWithText("Prioridades del día").performClick()
 
         assertEquals(DigestSettings(morningEnabled = false), settings.digest)
-        assertEquals(AssistantSettings(focusEnabled = false), settings.assistant)
+        compose.onNodeWithText("Avisos de presupuesto").performClick()
+
+        assertEquals(AssistantSettings(focusEnabled = false, budgetAlertsEnabled = false), settings.assistant)
     }
 
     @Test

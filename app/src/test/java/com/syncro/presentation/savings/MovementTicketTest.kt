@@ -1,5 +1,6 @@
 package com.syncro.presentation.savings
 
+import com.syncro.domain.model.Budget
 import com.syncro.domain.model.MovementCategory
 import com.syncro.domain.model.MovementOccurrence
 import com.syncro.domain.model.MovementType
@@ -151,6 +152,17 @@ class MovementTicketTest {
 
         assertEquals(listOf("01/10 Nómina", "01/10 Alquiler", "02/10 Supermercado", "28/10 Seguro *"), labels)
         assertTrue(statement.footer.contains("* Previsto: aún no ha llegado."))
+    }
+
+    @Test
+    fun `el resumen incluye los presupuestos y el pie de foto cuantos van bien`() {
+        val budgets = listOf(Budget(MovementCategory.HOUSING, 70_000), Budget(MovementCategory.GROCERIES, 30_000))
+        val statement = monthStatement(october, issuedAt, budgets)
+
+        assertTrue(statement.blocks.contains(Heading("PRESUPUESTOS")))
+        assertTrue(statement.blocks.contains(Row("Vivienda", "750,00$nbsp€ / 700,00$nbsp€ · 107 % · PASADO", labelWeight = 0.35f)))
+        assertTrue(statement.blocks.contains(Row("Supermercado", "150,00$nbsp€ / 300,00$nbsp€ · 50 %", labelWeight = 0.35f)))
+        assertTrue(monthShareText(october, budgets).contains("🎯 Presupuestos: *1 de 2* dentro del límite (🚨 Vivienda)"))
     }
 
     @Test

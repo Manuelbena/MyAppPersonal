@@ -17,6 +17,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.syncro.domain.model.label
 import com.syncro.domain.model.MovementOccurrence
 import com.syncro.domain.model.MovementType
 import com.syncro.presentation.components.DeleteItemButton

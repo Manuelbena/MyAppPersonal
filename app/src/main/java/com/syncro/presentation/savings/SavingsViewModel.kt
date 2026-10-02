@@ -2,10 +2,14 @@ package com.syncro.presentation.savings
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.syncro.domain.model.Budget
 import com.syncro.domain.model.MonthMovements
 import com.syncro.domain.model.MovementCategory
 import com.syncro.domain.model.MovementType
+import com.syncro.domain.usecase.DeleteBudgetUseCase
 import com.syncro.domain.usecase.DeleteMovementUseCase
+import com.syncro.domain.usecase.GetBudgetsUseCase
+import com.syncro.domain.usecase.SaveBudgetUseCase
 import com.syncro.domain.usecase.GetMonthMovementsUseCase
 import com.syncro.domain.usecase.SaveMovementUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -24,6 +28,9 @@ class SavingsViewModel @Inject constructor(
     getMonthMovementsUseCase: GetMonthMovementsUseCase,
     private val saveMovementUseCase: SaveMovementUseCase,
     private val deleteMovementUseCase: DeleteMovementUseCase,
+    getBudgetsUseCase: GetBudgetsUseCase,
+    private val saveBudgetUseCase: SaveBudgetUseCase,
+    private val deleteBudgetUseCase: DeleteBudgetUseCase,
     private val clock: Clock
 ) : ViewModel() {
 
@@ -67,6 +74,25 @@ class SavingsViewModel @Inject constructor(
             // Se ve el mes donde ha caído lo que se acaba de apuntar
             if (result.isSuccess) month.value = YearMonth.from(date)
         }
+    }
+
+    /** Los presupuestos por categoría (valen para todos los meses). */
+    val budgets: StateFlow<List<Budget>> = getBudgetsUseCase()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    fun saveBudget(category: MovementCategory, limitCents: Long) {
+        viewModelScope.launch {
+            _messages.send(
+                saveBudgetUseCase(category, limitCents).fold(
+                    onSuccess = { "Presupuesto guardado" },
+                    onFailure = { it.message ?: "No se pudo guardar el presupuesto" }
+                )
+            )
+        }
+    }
+
+    fun deleteBudget(category: MovementCategory) {
+        viewModelScope.launch { deleteBudgetUseCase(category) }
     }
 
     fun delete(id: String) {

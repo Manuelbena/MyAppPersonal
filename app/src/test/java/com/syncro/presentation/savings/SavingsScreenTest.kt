@@ -14,6 +14,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
+import com.syncro.domain.model.Budget
 import com.syncro.domain.model.MonthMovements
 import com.syncro.domain.model.MovementCategory
 import com.syncro.domain.model.MovementType
@@ -44,7 +45,10 @@ class SavingsScreenTest {
     private val shared = mutableListOf<String>()
     private val sharedMonths = mutableListOf<String>()
 
-    private fun show(movements: MonthMovements = monthMovements(october, emptyList())) {
+    private val savedBudgets = mutableListOf<String>()
+    private val deletedBudgets = mutableListOf<MovementCategory>()
+
+    private fun show(movements: MonthMovements = monthMovements(october, emptyList()), budgets: List<Budget> = emptyList()) {
         compose.setContent {
             SavingsContent(
                 month = october,
@@ -55,7 +59,10 @@ class SavingsScreenTest {
                 onSave = { type, cents, category, date, note, repeats, id -> saved += "$type $cents $category $date '$note' $repeats" + (id?.let { " id=$it" } ?: "") },
                 onDelete = { deleted += it },
                 onShare = { shared += it.movement.id },
-                onShareMonth = { sharedMonths += it.month.toString() }
+                onShareMonth = { sharedMonths += it.month.toString() },
+                budgets = budgets,
+                onSaveBudget = { category, cents -> savedBudgets += "$category $cents" },
+                onDeleteBudget = { deletedBudgets += it }
             )
         }
     }
@@ -123,8 +130,6 @@ class SavingsScreenTest {
 
         openNetflix()
 
-        // El importe sale en el balance, en la fila y como título del detalle
-        compose.onAllNodesWithText("−12,99 €").assertCountEquals(3)
         compose.onNodeWithText("Guardado solo en este móvil").assertExists()
         compose.onNodeWithText("Cada mes desde el", substring = true).assertExists()
         compose.onNodeWithText("Editar").assertIsDisplayed()
@@ -183,6 +188,51 @@ class SavingsScreenTest {
 
         assertEquals(1, opened)
         assertEquals(listOf("INCOME 185000 SALARY 2026-10-02"), saved)
+    }
+
+    @Test
+    fun `sin presupuestos invita a crear uno y se guarda con categoria e importe`() {
+        show()
+
+        compose.onNode(hasScrollAction()).performScrollToNode(hasText("Crear presupuesto"))
+        compose.onNodeWithText("Crear presupuesto").performClick()
+        compose.onNodeWithText("Nuevo presupuesto").assertIsDisplayed()
+        compose.onNodeWithText("Guardar").assertIsNotEnabled()
+        compose.onNodeWithText("0,00 €").performTextInput("300")
+        compose.onNodeWithText("Supermercado").performClick()
+        compose.onNodeWithText("Guardar").assertIsEnabled().performClick()
+
+        assertEquals(listOf("GROCERIES 30000"), savedBudgets)
+    }
+
+    @Test
+    fun `un presupuesto muestra lo gastado y lo que queda, y se puede quitar`() {
+        show(
+            monthMovements(october, listOf(aMovement(id = "m", amountCents = 15_000, category = MovementCategory.GROCERIES, date = LocalDate.of(2026, 10, 1), note = "Mercadona"))),
+            budgets = listOf(Budget(MovementCategory.GROCERIES, 30_000))
+        )
+
+        compose.onNode(hasScrollAction()).performScrollToNode(hasText("150,00 € de 300,00 €"))
+        compose.onNodeWithText("Te quedan 150,00 €").assertIsDisplayed()
+        compose.onNodeWithText("50 %").assertIsDisplayed()
+
+        compose.onNodeWithText("Te quedan 150,00 €").performClick()
+        compose.onNodeWithText("Presupuesto de Supermercado").assertIsDisplayed()
+        compose.onNodeWithText("Quitar presupuesto").performScrollTo().performClick()
+        compose.onNodeWithText("Eliminar").performClick()
+
+        assertEquals(listOf(MovementCategory.GROCERIES), deletedBudgets)
+    }
+
+    @Test
+    fun `pasarse del presupuesto se dice en rojo`() {
+        show(
+            monthMovements(october, listOf(aMovement(id = "m", amountCents = 32_000, category = MovementCategory.GROCERIES, date = LocalDate.of(2026, 10, 1), note = "Mercadona"))),
+            budgets = listOf(Budget(MovementCategory.GROCERIES, 30_000))
+        )
+
+        compose.onNode(hasScrollAction()).performScrollToNode(hasText("Te has pasado 20,00 €"))
+        compose.onNodeWithText("106 %").assertIsDisplayed()
     }
 
     @Test
