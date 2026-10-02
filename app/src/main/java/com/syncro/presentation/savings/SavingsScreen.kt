@@ -13,6 +13,7 @@ import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.rounded.TrendingDown
 import androidx.compose.material.icons.automirrored.rounded.TrendingUp
 import androidx.compose.material.icons.outlined.Savings
+import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -38,6 +39,7 @@ import com.syncro.presentation.home.components.AddOptionItem
 import com.syncro.presentation.home.components.AddOptionsSheet
 import com.syncro.presentation.theme.Emerald500
 import com.syncro.presentation.theme.Rose500
+import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.YearMonth
@@ -53,6 +55,7 @@ fun SavingsScreen(viewModel: SavingsViewModel = hiltViewModel()) {
     val month by viewModel.currentMonth.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(viewModel) {
         viewModel.messages.collect { snackbarHostState.showSnackbar(it, duration = SnackbarDuration.Short) }
@@ -67,7 +70,8 @@ fun SavingsScreen(viewModel: SavingsViewModel = hiltViewModel()) {
         onNextMonth = viewModel::nextMonth,
         onSave = viewModel::save,
         onDelete = viewModel::delete,
-        onPrint = { context.printMovementTicket(it, LocalDateTime.now()) }
+        onShare = { scope.launch { context.shareMovementTicket(it, LocalDateTime.now()) } },
+        onShareMonth = { scope.launch { context.shareMonthStatement(it, LocalDateTime.now()) } }
     )
 }
 
@@ -77,7 +81,7 @@ private data class SelectedOccurrence(val id: String, val date: LocalDate)
 /**
  * Ahorros: el mes con su resumen (ingresos, gastos, balance y tasa de ahorro), sus movimientos
  * por día y el "+" para apuntar uno nuevo. Tocar un movimiento abre su detalle, desde donde se
- * edita, se imprime su ticket o se borra.
+ * edita, se comparte su ticket (imagen para WhatsApp, etc.) o se borra.
  */
 @Composable
 fun SavingsContent(
@@ -88,7 +92,8 @@ fun SavingsContent(
     onNextMonth: () -> Unit,
     onSave: (type: MovementType, amountCents: Long, category: MovementCategory, date: LocalDate, note: String, repeatsMonthly: Boolean, id: String?) -> Unit,
     onDelete: (id: String) -> Unit,
-    onPrint: (MovementOccurrence) -> Unit = {},
+    onShare: (MovementOccurrence) -> Unit = {},
+    onShareMonth: (MonthMovements) -> Unit = {},
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() }
 ) {
     var showAddSheet by remember { mutableStateOf(false) }
@@ -114,7 +119,7 @@ fun SavingsContent(
                 SavingsHeader(month, onPreviousMonth, onNextMonth)
             }
             if (movements != null) {
-                item(key = "summary") { MonthSummaryCard(movements) }
+                item(key = "summary") { MonthSummaryCard(movements, onShare = { onShareMonth(movements) }) }
 
                 if (movements.occurrences.isEmpty()) {
                     item(key = "empty") { EmptyMonth() }
@@ -179,7 +184,7 @@ fun SavingsContent(
                     selected = null
                     editing = occurrence.movement
                 },
-                onPrint = { onPrint(occurrence) },
+                onShare = { onShare(occurrence) },
                 onDelete = {
                     selected = null
                     onDelete(occurrence.movement.id)
@@ -249,7 +254,7 @@ private fun SavingsHeader(month: YearMonth, onPrevious: () -> Unit, onNext: () -
  * tasa de ahorro (qué parte de lo que entra se queda).
  */
 @Composable
-private fun MonthSummaryCard(movements: MonthMovements) {
+private fun MonthSummaryCard(movements: MonthMovements, onShare: (() -> Unit)? = null) {
     val balance = movements.balanceCents
     val balanceColor = when {
         balance > 0 -> Emerald500
@@ -299,6 +304,21 @@ private fun MonthSummaryCard(movements: MonthMovements) {
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurface
                 )
+            }
+            // El extracto del mes (imagen para WhatsApp, etc.); sin movimientos no hay nada que resumir
+            if (onShare != null && movements.occurrences.isNotEmpty()) {
+                Spacer(Modifier.height(14.dp))
+                OutlinedButton(
+                    onClick = onShare,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp),
+                    border = BorderStroke(1.dp, accent.copy(alpha = 0.5f)),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = accent)
+                ) {
+                    Icon(Icons.Rounded.Share, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Compartir resumen del mes", fontWeight = FontWeight.SemiBold)
+                }
             }
         }
     }

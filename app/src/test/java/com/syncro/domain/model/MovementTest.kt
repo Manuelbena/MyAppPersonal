@@ -98,6 +98,30 @@ class MovementTest {
     }
 
     @Test
+    fun `el desglose suma cada categoria de un tipo, de mayor a menor, con su porcentaje`() {
+        val october = YearMonth.of(2026, 10)
+        val month = monthMovements(
+            october,
+            listOf(
+                aMovement(id = "s1", amountCents = 2_000, category = MovementCategory.GROCERIES, date = LocalDate.of(2026, 10, 1)),
+                aMovement(id = "s2", amountCents = 1_000, category = MovementCategory.GROCERIES, date = LocalDate.of(2026, 10, 9)),
+                aMovement(id = "o", amountCents = 1_000, category = MovementCategory.LEISURE, date = LocalDate.of(2026, 10, 3)),
+                // Los ingresos no entran en el desglose de gastos
+                aMovement(id = "n", type = MovementType.INCOME, amountCents = 99_000, category = MovementCategory.SALARY, date = LocalDate.of(2026, 10, 1))
+            )
+        )
+
+        assertEquals(
+            listOf(
+                CategoryTotal(MovementCategory.GROCERIES, 3_000, 75),
+                CategoryTotal(MovementCategory.LEISURE, 1_000, 25)
+            ),
+            month.totalsByCategory(MovementType.EXPENSE)
+        )
+        assertEquals(emptyList<CategoryTotal>(), monthMovements(october, emptyList()).totalsByCategory(MovementType.INCOME))
+    }
+
+    @Test
     fun `sin ingresos no hay tasa de ahorro, y gastar de mas la hace negativa`() {
         val october = YearMonth.of(2026, 10)
         assertNull(monthMovements(october, listOf(aMovement(date = LocalDate.of(2026, 10, 1)))).savingsRatePercent)

@@ -12,7 +12,7 @@ import androidx.compose.material.icons.rounded.EventRepeat
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Event
 import androidx.compose.material.icons.rounded.PhoneAndroid
-import androidx.compose.material.icons.rounded.Print
+import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -37,7 +37,7 @@ fun MovementDetailSheet(
     occurrence: MovementOccurrence,
     onDismiss: () -> Unit,
     onEdit: () -> Unit,
-    onPrint: () -> Unit,
+    onShare: () -> Unit,
     onDelete: () -> Unit
 ) {
     ModalBottomSheet(
@@ -50,19 +50,19 @@ fun MovementDetailSheet(
         containerColor = MaterialTheme.colorScheme.surface,
         shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
     ) {
-        MovementDetailContent(occurrence, onEdit = onEdit, onPrint = onPrint, onDelete = onDelete)
+        MovementDetailContent(occurrence, onEdit = onEdit, onShare = onShare, onDelete = onDelete)
     }
 }
 
 /**
  * Detalle de un ingreso o gasto, con el mismo estilo que el de un evento: el importe como título
- * sobre el color de su categoría, sus datos y las acciones (editar, imprimir el ticket, borrar).
+ * sobre el color de su categoría, sus datos y las acciones (editar, compartir el ticket, borrar).
  */
 @Composable
 fun MovementDetailContent(
     occurrence: MovementOccurrence,
     onEdit: () -> Unit,
-    onPrint: () -> Unit,
+    onShare: () -> Unit,
     onDelete: () -> Unit
 ) {
     val movement = occurrence.movement
@@ -90,7 +90,7 @@ fun MovementDetailContent(
             },
             actions = {
                 QuickAction(Icons.Rounded.Edit, "Editar", accent, filled = true, onClick = onEdit, modifier = Modifier.weight(1f))
-                QuickAction(Icons.Rounded.Print, "Ticket", accent, onClick = onPrint, modifier = Modifier.weight(1f))
+                QuickAction(Icons.Rounded.Share, "Compartir", accent, onClick = onShare, modifier = Modifier.weight(1f))
             }
         )
 

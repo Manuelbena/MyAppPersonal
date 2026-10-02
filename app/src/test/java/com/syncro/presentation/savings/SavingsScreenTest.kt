@@ -41,7 +41,8 @@ class SavingsScreenTest {
     private val october = YearMonth.of(2026, 10)
     private val saved = mutableListOf<String>()
     private val deleted = mutableListOf<String>()
-    private val printed = mutableListOf<String>()
+    private val shared = mutableListOf<String>()
+    private val sharedMonths = mutableListOf<String>()
 
     private fun show(movements: MonthMovements = monthMovements(october, emptyList())) {
         compose.setContent {
@@ -53,7 +54,8 @@ class SavingsScreenTest {
                 onNextMonth = {},
                 onSave = { type, cents, category, date, note, repeats, id -> saved += "$type $cents $category $date '$note' $repeats" + (id?.let { " id=$it" } ?: "") },
                 onDelete = { deleted += it },
-                onPrint = { printed += it.movement.id }
+                onShare = { shared += it.movement.id },
+                onShareMonth = { sharedMonths += it.month.toString() }
             )
         }
     }
@@ -116,26 +118,26 @@ class SavingsScreenTest {
     }
 
     @Test
-    fun `tocar un movimiento abre su detalle con importe, editar y ticket`() {
+    fun `tocar un movimiento abre su detalle con importe, editar y compartir`() {
         show(monthMovements(october, listOf(netflix)))
 
-        compose.onNodeWithText("Netflix").performClick()
+        openNetflix()
 
         // El importe sale en el balance, en la fila y como título del detalle
         compose.onAllNodesWithText("−12,99 €").assertCountEquals(3)
         compose.onNodeWithText("Guardado solo en este móvil").assertExists()
         compose.onNodeWithText("Cada mes desde el", substring = true).assertExists()
         compose.onNodeWithText("Editar").assertIsDisplayed()
-        compose.onNodeWithText("Ticket").performClick()
+        compose.onNodeWithText("Compartir").performClick()
 
-        assertEquals(listOf("netflix"), printed)
+        assertEquals(listOf("netflix"), shared)
     }
 
     @Test
     fun `borrar desde el detalle avisa de que un mensual se quita de todos los meses`() {
         show(monthMovements(october, listOf(netflix)))
 
-        compose.onNodeWithText("Netflix").performClick()
+        openNetflix()
         compose.onNodeWithText("Eliminar gasto").performScrollTo().performClick()
         compose.onNodeWithText("se quitará de todos los meses", substring = true).assertIsDisplayed()
         compose.onNodeWithText("Eliminar").performClick()
@@ -147,7 +149,7 @@ class SavingsScreenTest {
     fun `editar abre el formulario relleno y guarda con el mismo id`() {
         show(monthMovements(october, listOf(netflix)))
 
-        compose.onNodeWithText("Netflix").performClick()
+        openNetflix()
         compose.onNodeWithText("Editar").performClick()
 
         compose.onNodeWithText("Editar gasto").assertIsDisplayed()
@@ -155,6 +157,28 @@ class SavingsScreenTest {
         compose.onNodeWithText("Guardar").assertIsEnabled().performClick()
 
         assertEquals(listOf("EXPENSE 1299 SUBSCRIPTIONS 2026-10-01 'Netflix' true id=netflix"), saved)
+    }
+
+    @Test
+    fun `con movimientos se puede compartir el resumen del mes`() {
+        show(monthMovements(october, listOf(netflix)))
+
+        compose.onNodeWithText("Compartir resumen del mes").performClick()
+
+        assertEquals(listOf("2026-10"), sharedMonths)
+    }
+
+    @Test
+    fun `un mes sin movimientos no ofrece compartir el resumen`() {
+        show()
+
+        compose.onNodeWithText("Compartir resumen del mes").assertDoesNotExist()
+    }
+
+    /** La lista es perezosa y la pantalla del test es pequeña: se baja hasta la fila antes de tocarla. */
+    private fun openNetflix() {
+        compose.onNode(hasScrollAction()).performScrollToNode(hasText("Netflix"))
+        compose.onNodeWithText("Netflix").performClick()
     }
 
     private val netflix = aMovement(

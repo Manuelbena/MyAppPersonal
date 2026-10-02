@@ -118,7 +118,7 @@ private val privacyPolicy = LegalDocument(
             listOf(
                 "Solo con Google, que es quien presta el inicio de sesión y los servicios de Calendar y Tasks, y con quien ya tienes una relación como usuario. Google trata esos datos según su propia política de privacidad (policies.google.com/privacy).",
                 "Google puede tratar datos fuera del Espacio Económico Europeo, con las garantías que recoge su política, como el Marco de Privacidad de Datos UE-EE. UU. y las cláusulas contractuales tipo de la Comisión Europea.",
-                "Tickets: si imprimes el ticket de un ingreso o gasto, sus datos se envían solo a la impresora o al servicio de impresión que elijas en el diálogo de Android (o se guardan como PDF en tu móvil). La app no los envía a ningún otro sitio.",
+                "Tickets y resúmenes: si compartes el ticket de un ingreso o gasto o el resumen de un mes, se crea una imagen con sus datos en el almacenamiento temporal de la app y se envía solo a la app que elijas en el menú de compartir de Android (por ejemplo WhatsApp o el correo), que la tratará según su propia política. La app no la envía a ningún otro sitio.",
                 "Copias de seguridad: si tienes activada la copia de seguridad de Android, el sistema puede incluir los datos de la app (entre ellos las notas, los ingresos y gastos y la sesión) en la copia de tu cuenta de Google. Puedes desactivarla en los ajustes del móvil."
             )
         ),

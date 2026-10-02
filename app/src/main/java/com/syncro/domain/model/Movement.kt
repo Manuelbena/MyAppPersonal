@@ -2,6 +2,7 @@ package com.syncro.domain.model
 
 import java.time.LocalDate
 import java.time.YearMonth
+import kotlin.math.roundToInt
 
 /*
  * Ahorros: ingresos y gastos. Solo euros. Los importes se guardan en céntimos enteros (Long): con
@@ -90,6 +91,26 @@ data class MonthMovements(val month: YearMonth, val occurrences: List<MovementOc
      */
     val savingsRatePercent: Int?
         get() = if (incomeCents <= 0) null else (balanceCents * 100 / incomeCents).toInt()
+}
+
+/** Lo que suma una categoría en el mes y qué parte es del total de su tipo (en %, redondeado). */
+data class CategoryTotal(val category: MovementCategory, val cents: Long, val percent: Int)
+
+/**
+ * Desglose del mes por categoría para un tipo (gastos o ingresos), de mayor a menor. Los % se
+ * redondean, así que pueden no sumar exactamente 100.
+ */
+fun MonthMovements.totalsByCategory(type: MovementType): List<CategoryTotal> {
+    val ofType = occurrences.filter { it.movement.type == type }
+    val total = ofType.sumOf { it.movement.amountCents }
+    if (total == 0L) return emptyList()
+    return ofType
+        .groupBy { it.movement.category }
+        .map { (category, items) ->
+            val cents = items.sumOf { it.movement.amountCents }
+            CategoryTotal(category, cents, ((cents * 100.0) / total).roundToInt())
+        }
+        .sortedByDescending { it.cents }
 }
 
 fun monthMovements(month: YearMonth, movements: List<Movement>): MonthMovements = MonthMovements(
