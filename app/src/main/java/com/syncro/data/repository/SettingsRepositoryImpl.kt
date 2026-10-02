@@ -5,6 +5,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.syncro.data.local.toLocalTimeOrMidnight
@@ -33,6 +34,7 @@ class SettingsRepositoryImpl @Inject constructor(
     private val EVENING_TIME = stringPreferencesKey("digest_evening_time")
     private val FOCUS_ENABLED = booleanPreferencesKey("assistant_focus_enabled")
     private val LEFTOVERS_ENABLED = booleanPreferencesKey("assistant_leftovers_enabled")
+    private val PAYDAY_DAY = intPreferencesKey("assistant_payday_day")
 
     override val settings: Flow<AppSettings> = context.settingsDataStore.data.map { prefs ->
         val defaults = AppSettings()
@@ -45,7 +47,8 @@ class SettingsRepositoryImpl @Inject constructor(
             ),
             assistant = AssistantSettings(
                 focusEnabled = prefs[FOCUS_ENABLED] ?: defaults.assistant.focusEnabled,
-                leftoversEnabled = prefs[LEFTOVERS_ENABLED] ?: defaults.assistant.leftoversEnabled
+                leftoversEnabled = prefs[LEFTOVERS_ENABLED] ?: defaults.assistant.leftoversEnabled,
+                paydayDay = prefs[PAYDAY_DAY]?.takeIf { it in 1..31 }
             )
         )
     }
@@ -58,6 +61,9 @@ class SettingsRepositoryImpl @Inject constructor(
             prefs[EVENING_TIME] = settings.digest.eveningTime.toStoredTime()
             prefs[FOCUS_ENABLED] = settings.assistant.focusEnabled
             prefs[LEFTOVERS_ENABLED] = settings.assistant.leftoversEnabled
+            // Sin nómina no se guarda nada: así lo de fábrica (null) vuelve tal cual
+            val payday = settings.assistant.paydayDay
+            if (payday != null) prefs[PAYDAY_DAY] = payday else prefs.remove(PAYDAY_DAY)
         }
     }
 }

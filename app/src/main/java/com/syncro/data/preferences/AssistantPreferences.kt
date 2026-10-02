@@ -11,6 +11,7 @@ import com.syncro.domain.model.DigestAnswer
 import com.syncro.domain.model.LeftoverChoice
 import com.syncro.domain.model.LeftoverOutcome
 import com.syncro.domain.model.MoveTarget
+import com.syncro.domain.model.PaydayAnswer
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -22,7 +23,7 @@ import javax.inject.Singleton
 private val Context.assistantDataStore: DataStore<Preferences> by preferencesDataStore(name = "notification_prefs")
 
 /**
- * Estado del chat del asistente: qué contestó el usuario a los avisos diarios, qué decidió en cada
+ * Estado del chat del asistente: qué contestó el usuario a los avisos diarios y el día de nómina, qué decidió en cada
  * repaso de tareas pendientes y qué mensajes ya ha visto o ha borrado.
  */
 @Singleton
@@ -48,6 +49,20 @@ class AssistantPreferences @Inject constructor(
             if (!key.name.startsWith(OUTCOME_PREFIX)) return@mapNotNull null
             decodeOutcome(key.name.removePrefix(OUTCOME_PREFIX), value as? String ?: return@mapNotNull null)
         }
+    }
+
+    /** Lo contestado cada día de nómina; una clave por día ("payday_2026-10-28"). */
+    val paydayAnswers: Flow<Map<LocalDate, PaydayAnswer>> = context.assistantDataStore.data.map { prefs ->
+        prefs.asMap().mapNotNull { (key, value) ->
+            if (!key.name.startsWith(PAYDAY_PREFIX)) return@mapNotNull null
+            runCatching {
+                LocalDate.parse(key.name.removePrefix(PAYDAY_PREFIX)) to PaydayAnswer.valueOf(value as String)
+            }.getOrNull()
+        }.toMap()
+    }
+
+    suspend fun savePaydayAnswer(date: LocalDate, answer: PaydayAnswer) {
+        context.assistantDataStore.edit { it[stringPreferencesKey("$PAYDAY_PREFIX$date")] = answer.name }
     }
 
     suspend fun saveDigestAnswer(answer: DigestAnswer) {
@@ -102,5 +117,6 @@ class AssistantPreferences @Inject constructor(
 
     private companion object {
         const val OUTCOME_PREFIX = "leftovers_"
+        const val PAYDAY_PREFIX = "payday_"
     }
 }

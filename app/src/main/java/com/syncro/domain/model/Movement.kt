@@ -141,3 +141,12 @@ fun parseEuroCents(text: String): Long? {
 
 class InvalidAmountException :
     IllegalArgumentException("Introduce un importe mayor que 0")
+
+/**
+ * "1.234,56 €": siempre dos decimales, como un extracto, con espacio no separable antes del € para
+ * que no se parta en dos líneas. Exacto (BigDecimal), sin pasar por decimales.
+ */
+fun euros(cents: Long): String =
+    java.text.NumberFormat.getCurrencyInstance(java.util.Locale("es", "ES")).apply {
+        currency = java.util.Currency.getInstance("EUR")
+    }.format(java.math.BigDecimal.valueOf(cents, 2))

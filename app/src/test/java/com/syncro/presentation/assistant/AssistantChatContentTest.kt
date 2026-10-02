@@ -16,6 +16,7 @@ import com.syncro.domain.model.LeftoverChoice
 import com.syncro.domain.model.LeftoverOutcome
 import com.syncro.domain.model.LeftoverTasks
 import com.syncro.domain.model.MoveTarget
+import com.syncro.domain.model.Payday
 import com.syncro.domain.model.assistantConversation
 import com.syncro.testutil.DAY
 import com.syncro.testutil.aTask
@@ -72,6 +73,16 @@ class AssistantChatContentTest {
         compose.onAllNodesWithText("Sí, avísame").assertCountEquals(1)
         compose.onNodeWithText("¡Hecho!", substring = true).assertIsDisplayed()
         compose.onNodeWithText("Ahora no").assertDoesNotExist()
+    }
+
+    @Test
+    fun `el dia de nomina ofrece apuntarla o dejarlo para luego`() {
+        show(assistantConversation(DigestAnswer.ACCEPTED, true, payday = Payday(DAY, salaryCents = null, answer = null)))
+
+        compose.onNodeWithText("Ahora no").assertExists()
+        compose.onNodeWithText("Apuntar nómina").performScrollTo().performClick()
+
+        assertEquals(listOf("PAYDAY_REGISTER"), calls)
     }
 
     @Test

@@ -29,7 +29,12 @@ data class AssistantSettings(
     /** Preguntar cada mañana por las prioridades del día. */
     val focusEnabled: Boolean = true,
     /** Preguntar qué hacer con las tareas que se quedaron sin hacer. */
-    val leftoversEnabled: Boolean = true
+    val leftoversEnabled: Boolean = true,
+    /**
+     * Día del mes en que se cobra la nómina (1–31; en los meses más cortos, el último día). Null:
+     * sin nómina (aún no trabaja, autónomo…), y el asistente no dice nada. Es lo de fábrica.
+     */
+    val paydayDay: Int? = null
 )
 
 /** Ajustes de la app que afectan a la lógica (el tema es solo de la interfaz y va aparte). */
@@ -37,6 +42,9 @@ data class AppSettings(
     val digest: DigestSettings = DigestSettings(),
     val assistant: AssistantSettings = AssistantSettings()
 )
+
+class InvalidPaydayException :
+    IllegalArgumentException("El día de la nómina tiene que estar entre el 1 y el 31")
 
 class InvalidDigestTimesException :
     IllegalArgumentException("El resumen de la mañana tiene que ser antes que el de la noche")

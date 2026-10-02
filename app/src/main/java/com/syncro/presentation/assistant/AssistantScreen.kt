@@ -64,7 +64,11 @@ fun TrackAssistantOnResume(viewModel: AssistantViewModel) {
 }
 
 @Composable
-fun AssistantMainScreen(viewModel: AssistantViewModel) {
+fun AssistantMainScreen(
+    viewModel: AssistantViewModel,
+    // "Apuntar nómina": abre Ahorros con el formulario de ingreso preparado
+    onRegisterSalary: () -> Unit = {}
+) {
     val context = LocalContext.current
     val state by viewModel.uiState.collectAsState()
 
@@ -96,6 +100,11 @@ fun AssistantMainScreen(viewModel: AssistantViewModel) {
                 ChatReply.LEFTOVERS_MOVE_ALL, ChatReply.LEFTOVERS_ONE_BY_ONE, ChatReply.LEFTOVERS_KEEP ->
                     viewModel.answerLeftovers(reply)
                 ChatReply.FOCUS_CONFIRM, ChatReply.FOCUS_SKIP -> viewModel.answerFocus(reply, selectedTaskIds)
+                ChatReply.PAYDAY_REGISTER -> {
+                    viewModel.answerPayday(reply)
+                    onRegisterSalary()
+                }
+                ChatReply.PAYDAY_LATER -> viewModel.answerPayday(reply)
             }
         },
         onTaskAction = viewModel::resolveLeftover,

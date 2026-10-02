@@ -30,6 +30,27 @@ class DigestMessagesTest {
     // region Mañana
 
     @Test
+    fun `el dia de nomina el aviso de la manana lo anuncia y lleva al chat`() {
+        val message = digest(DigestMoment.MORNING, tasks = listOf(aTask(title = "Llamar al banco"))).copy(isPayday = true).toMessage()
+
+        assertTrue(message.title.contains("Ana"))
+        assertTrue(message.title.contains("💼") || message.title.contains("💸"))
+        assertTrue(message.text.contains("organizar el dinero del mes"))
+        assertTrue(message.lines.first().contains("50/30/20"))
+        // Lo demás del día sigue en el aviso
+        assertTrue(message.lines.any { it.contains("Llamar al banco") })
+        assertTrue(message.opensAssistant)
+    }
+
+    @Test
+    fun `un dia normal la manana no habla de nomina`() {
+        val message = digest(DigestMoment.MORNING).toMessage()
+
+        assertFalse(message.title.contains("nómina"))
+        assertFalse(message.opensAssistant)
+    }
+
+    @Test
     fun `por la manana resume el dia y dice que es lo primero`() {
         val message = digest(
             DigestMoment.MORNING,

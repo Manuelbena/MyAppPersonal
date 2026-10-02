@@ -36,7 +36,9 @@ data class DailyDigest(
     /** Invitar a elegir las prioridades de hoy: activadas en Ajustes y aún sin elegir (ni "Hoy no"). */
     val offerFocus: Boolean = true,
     /** Llevar al repaso de pendientes por la noche: activado en Ajustes. */
-    val offerLeftovers: Boolean = true
+    val offerLeftovers: Boolean = true,
+    /** Hoy es día de nómina (configurado en Ajustes): el aviso de la mañana lo celebra y lleva al chat. */
+    val isPayday: Boolean = false
 )
 
 /**

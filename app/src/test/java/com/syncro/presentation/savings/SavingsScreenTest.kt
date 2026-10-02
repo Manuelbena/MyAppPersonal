@@ -160,6 +160,32 @@ class SavingsScreenTest {
     }
 
     @Test
+    fun `apuntar nomina desde el asistente abre el ingreso con Nomina ya elegida`() {
+        var opened = 0
+        compose.setContent {
+            SavingsContent(
+                month = october,
+                movements = monthMovements(october, emptyList()),
+                today = today,
+                onPreviousMonth = {},
+                onNextMonth = {},
+                onSave = { type, cents, category, date, _, _, _ -> saved += "$type $cents $category $date" },
+                onDelete = {},
+                openSalaryForm = true,
+                onSalaryFormOpened = { opened++ }
+            )
+        }
+
+        compose.onNodeWithText("Nuevo ingreso").assertIsDisplayed()
+        compose.onNodeWithText("0,00 €").performTextInput("1850")
+        // Con la categoría ya elegida basta con el importe
+        compose.onNodeWithText("Guardar").assertIsEnabled().performClick()
+
+        assertEquals(1, opened)
+        assertEquals(listOf("INCOME 185000 SALARY 2026-10-02"), saved)
+    }
+
+    @Test
     fun `con movimientos se puede compartir el resumen del mes`() {
         show(monthMovements(october, listOf(netflix)))
 

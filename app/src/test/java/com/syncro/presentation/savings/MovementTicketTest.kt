@@ -78,9 +78,23 @@ class MovementTicketTest {
     }
 
     @Test
-    fun `el pie de foto resume el movimiento en pocas lineas`() {
-        assertEquals("Gasto · Supermercado\n−45,90$nbsp€ · 01/10/2026\nMercadona", movementShareText(occurrence("Mercadona")))
-        assertEquals("Ingreso · Nómina\n+45,90$nbsp€ · 01/10/2026", movementShareText(occurrence(null, type = MovementType.INCOME)))
+    fun `el pie de foto resume el movimiento con emojis y negritas de WhatsApp`() {
+        assertEquals(
+            "/// 🧾 *GASTO* · 🛒 Supermercado ///\n" +
+                "💸 *−45,90$nbsp€*\n" +
+                "📅 01/10/2026\n" +
+                "📝 Mercadona\n" +
+                "🔁 Se repite cada mes\n" +
+                "✨ _Enviado con Syncro_",
+            movementShareText(occurrence("Mercadona", repeats = true))
+        )
+        assertEquals(
+            "/// 🧾 *INGRESO* · 💼 Nómina ///\n" +
+                "💰 *+45,90$nbsp€*\n" +
+                "📅 01/10/2026\n" +
+                "✨ _Enviado con Syncro_",
+            movementShareText(occurrence(null, type = MovementType.INCOME))
+        )
     }
 
     // endregion
@@ -150,9 +164,15 @@ class MovementTicketTest {
     }
 
     @Test
-    fun `el pie de foto del resumen dice el mes, los totales y el balance`() {
+    fun `el pie de foto del resumen dice el mes, los totales, el ahorro y el mayor gasto`() {
         assertEquals(
-            "Resumen de octubre de 2026\nIngresos +2.000,00$nbsp€ · Gastos −1.000,00$nbsp€\nBalance +1.000,00$nbsp€ (ahorro del 50 %)",
+            "/// 📊 *RESUMEN DE OCTUBRE DE 2026* ///\n" +
+                "💰 Ingresos: *+2.000,00$nbsp€*\n" +
+                "💸 Gastos: *−1.000,00$nbsp€*\n" +
+                "⚖️ Balance: *+1.000,00$nbsp€*\n" +
+                "🐷 Ahorro: *50 %* 💪\n" +
+                "🏆 Mayor gasto: 🏠 Vivienda (75 %)\n" +
+                "✨ _Enviado con Syncro_",
             monthShareText(october)
         )
     }

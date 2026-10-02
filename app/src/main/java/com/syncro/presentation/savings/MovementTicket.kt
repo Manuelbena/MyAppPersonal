@@ -22,6 +22,9 @@ private val TICKET_DATE: DateTimeFormatter = DateTimeFormatter.ofPattern("dd/MM/
 private val TICKET_DAY: DateTimeFormatter = DateTimeFormatter.ofPattern("dd/MM", SPANISH)
 private val TICKET_DATE_TIME: DateTimeFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm", SPANISH)
 
+/** Firma de los textos compartidos (_cursiva_ en WhatsApp). */
+private const val SIGNATURE = "✨ _Enviado con Syncro_"
+
 private const val NOT_AN_INVOICE = "Documento informativo generado por Syncro. No es una factura ni un justificante bancario."
 
 // region Ticket de un movimiento
@@ -54,14 +57,26 @@ fun movementTicket(occurrence: MovementOccurrence, issuedAt: LocalDateTime): Tic
     )
 }
 
-/** Pie de foto al compartir: "Gasto · Supermercado\n−45,90 € · 01/10/2026\nMercadona". */
+/**
+ * Pie de foto al compartir, con el formato de WhatsApp (*negrita*) y emojis:
+ *
+ * /// 🧾 *GASTO* · 🛒 Supermercado ///
+ * 💸 *−45,90 €*
+ * 📅 01/10/2026
+ * 📝 Mercadona
+ * ✨ _Enviado con Syncro_
+ */
 fun movementShareText(occurrence: MovementOccurrence): String {
     val movement = occurrence.movement
+    val isIncome = movement.type == MovementType.INCOME
     return buildString {
-        appendLine("${movement.typeLabel} · ${movement.category.label}")
-        appendLine("${formatSignedEuros(movement.amountCents, movement.type)} · ${occurrence.date.format(TICKET_DATE)}")
-        movement.note?.let { appendLine(it) }
-    }.trim()
+        appendLine("/// 🧾 *${movement.typeLabel.uppercase(SPANISH)}* · ${movement.category.emoji} ${movement.category.label} ///")
+        appendLine("${if (isIncome) "💰" else "💸"} *${formatSignedEuros(movement.amountCents, movement.type)}*")
+        appendLine("📅 ${occurrence.date.format(TICKET_DATE)}")
+        movement.note?.let { appendLine("📝 $it") }
+        if (movement.repeatsMonthly) appendLine("🔁 Se repite cada mes")
+        append(SIGNATURE)
+    }
 }
 
 suspend fun Context.shareMovementTicket(occurrence: MovementOccurrence, issuedAt: LocalDateTime) =
@@ -129,15 +144,34 @@ fun monthStatement(month: MonthMovements, issuedAt: LocalDateTime): TicketConten
     )
 }
 
-/** Pie de foto del resumen: el mes, lo que entró y salió y el balance. */
+/**
+ * Pie de foto del resumen, con el formato de WhatsApp y emojis:
+ *
+ * /// 📊 *RESUMEN DE OCTUBRE DE 2026* ///
+ * 💰 Ingresos: *+2.000,00 €*
+ * 💸 Gastos: *−1.000,00 €*
+ * ⚖️ Balance: *+1.000,00 €*
+ * 🐷 Ahorro: *50 %* 💪
+ * 🏆 Mayor gasto: 🏠 Vivienda (75 %)
+ * ✨ _Enviado con Syncro_
+ */
 fun monthShareText(month: MonthMovements): String = buildString {
-    appendLine("Resumen de ${month.monthName()}")
-    appendLine(
-        "Ingresos ${formatSignedEuros(month.incomeCents, MovementType.INCOME)} · " +
-            "Gastos ${formatSignedEuros(month.expenseCents, MovementType.EXPENSE)}"
-    )
-    append("Balance ${month.balanceCents.signedEuros()}")
-    month.savingsRatePercent?.takeIf { it > 0 }?.let { append(" (ahorro del $it %)") }
+    appendLine("/// 📊 *RESUMEN DE ${month.monthName().uppercase(SPANISH)}* ///")
+    appendLine("💰 Ingresos: *${formatSignedEuros(month.incomeCents, MovementType.INCOME)}*")
+    appendLine("💸 Gastos: *${formatSignedEuros(month.expenseCents, MovementType.EXPENSE)}*")
+    appendLine("⚖️ Balance: *${month.balanceCents.signedEuros()}*")
+    month.savingsRatePercent?.let { rate ->
+        val mood = when {
+            rate >= 20 -> " 💪"
+            rate > 0 -> " 👍"
+            else -> " ⚠️"
+        }
+        appendLine("🐷 Ahorro: *$rate %*$mood")
+    }
+    month.totalsByCategory(MovementType.EXPENSE).firstOrNull()?.let { top ->
+        appendLine("🏆 Mayor gasto: ${top.category.emoji} ${top.category.label} (${top.percent} %)")
+    }
+    append(SIGNATURE)
 }
 
 suspend fun Context.shareMonthStatement(month: MonthMovements, issuedAt: LocalDateTime) =

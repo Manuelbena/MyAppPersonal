@@ -9,9 +9,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import com.syncro.domain.model.MovementCategory
 import com.syncro.domain.model.MovementCategory.*
 import com.syncro.domain.model.MovementType
+import com.syncro.domain.model.euros
 import com.syncro.presentation.theme.*
-import java.text.NumberFormat
-import java.util.Locale
 
 /*
  * Cómo se ven los movimientos: nombre, icono y color de cada categoría, y los importes en euros.
@@ -82,17 +81,34 @@ val MovementCategory.color: Color
         OTHER_EXPENSE, OTHER_INCOME -> Slate500
     }
 
+/** Emoji de la categoría, para los textos que se comparten (WhatsApp no muestra iconos). */
+val MovementCategory.emoji: String
+    get() = when (this) {
+        HOUSING -> "🏠"
+        BILLS -> "⚡"
+        GROCERIES -> "🛒"
+        TRANSPORT -> "🚗"
+        RESTAURANTS -> "🍽️"
+        LEISURE -> "🎮"
+        SUBSCRIPTIONS -> "🔁"
+        HEALTH -> "💊"
+        SHOPPING -> "🛍️"
+        EDUCATION -> "🎓"
+        SALARY -> "💼"
+        EXTRA_WORK -> "🛠️"
+        SALES -> "🏷️"
+        REFUNDS -> "↩️"
+        GIFTS -> "🎁"
+        INVESTMENTS -> "📈"
+        OTHER_EXPENSE, OTHER_INCOME -> "📦"
+    }
+
 /** Verde lo que entra, rojo lo que sale. */
 val MovementType.color: Color
     get() = if (this == MovementType.INCOME) Emerald500 else Rose500
 
-private val SPANISH = Locale("es", "ES")
-
 /** "1.234,56 €" (siempre dos decimales, como un extracto bancario). */
-fun formatEuros(cents: Long): String =
-    NumberFormat.getCurrencyInstance(SPANISH).apply {
-        currency = java.util.Currency.getInstance("EUR")
-    }.format(java.math.BigDecimal.valueOf(cents, 2))
+fun formatEuros(cents: Long): String = euros(cents)
 
 /** Con signo: "+1.200,00 €" para ingresos y "−45,90 €" para gastos. */
 fun formatSignedEuros(cents: Long, type: MovementType): String =

@@ -14,7 +14,10 @@ enum class ChatReply {
     LEFTOVERS_KEEP,
     /** Confirma las tareas marcadas en la lista del mensaje (prioridades del día). */
     FOCUS_CONFIRM,
-    FOCUS_SKIP
+    FOCUS_SKIP,
+    /** Día de nómina: abrir Ahorros con la nómina preparada. */
+    PAYDAY_REGISTER,
+    PAYDAY_LATER
 }
 
 data class ChatOption(val reply: ChatReply, val label: String)
@@ -58,6 +61,7 @@ data class AssistantConversation(val messages: List<ChatMessage>) {
  * @param outcomes lo que el usuario decidió en cada repaso (el actual y los recientes)
  * @param focus las tareas de hoy entre las que elegir prioridades (null desde las 21:00)
  * @param focusHistory las prioridades ya elegidas (la de hoy y las recientes)
+ * @param payday el último día de nómina si fue hace poco (null sin nómina en Ajustes)
  * @param clearedIds mensajes que el usuario borró al vaciar el chat (no vuelven a salir)
  */
 fun assistantConversation(
@@ -67,6 +71,7 @@ fun assistantConversation(
     outcomes: List<LeftoverOutcome> = emptyList(),
     focus: FocusCandidates? = null,
     focusHistory: List<DailyFocus> = emptyList(),
+    payday: Payday? = null,
     clearedIds: Set<String> = emptySet()
 ): AssistantConversation {
     val messages = digestMessages(answer, notificationsAllowed)
@@ -91,6 +96,8 @@ fun assistantConversation(
     ) {
         blocks += Moment(focus.date, FOCUS_ORDER) to listOf(focusQuestion(focus))
     }
+    // La nómina, lo primero de su día: es lo que marca cómo se organiza el mes
+    payday?.let { blocks += Moment(it.date, PAYDAY_ORDER) to paydayMessages(it) }
     blocks.sortedWith(compareBy({ it.first.day }, { it.first.order })).forEach { messages += it.second }
 
     return AssistantConversation(messages.filter { it.id !in clearedIds })
@@ -98,6 +105,7 @@ fun assistantConversation(
 
 /** Posición de un bloque en el chat: el día y, dentro del día, repaso (antes) o prioridades. */
 private data class Moment(val day: LocalDate, val order: Int)
+private const val PAYDAY_ORDER = -1
 private const val LEFTOVERS_ORDER = 0
 private const val FOCUS_ORDER = 1
 
@@ -217,6 +225,68 @@ private fun oneByOneSummary(outcome: LeftoverOutcome): String {
 }
 
 private fun leftoverId(reviewDate: LocalDate) = "leftovers-$reviewDate"
+
+// endregion
+
+// region Día de nómina
+
+/**
+ * El día de nómina: el saludo con un consejo y la pregunta de si se apunta en Ahorros; lo que se
+ * contestó; y, en cuanto la nómina está apuntada, el reparto 50/30/20 con los euros de verdad.
+ */
+private fun paydayMessages(payday: Payday): List<ChatMessage> {
+    val id = paydayId(payday.date)
+    val salary = payday.salaryCents
+    // Si ya estaba apuntada (p. ej. una nómina mensual) no hay nada que preguntar
+    val asks = salary == null || payday.answer != null
+    val greeting = pickFor(
+        payday.date,
+        "💼 ¡Día de nómina! 🎉 Hoy entra el sueldo: es el mejor momento para organizar el mes.",
+        "💼 ¡Hoy cobras! 🎉 Antes de que el dinero vuele, vamos a darle un plan.",
+        "💼 ¡Día de nómina! 💸 Lo que hagas hoy con el sueldo marca cómo irá el resto del mes."
+    )
+    val tip = "💡 El truco de los bancos: aparta primero el ahorro y gasta lo que queda, no al revés."
+    return buildList {
+        add(
+            assistant(
+                id,
+                if (asks) "$greeting\n\n$tip\n\n¿Apuntamos la nómina en Ahorros?" else "$greeting\n\n$tip",
+                options = if (payday.answer == null && salary == null) {
+                    listOf(ChatOption(ChatReply.PAYDAY_REGISTER, "Apuntar nómina"), ChatOption(ChatReply.PAYDAY_LATER, "Ahora no"))
+                } else {
+                    emptyList()
+                }
+            )
+        )
+        when (payday.answer) {
+            PaydayAnswer.REGISTER -> {
+                add(user("$id-answer", "Apuntar nómina"))
+                if (salary == null) add(assistant("$id-open", "¡Vamos! Te abro Ahorros con la nómina preparada: solo pon el importe. 📝"))
+            }
+            PaydayAnswer.LATER -> {
+                add(user("$id-answer", "Ahora no"))
+                add(assistant("$id-later", "Vale 👍 Cuando la cobres, apúntala con el + de Ahorros y te ayudo a repartirla."))
+            }
+            null -> Unit
+        }
+        salary?.let { add(assistant("$id-plan", salaryPlanText(it))) }
+    }
+}
+
+private fun salaryPlanText(salaryCents: Long): String {
+    val plan = salaryPlan(salaryCents)
+    return "💰 Tienes apuntados ${euros(salaryCents)} de nómina. Con la regla 50/30/20 quedaría así:\n" +
+        "🏠 Necesidades (50 %): ${euros(plan.needsCents)}\n" +
+        "🎉 Caprichos (30 %): ${euros(plan.wantsCents)}\n" +
+        "🐷 Ahorro (20 %): ${euros(plan.savingsCents)}\n\n" +
+        "Consejo: mueve hoy mismo los ${euros(plan.savingsCents)} a tu cuenta de ahorro y olvídate de ellos. " +
+        "¡Tu yo del futuro te lo agradecerá! 😉"
+}
+
+/** Una de varias frases, fija para cada día (cambia de un mes a otro, no al reabrir el chat). */
+private fun pickFor(date: LocalDate, vararg options: String): String = options[date.dayOfYear % options.size]
+
+private fun paydayId(date: LocalDate) = "payday-$date"
 
 // endregion
 

@@ -21,7 +21,22 @@ fun DailyDigest.toMessage(): DigestMessage = when (moment) {
 
 // region Mañana: qué te espera hoy
 
+/**
+ * El día de nómina el aviso de la mañana lo anuncia primero (título y primera línea) y lleva al
+ * chat, donde el asistente ayuda a repartir el sueldo. Lo demás del día sigue debajo.
+ */
 private fun DailyDigest.morningMessage(): DigestMessage {
+    val base = morningAgendaMessage()
+    if (!isPayday) return base
+    return DigestMessage(
+        title = pick(listOf("💼 ¡Día de nómina$name! 🎉", "💸 ¡Hoy cobras$name! 🎉")),
+        text = "Hoy entra el sueldo: vamos a organizar el dinero del mes antes de que vuele. ${base.text}",
+        lines = listOf("👉 Toca y te ayudo a repartirlo (50/30/20)") + base.lines,
+        opensAssistant = true
+    )
+}
+
+private fun DailyDigest.morningAgendaMessage(): DigestMessage {
     val pending = tasks.filterNot { it.isCompleted }
     val title = pick(listOf("¡Buenos días$name! ☀️", "¡Arriba$name! ☀️", "Hola$name 👋 ¿Empezamos?"))
 

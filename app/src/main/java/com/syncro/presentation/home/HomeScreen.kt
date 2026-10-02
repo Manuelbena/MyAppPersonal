@@ -5,6 +5,7 @@ import androidx.compose.ui.platform.LocalContext
 import com.syncro.presentation.components.rememberCurrentMinute
 import com.syncro.presentation.components.shareEvent
 import com.syncro.presentation.components.AddFab
+import com.syncro.presentation.components.EdgeFades
 import com.syncro.presentation.components.LocalWidthClass
 import com.syncro.presentation.components.WidthClass
 import android.app.Activity
@@ -432,42 +433,4 @@ fun HomeScreen(
                 }
             )
         }
-}
-
-/**
- * Degradados arriba y abajo de una zona con scroll: arriba el contenido se desvanece al subir y
- * abajo se ve por detrás de la barra de navegación flotante.
- */
-@Composable
-private fun BoxScope.EdgeFades() {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(24.dp)
-            .align(Alignment.TopCenter)
-            .background(
-                brush = Brush.verticalGradient(
-                    colors = listOf(
-                        MaterialTheme.colorScheme.background,
-                        Color.Transparent
-                    )
-                )
-            )
-    )
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(140.dp)
-            .align(Alignment.BottomCenter)
-            .background(
-                brush = Brush.verticalGradient(
-                    colors = listOf(
-                        Color.Transparent,
-                        MaterialTheme.colorScheme.background.copy(alpha = 0.7f),
-                        MaterialTheme.colorScheme.background.copy(alpha = 0.95f),
-                        MaterialTheme.colorScheme.background
-                    )
-                )
-            )
-    )
 }

@@ -3,12 +3,14 @@ package com.syncro.domain.usecase
 import com.syncro.domain.model.DailyDigest
 import com.syncro.domain.model.DigestMoment
 import com.syncro.domain.model.SyncroItem
+import com.syncro.domain.model.paydayIn
 import com.syncro.domain.repository.DailyFocusRepository
 import com.syncro.domain.repository.SettingsRepository
 import com.syncro.domain.repository.UserRepository
 import kotlinx.coroutines.flow.first
 import java.time.Clock
 import java.time.LocalDate
+import java.time.YearMonth
 import javax.inject.Inject
 
 /**
@@ -38,7 +40,8 @@ class GetDailyDigestUseCase @Inject constructor(
             tomorrowTasks = tomorrowItems.filterIsInstance<SyncroItem.Task>(),
             tomorrowEvents = tomorrowItems.filterIsInstance<SyncroItem.Event>(),
             offerFocus = assistant.focusEnabled && focusRepository.getFocus(today).first() == null,
-            offerLeftovers = assistant.leftoversEnabled
+            offerLeftovers = assistant.leftoversEnabled,
+            isPayday = assistant.paydayDay?.let { paydayIn(YearMonth.from(today), it) == today } == true
         )
     }
 }

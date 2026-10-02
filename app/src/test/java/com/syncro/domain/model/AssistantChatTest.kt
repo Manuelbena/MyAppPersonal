@@ -268,4 +268,61 @@ class AssistantChatTest {
     }
 
     // endregion
+
+    // region Día de nómina
+
+    private fun withPayday(payday: Payday) = assistantConversation(DigestAnswer.ACCEPTED, true, payday = payday)
+
+    @Test
+    fun `el dia de nomina saluda, aconseja y pregunta si se apunta`() {
+        val chat = withPayday(Payday(DAY, salaryCents = null, answer = null))
+        val question = chat.byId("payday-$DAY")!!
+
+        assertTrue(question.text.contains("💼"))
+        assertTrue(question.text.contains("aparta primero el ahorro"))
+        assertTrue(question.text.contains("¿Apuntamos la nómina en Ahorros?"))
+        assertEquals(listOf(ChatReply.PAYDAY_REGISTER, ChatReply.PAYDAY_LATER), question.options.map { it.reply })
+    }
+
+    @Test
+    fun `con la nomina apuntada propone el reparto 50-30-20 en euros`() {
+        val chat = withPayday(Payday(DAY, salaryCents = 185_000, answer = PaydayAnswer.REGISTER))
+        val plan = chat.byId("payday-$DAY-plan")!!.text
+
+        assertTrue(plan.contains("1.850,00 €"))
+        assertTrue(plan.contains("Necesidades (50 %): 925,00 €"))
+        assertTrue(plan.contains("Caprichos (30 %): 555,00 €"))
+        assertTrue(plan.contains("Ahorro (20 %): 370,00 €"))
+        // Ya contestado: sin botones
+        assertTrue(chat.optionMessages.isEmpty())
+        assertEquals("Apuntar nómina", chat.byId("payday-$DAY-answer")!!.text)
+    }
+
+    @Test
+    fun `si la nomina ya estaba apuntada no pregunta, va directo al reparto`() {
+        val chat = withPayday(Payday(DAY, salaryCents = 185_000, answer = null))
+
+        assertFalse(chat.byId("payday-$DAY")!!.text.contains("¿Apuntamos"))
+        assertTrue(chat.optionMessages.isEmpty())
+        assertTrue(chat.byId("payday-$DAY-plan") != null)
+    }
+
+    @Test
+    fun `apuntar sin importe aun avisa de que abre Ahorros, y ahora no lo deja para luego`() {
+        assertTrue(withPayday(Payday(DAY, null, PaydayAnswer.REGISTER)).byId("payday-$DAY-open")!!.text.contains("Te abro Ahorros"))
+
+        val later = withPayday(Payday(DAY, null, PaydayAnswer.LATER))
+        assertEquals("Ahora no", later.byId("payday-$DAY-answer")!!.text)
+        assertTrue(later.byId("payday-$DAY-later") != null)
+        assertNull(later.byId("payday-$DAY-plan"))
+    }
+
+    @Test
+    fun `sin nomina en Ajustes no hay mensajes de nomina`() {
+        val chat = assistantConversation(DigestAnswer.ACCEPTED, true)
+
+        assertTrue(chat.messages.none { it.id.startsWith("payday") })
+    }
+
+    // endregion
 }

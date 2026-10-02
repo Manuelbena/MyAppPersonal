@@ -12,12 +12,17 @@ import com.syncro.domain.model.LeftoverChoice
 import com.syncro.domain.model.LeftoverOutcome
 import com.syncro.domain.model.LeftoverTasks
 import com.syncro.domain.model.MoveTarget
+import com.syncro.domain.model.Payday
+import com.syncro.domain.model.PaydayAnswer
 import com.syncro.domain.model.TaskAction
 import com.syncro.domain.model.assistantConversation
+import com.syncro.domain.model.lastPayday
+import com.syncro.domain.model.salaryCents
 import com.syncro.domain.usecase.ChooseDailyFocusUseCase
 import com.syncro.domain.usecase.GetFocusCandidatesUseCase
 import com.syncro.domain.usecase.GetFocusHistoryUseCase
 import com.syncro.domain.usecase.GetLeftoverTasksUseCase
+import com.syncro.domain.usecase.GetMonthMovementsUseCase
 import com.syncro.domain.usecase.GetSettingsUseCase
 import com.syncro.domain.usecase.MoveTasksUseCase
 import com.syncro.domain.usecase.ToggleTaskCompletionUseCase
@@ -29,11 +34,13 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.Clock
 import java.time.LocalDate
+import java.time.YearMonth
 import javax.inject.Inject
 
 data class AssistantUiState(val conversation: AssistantConversation, val unreadCount: Int)
@@ -52,6 +59,7 @@ class AssistantViewModel @Inject constructor(
     private val getFocusCandidates: GetFocusCandidatesUseCase,
     private val getFocusHistory: GetFocusHistoryUseCase,
     private val chooseDailyFocus: ChooseDailyFocusUseCase,
+    private val getMonthMovements: GetMonthMovementsUseCase,
     getSettings: GetSettingsUseCase,
     private val clock: Clock
 ) : ViewModel() {
@@ -76,15 +84,30 @@ class AssistantViewModel @Inject constructor(
     private val historySince get() = LocalDate.now(clock).minusDays(HISTORY_DAYS)
     private val focusHistory = refreshTick.flatMapLatest { getFocusHistory(historySince) }
 
-    private data class Tasks(val leftovers: LeftoverTasks, val focus: Focus, val focusHistory: List<DailyFocus>)
+    // Día de nómina: el último, si fue esta semana, con la nómina apuntada ese mes y lo contestado.
+    // Envuelto como Focus: null (sin nómina) es válido y distinto de "aún no se sabe"
+    private data class PaydayState(val payday: Payday?)
+    private val payday: StateFlow<PaydayState?> = combine(refreshTick, getSettings(), preferences.paydayAnswers) { _, settings, answers ->
+        settings.assistant.paydayDay to answers
+    }.flatMapLatest { (day, answers) ->
+        val date = day?.let { lastPayday(it, LocalDate.now(clock)) }
+        if (date == null || date.isBefore(historySince)) {
+            flowOf(PaydayState(null))
+        } else {
+            getMonthMovements(YearMonth.from(date)).map { month -> PaydayState(Payday(date, month.salaryCents(), answers[date])) }
+        }
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
+    private data class Tasks(val leftovers: LeftoverTasks, val focus: Focus, val focusHistory: List<DailyFocus>, val payday: Payday?)
     private val tasks = combine(
-        leftovers.filterNotNull(), focus.filterNotNull(), focusHistory, getSettings()
-    ) { leftovers, focus, history, settings ->
+        leftovers.filterNotNull(), focus.filterNotNull(), focusHistory, getSettings(), payday.filterNotNull()
+    ) { leftovers, focus, history, settings, payday ->
         // Con una pregunta apagada en Ajustes no se hace; lo ya contestado sigue en el historial
         Tasks(
             leftovers = if (settings.assistant.leftoversEnabled) leftovers else leftovers.copy(tasks = emptyList()),
             focus = if (settings.assistant.focusEnabled) focus else Focus(null),
-            focusHistory = history
+            focusHistory = history,
+            payday = payday.payday
         )
     }
 
@@ -102,6 +125,7 @@ class AssistantViewModel @Inject constructor(
             outcomes = outcomes.filter { !it.reviewDate.isBefore(historySince) },
             focus = tasks.focus.candidates,
             focusHistory = tasks.focusHistory,
+            payday = tasks.payday,
             clearedIds = clearedIds
         )
     }
@@ -186,6 +210,20 @@ class AssistantViewModel @Inject constructor(
             else -> return
         }
         viewModelScope.launch { chooseDailyFocus(candidates.date, chosen) }
+    }
+
+    /**
+     * Día de nómina: [ChatReply.PAYDAY_REGISTER] ("Apuntar nómina"; la pantalla abre además Ahorros)
+     * o [ChatReply.PAYDAY_LATER] ("Ahora no").
+     */
+    fun answerPayday(reply: ChatReply) {
+        val current = payday.value?.payday ?: return
+        val answer = when (reply) {
+            ChatReply.PAYDAY_REGISTER -> PaydayAnswer.REGISTER
+            ChatReply.PAYDAY_LATER -> PaydayAnswer.LATER
+            else -> return
+        }
+        viewModelScope.launch { preferences.savePaydayAnswer(current.date, answer) }
     }
 
     /** El chat está en pantalla: todo lo que hay en él se da por leído. */

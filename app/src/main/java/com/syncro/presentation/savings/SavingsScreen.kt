@@ -34,6 +34,7 @@ import com.syncro.domain.model.MovementCategory
 import com.syncro.domain.model.MovementOccurrence
 import com.syncro.domain.model.MovementType
 import com.syncro.presentation.components.AddFab
+import com.syncro.presentation.components.EdgeFades
 import com.syncro.presentation.event.IconBadge
 import com.syncro.presentation.home.components.AddOptionItem
 import com.syncro.presentation.home.components.AddOptionsSheet
@@ -50,7 +51,12 @@ import java.util.Locale
 private val SPANISH = Locale("es", "ES")
 
 @Composable
-fun SavingsScreen(viewModel: SavingsViewModel = hiltViewModel()) {
+fun SavingsScreen(
+    // "Apuntar nómina" desde el asistente: abrir el formulario de ingreso con la categoría Nómina
+    openSalaryForm: Boolean = false,
+    onSalaryFormOpened: () -> Unit = {},
+    viewModel: SavingsViewModel = hiltViewModel()
+) {
     val state by viewModel.state.collectAsState()
     val month by viewModel.currentMonth.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -70,6 +76,8 @@ fun SavingsScreen(viewModel: SavingsViewModel = hiltViewModel()) {
         onNextMonth = viewModel::nextMonth,
         onSave = viewModel::save,
         onDelete = viewModel::delete,
+        openSalaryForm = openSalaryForm,
+        onSalaryFormOpened = onSalaryFormOpened,
         onShare = { scope.launch { context.shareMovementTicket(it, LocalDateTime.now()) } },
         onShareMonth = { scope.launch { context.shareMonthStatement(it, LocalDateTime.now()) } }
     )
@@ -94,10 +102,21 @@ fun SavingsContent(
     onDelete: (id: String) -> Unit,
     onShare: (MovementOccurrence) -> Unit = {},
     onShareMonth: (MonthMovements) -> Unit = {},
+    openSalaryForm: Boolean = false,
+    onSalaryFormOpened: () -> Unit = {},
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() }
 ) {
     var showAddSheet by remember { mutableStateOf(false) }
     var formType by remember { mutableStateOf<MovementType?>(null) }
+    // Categoría ya elegida al abrir el formulario (la nómina que se apunta desde el asistente)
+    var presetCategory by remember { mutableStateOf<MovementCategory?>(null) }
+    LaunchedEffect(openSalaryForm) {
+        if (openSalaryForm) {
+            presetCategory = MovementCategory.SALARY
+            formType = MovementType.INCOME
+            onSalaryFormOpened()
+        }
+    }
     // Se guarda el id y no el movimiento para que el detalle refleje los cambios al editarlo
     var selected by remember { mutableStateOf<SelectedOccurrence?>(null) }
     var editing by remember { mutableStateOf<Movement?>(null) }
@@ -108,33 +127,42 @@ fun SavingsContent(
         floatingActionButton = { AddFab(onClick = { showAddSheet = true }, contentDescription = "Añadir movimiento") },
         floatingActionButtonPosition = FabPosition.End
     ) { padding ->
-        LazyColumn(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding),
-            // Abajo deja sitio a la barra de navegación flotante y al "+"
-            contentPadding = PaddingValues(bottom = 180.dp)
+                .padding(padding)
         ) {
-            item(key = "header") {
-                SavingsHeader(month, onPreviousMonth, onNextMonth)
-            }
-            if (movements != null) {
-                item(key = "summary") { MonthSummaryCard(movements, onShare = { onShareMonth(movements) }) }
+            // Fija: el título y el mes; lo de debajo hace scroll
+            SavingsHeader(month, onPreviousMonth, onNextMonth)
 
-                if (movements.occurrences.isEmpty()) {
-                    item(key = "empty") { EmptyMonth() }
-                } else {
-                    movements.occurrences.groupBy { it.date }.forEach { (date, dayItems) ->
-                        item(key = "day-$date") { DayHeader(date, today) }
-                        items(dayItems, key = { "${it.movement.id}-${it.date}" }) { occurrence ->
-                            MovementRow(
-                                occurrence = occurrence,
-                                isUpcoming = occurrence.date.isAfter(today),
-                                onClick = { selected = SelectedOccurrence(occurrence.movement.id, occurrence.date) }
-                            )
+            // Igual que en Inicio: el contenido se desvanece bajo la cabecera y sobre la barra
+            Box(modifier = Modifier.fillMaxSize()) {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    // Arriba, aire para que la tarjeta no empiece bajo el degradado; abajo, sitio para la
+                    // barra de navegación flotante y el "+"
+                    contentPadding = PaddingValues(top = 8.dp, bottom = 180.dp)
+                ) {
+                    if (movements != null) {
+                        item(key = "summary") { MonthSummaryCard(movements, onShare = { onShareMonth(movements) }) }
+
+                        if (movements.occurrences.isEmpty()) {
+                            item(key = "empty") { EmptyMonth() }
+                        } else {
+                            movements.occurrences.groupBy { it.date }.forEach { (date, dayItems) ->
+                                item(key = "day-$date") { DayHeader(date, today) }
+                                items(dayItems, key = { "${it.movement.id}-${it.date}" }) { occurrence ->
+                                    MovementRow(
+                                        occurrence = occurrence,
+                                        isUpcoming = occurrence.date.isAfter(today),
+                                        onClick = { selected = SelectedOccurrence(occurrence.movement.id, occurrence.date) }
+                                    )
+                                }
+                            }
                         }
                     }
                 }
+                EdgeFades()
             }
         }
     }
@@ -153,9 +181,14 @@ fun SavingsContent(
         MovementSheet(
             type = type,
             today = today,
-            onDismiss = { formType = null },
+            presetCategory = presetCategory,
+            onDismiss = {
+                formType = null
+                presetCategory = null
+            },
             onSave = { amountCents, category, date, note, repeatsMonthly ->
                 formType = null
+                presetCategory = null
                 onSave(type, amountCents, category, date, note, repeatsMonthly, null)
             }
         )

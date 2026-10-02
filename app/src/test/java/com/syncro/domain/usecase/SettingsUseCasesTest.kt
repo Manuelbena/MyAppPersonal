@@ -3,6 +3,7 @@ package com.syncro.domain.usecase
 import com.syncro.domain.model.AppSettings
 import com.syncro.domain.model.DataLossSummary
 import com.syncro.domain.model.InvalidDigestTimesException
+import com.syncro.domain.model.InvalidPaydayException
 import com.syncro.domain.model.User
 import com.syncro.testutil.CallLog
 import com.syncro.testutil.FakeAccountDataRepository
@@ -37,6 +38,23 @@ class SettingsUseCasesTest {
         assertEquals(at("08:30"), saved.digest.morningTime)
         assertEquals(false, saved.assistant.focusEnabled)
         assertEquals(AppSettings().digest.eveningTime, saved.digest.eveningTime)
+    }
+
+    @Test
+    fun `por defecto no hay nomina, y el dia tiene que ser del 1 al 31`() = runTest {
+        assertEquals(null, settings.settings.first().assistant.paydayDay)
+
+        assertTrue(update { it.copy(assistant = it.assistant.copy(paydayDay = 28)) }.isSuccess)
+        assertEquals(28, settings.settings.first().assistant.paydayDay)
+
+        listOf(0, 32).forEach { day ->
+            assertTrue(update { it.copy(assistant = it.assistant.copy(paydayDay = day)) }.exceptionOrNull() is InvalidPaydayException)
+        }
+        assertEquals(28, settings.settings.first().assistant.paydayDay)
+
+        // "No tengo nómina" vuelve a lo de fábrica
+        update { it.copy(assistant = it.assistant.copy(paydayDay = null)) }
+        assertEquals(null, settings.settings.first().assistant.paydayDay)
     }
 
     @Test

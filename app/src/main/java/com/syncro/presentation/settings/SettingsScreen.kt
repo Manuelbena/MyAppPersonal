@@ -18,6 +18,7 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -42,6 +43,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -143,6 +146,7 @@ fun SettingsContent(
     val assistant = state.settings.assistant
     // Qué hora se está cambiando (mañana o noche)
     var editingMorning by remember { mutableStateOf<Boolean?>(null) }
+    var editingPayday by remember { mutableStateOf(false) }
     // Apartado abierto; null = la lista de categorías. Sobrevive a girar la pantalla
     var page by rememberSaveable { mutableStateOf<SettingsPage?>(null) }
     // El botón atrás del móvil vuelve a la lista antes de salir de Ajustes
@@ -275,6 +279,20 @@ fun SettingsContent(
                             checked = assistant.leftoversEnabled,
                             onCheckedChange = { on -> onAssistantChange { it.copy(leftoversEnabled = on) } }
                         )
+                        SettingsDivider()
+                        SettingsRow(
+                            title = "Día de nómina",
+                            subtitle = "El día que cobras te ayuda a organizar el dinero del mes",
+                            onClick = { editingPayday = true },
+                            trailing = {
+                                Text(
+                                    paydayLabel(assistant.paydayDay),
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        )
                     }
 
                     SettingsPage.APPEARANCE -> SettingsCard {
@@ -330,6 +348,17 @@ fun SettingsContent(
         )
     }
 
+    if (editingPayday) {
+        PaydayDialog(
+            initial = assistant.paydayDay,
+            onDismiss = { editingPayday = false },
+            onConfirm = { day ->
+                editingPayday = false
+                onAssistantChange { it.copy(paydayDay = day) }
+            }
+        )
+    }
+
     state.logoutPrompt?.let { loss ->
         LogoutDialog(loss = loss, isLoggingOut = state.isLoggingOut, onConfirm = onLogoutConfirm, onDismiss = onLogoutDismiss)
     }
@@ -356,7 +385,8 @@ private fun digestSummary(digest: DigestSettings): String = listOfNotNull(
 
 private fun assistantSummary(assistant: AssistantSettings): String = listOfNotNull(
     "Prioridades".takeIf { assistant.focusEnabled },
-    "Pendientes".takeIf { assistant.leftoversEnabled }
+    "Pendientes".takeIf { assistant.leftoversEnabled },
+    assistant.paydayDay?.let { "Nómina día $it" }
 ).joinToString(" · ").ifEmpty { "Sin preguntas" }
 
 private fun themeLabel(mode: ThemeMode): String = when (mode) {
@@ -521,6 +551,78 @@ private fun TimePickerDialog(title: String, initial: LocalTime, onDismiss: () ->
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } }
     )
 }
+
+/**
+ * Elegir el día de cobro: "No tengo nómina" (lo de fábrica: sin trabajo aún, autónomos…) o un día
+ * del 1 al 31. En los meses más cortos se usa el último día.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun PaydayDialog(initial: Int?, onDismiss: () -> Unit, onConfirm: (Int?) -> Unit) {
+    var selected by remember { mutableStateOf(initial) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("¿Qué día cobras la nómina?") },
+        text = {
+            // Con scroll: en un móvil pequeño los 31 días podrían no caber
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable(role = Role.RadioButton) { selected = null },
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    RadioButton(selected = selected == null, onClick = { selected = null })
+                    Column {
+                        Text("No tengo nómina", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+                        Text(
+                            "Si aún no trabajas o no cobras un sueldo fijo",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    (1..31).forEach { day ->
+                        val isSelected = selected == day
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(CircleShape)
+                                .background(if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant)
+                                .clickable(role = Role.RadioButton) { selected = day }
+                                .semantics { contentDescription = "Día $day" },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                "$day",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+                Text(
+                    "Si el mes tiene menos días, será el último día del mes.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        },
+        confirmButton = { TextButton(onClick = { onConfirm(selected) }) { Text("Guardar") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } }
+    )
+}
+
+private fun paydayLabel(day: Int?): String = day?.let { "Día $it" } ?: "No tengo"
 
 @Composable
 private fun LogoutDialog(loss: DataLossSummary, isLoggingOut: Boolean, onConfirm: () -> Unit, onDismiss: () -> Unit) {

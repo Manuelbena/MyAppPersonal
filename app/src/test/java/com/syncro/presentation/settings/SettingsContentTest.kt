@@ -121,6 +121,33 @@ class SettingsContentTest {
     }
 
     @Test
+    fun `el dia de nomina empieza sin nomina y se elige en un dialogo`() {
+        show()
+        compose.onNodeWithText("Asistente").performScrollTo().performClick()
+
+        compose.onNodeWithText("No tengo").assertIsDisplayed()
+        compose.onNodeWithText("Día de nómina").performClick()
+        compose.onNodeWithContentDescription("Día 28").performScrollTo().performClick()
+        compose.onNodeWithText("Guardar").performClick()
+
+        assertEquals(28, settings.assistant.paydayDay)
+    }
+
+    @Test
+    fun `no tengo nomina quita el dia elegido`() {
+        settings = AppSettings(assistant = AssistantSettings(paydayDay = 28))
+        show()
+        compose.onNodeWithText("Asistente").performScrollTo().performClick()
+
+        compose.onNodeWithText("Día 28").assertIsDisplayed()
+        compose.onNodeWithText("Día de nómina").performClick()
+        compose.onNodeWithText("No tengo nómina").performClick()
+        compose.onNodeWithText("Guardar").performClick()
+
+        assertEquals(null, settings.assistant.paydayDay)
+    }
+
+    @Test
     fun `el tema se elige entre sistema, claro y oscuro`() {
         show()
 

@@ -60,6 +60,18 @@ class GetDailyDigestUseCaseTest {
     }
 
     @Test
+    fun `es dia de nomina solo el dia configurado`() = runTest {
+        users.saveUser(User(email = "ana@example.com", name = "Ana", photoUrl = null))
+        assertFalse("Sin nómina en Ajustes", getDigest(DigestMoment.MORNING)!!.isPayday)
+
+        settings.current.value = AppSettings(assistant = AssistantSettings(paydayDay = DAY.dayOfMonth))
+        assertTrue(getDigest(DigestMoment.MORNING)!!.isPayday)
+
+        settings.current.value = AppSettings(assistant = AssistantSettings(paydayDay = DAY.dayOfMonth + 1))
+        assertFalse(getDigest(DigestMoment.MORNING)!!.isPayday)
+    }
+
+    @Test
     fun `con el repaso apagado en Ajustes la noche no lleva al chat`() = runTest {
         users.saveUser(User(email = "ana@example.com", name = "Ana", photoUrl = null))
         settings.current.value = AppSettings(assistant = AssistantSettings(leftoversEnabled = false))

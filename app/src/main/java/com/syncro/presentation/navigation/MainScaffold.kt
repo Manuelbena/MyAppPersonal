@@ -98,6 +98,8 @@ fun MainScaffold(
                        currentRoute != AppScreen.Legal.route
     // Mientras la barra se oculta con animación, sigue marcando la sección de la que se viene
     var lastBottomRoute by remember { mutableStateOf(currentRoute) }
+    // "Apuntar nómina" en el chat: Ahorros abre el formulario de ingreso con la categoría Nómina
+    var openSalaryForm by remember { mutableStateOf(false) }
     if (bottomNavItems.any { it.route == currentRoute }) lastBottomRoute = currentRoute
 
     SyncroTheme(darkTheme = isDarkTheme) {
@@ -286,11 +288,22 @@ fun MainScaffold(
                          CalendarScreen()
                     }
                     composable(AppScreen.Savings.route) {
-                        ReadableWidth(maxWidth = 720.dp) { SavingsScreen() }
+                        ReadableWidth(maxWidth = 720.dp) {
+                            SavingsScreen(
+                                openSalaryForm = openSalaryForm,
+                                onSalaryFormOpened = { openSalaryForm = false }
+                            )
+                        }
                     }
                     composable(AppScreen.Assistant.route) {
                         ReadableWidth {
-                            AssistantMainScreen(viewModel = assistantViewModel)
+                            AssistantMainScreen(
+                                viewModel = assistantViewModel,
+                                onRegisterSalary = {
+                                    openSalaryForm = true
+                                    navigateToTab(AppScreen.Savings)
+                                }
+                            )
                         }
                     }
                     }

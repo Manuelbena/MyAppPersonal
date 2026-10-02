@@ -94,7 +94,7 @@ private val privacyPolicy = LegalDocument(
                 "• Tareas de Google Tasks: título, notas, fecha, hora (solo en la app) y si están hechas.",
                 "• Notas: solo se guardan en tu móvil; no se sincronizan con Google ni con ningún otro servicio.",
                 "• Ingresos y gastos (sección Ahorros): importe, tipo, categoría, fecha, nota y si se repite cada mes. Los apuntas tú; solo se guardan en tu móvil, no se sincronizan con Google ni con ningún otro servicio y la app no se conecta a tu banco.",
-                "• Uso de la app en el móvil: tus respuestas al asistente, las prioridades que eliges cada día, tus ajustes (horarios de los avisos, tema) y si has dado permiso de notificaciones."
+                "• Uso de la app en el móvil: tus respuestas al asistente, las prioridades que eliges cada día, tus ajustes (horarios de los avisos, día de cobro de la nómina si lo indicas, tema) y si has dado permiso de notificaciones."
             )
         ),
         LegalSection(
