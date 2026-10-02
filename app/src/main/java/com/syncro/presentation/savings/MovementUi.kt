@@ -97,3 +97,7 @@ fun formatEuros(cents: Long): String =
 /** Con signo: "+1.200,00 €" para ingresos y "−45,90 €" para gastos. */
 fun formatSignedEuros(cents: Long, type: MovementType): String =
     (if (type == MovementType.INCOME) "+" else "−") + formatEuros(cents)
+
+/** El importe como se teclea en el formulario, para editarlo: "45,90" o "1200" (sin miles ni €). */
+internal fun Long.toAmountInput(): String =
+    if (this % 100 == 0L) (this / 100).toString() else "%d,%02d".format(this / 100, this % 100)

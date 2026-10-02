@@ -8,7 +8,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Notes
-import androidx.compose.material.icons.rounded.Autorenew
+import androidx.compose.material.icons.rounded.EventRepeat
 import androidx.compose.material.icons.rounded.Event
 import androidx.compose.material.icons.rounded.LocalOffer
 import androidx.compose.material3.*
@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.syncro.presentation.components.SheetDragHandle
 import com.syncro.presentation.components.GradientSheetInsets
+import com.syncro.domain.model.Movement
 import com.syncro.domain.model.MovementCategory
 import com.syncro.domain.model.MovementType
 import com.syncro.domain.model.parseEuroCents
@@ -53,6 +54,8 @@ private val AMOUNT_INPUT = Regex("""^\d{0,10}([.,]\d{0,2})?$""")
 fun MovementSheet(
     type: MovementType,
     today: LocalDate,
+    // Al editar, el movimiento tal como está; null para uno nuevo
+    initial: Movement? = null,
     onDismiss: () -> Unit,
     onSave: (amountCents: Long, category: MovementCategory, date: LocalDate, note: String, repeatsMonthly: Boolean) -> Unit
 ) {
@@ -66,7 +69,7 @@ fun MovementSheet(
         containerColor = MaterialTheme.colorScheme.surface,
         shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
     ) {
-        MovementContent(type = type, today = today, onSave = onSave)
+        MovementContent(type = type, today = today, initial = initial, onSave = onSave)
     }
 }
 
@@ -79,13 +82,14 @@ fun MovementSheet(
 fun MovementContent(
     type: MovementType,
     today: LocalDate,
+    initial: Movement? = null,
     onSave: (amountCents: Long, category: MovementCategory, date: LocalDate, note: String, repeatsMonthly: Boolean) -> Unit
 ) {
-    var amountText by remember { mutableStateOf("") }
-    var category by remember { mutableStateOf<MovementCategory?>(null) }
-    var date by remember { mutableStateOf(today) }
-    var note by remember { mutableStateOf("") }
-    var repeatsMonthly by remember { mutableStateOf(false) }
+    var amountText by remember { mutableStateOf(initial?.amountCents?.toAmountInput().orEmpty()) }
+    var category by remember { mutableStateOf(initial?.category) }
+    var date by remember { mutableStateOf(initial?.date ?: today) }
+    var note by remember { mutableStateOf(initial?.note.orEmpty()) }
+    var repeatsMonthly by remember { mutableStateOf(initial?.repeatsMonthly ?: false) }
     var showDatePicker by remember { mutableStateOf(false) }
 
     val accent = type.color
@@ -113,7 +117,12 @@ fun MovementContent(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    if (type == MovementType.INCOME) "Nuevo ingreso" else "Nuevo gasto",
+                    when {
+                        initial != null && type == MovementType.INCOME -> "Editar ingreso"
+                        initial != null -> "Editar gasto"
+                        type == MovementType.INCOME -> "Nuevo ingreso"
+                        else -> "Nuevo gasto"
+                    },
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface,
@@ -162,6 +171,16 @@ fun MovementContent(
                     .fillMaxWidth()
                     .padding(top = 8.dp)
             )
+            if (initial?.repeatsMonthly == true) {
+                // Es una sola fila que cuenta cada mes: editarla cambia todos los meses
+                Text(
+                    "Se repite cada mes: los cambios se aplican a todos los meses.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
         }
 
         Column(
@@ -237,7 +256,7 @@ fun MovementContent(
                         .padding(start = 16.dp, end = 12.dp, top = 8.dp, bottom = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    IconBadge(Icons.Rounded.Autorenew, accent)
+                    IconBadge(Icons.Rounded.EventRepeat, accent)
                     Spacer(Modifier.width(14.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(

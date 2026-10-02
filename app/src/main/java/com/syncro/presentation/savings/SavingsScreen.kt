@@ -19,6 +19,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -27,6 +28,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.syncro.domain.model.MonthMovements
+import com.syncro.domain.model.Movement
 import com.syncro.domain.model.MovementCategory
 import com.syncro.domain.model.MovementOccurrence
 import com.syncro.domain.model.MovementType
@@ -37,6 +39,7 @@ import com.syncro.presentation.home.components.AddOptionsSheet
 import com.syncro.presentation.theme.Emerald500
 import com.syncro.presentation.theme.Rose500
 import java.time.LocalDate
+import java.time.LocalDateTime
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
@@ -49,6 +52,7 @@ fun SavingsScreen(viewModel: SavingsViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsState()
     val month by viewModel.currentMonth.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
+    val context = LocalContext.current
 
     LaunchedEffect(viewModel) {
         viewModel.messages.collect { snackbarHostState.showSnackbar(it, duration = SnackbarDuration.Short) }
@@ -62,13 +66,18 @@ fun SavingsScreen(viewModel: SavingsViewModel = hiltViewModel()) {
         onPreviousMonth = viewModel::previousMonth,
         onNextMonth = viewModel::nextMonth,
         onSave = viewModel::save,
-        onDelete = viewModel::delete
+        onDelete = viewModel::delete,
+        onPrint = { context.printMovementTicket(it, LocalDateTime.now()) }
     )
 }
 
+/** Qué movimiento se está viendo en detalle: el id y el día (un mensual sale en varios meses). */
+private data class SelectedOccurrence(val id: String, val date: LocalDate)
+
 /**
  * Ahorros: el mes con su resumen (ingresos, gastos, balance y tasa de ahorro), sus movimientos
- * por día y el "+" para apuntar uno nuevo. Tocar un movimiento permite borrarlo.
+ * por día y el "+" para apuntar uno nuevo. Tocar un movimiento abre su detalle, desde donde se
+ * edita, se imprime su ticket o se borra.
  */
 @Composable
 fun SavingsContent(
@@ -77,13 +86,16 @@ fun SavingsContent(
     today: LocalDate,
     onPreviousMonth: () -> Unit,
     onNextMonth: () -> Unit,
-    onSave: (type: MovementType, amountCents: Long, category: MovementCategory, date: LocalDate, note: String, repeatsMonthly: Boolean) -> Unit,
+    onSave: (type: MovementType, amountCents: Long, category: MovementCategory, date: LocalDate, note: String, repeatsMonthly: Boolean, id: String?) -> Unit,
     onDelete: (id: String) -> Unit,
+    onPrint: (MovementOccurrence) -> Unit = {},
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() }
 ) {
     var showAddSheet by remember { mutableStateOf(false) }
     var formType by remember { mutableStateOf<MovementType?>(null) }
-    var toDelete by remember { mutableStateOf<MovementOccurrence?>(null) }
+    // Se guarda el id y no el movimiento para que el detalle refleje los cambios al editarlo
+    var selected by remember { mutableStateOf<SelectedOccurrence?>(null) }
+    var editing by remember { mutableStateOf<Movement?>(null) }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -113,7 +125,7 @@ fun SavingsContent(
                             MovementRow(
                                 occurrence = occurrence,
                                 isUpcoming = occurrence.date.isAfter(today),
-                                onClick = { toDelete = occurrence }
+                                onClick = { selected = SelectedOccurrence(occurrence.movement.id, occurrence.date) }
                             )
                         }
                     }
@@ -139,31 +151,41 @@ fun SavingsContent(
             onDismiss = { formType = null },
             onSave = { amountCents, category, date, note, repeatsMonthly ->
                 formType = null
-                onSave(type, amountCents, category, date, note, repeatsMonthly)
+                onSave(type, amountCents, category, date, note, repeatsMonthly, null)
             }
         )
     }
 
-    toDelete?.let { occurrence ->
-        val movement = occurrence.movement
-        AlertDialog(
-            onDismissRequest = { toDelete = null },
-            title = { Text(if (movement.type == MovementType.INCOME) "¿Borrar este ingreso?" else "¿Borrar este gasto?") },
-            text = {
-                Text(
-                    "${movement.note ?: movement.category.label} · ${formatEuros(movement.amountCents)}" +
-                        if (movement.repeatsMonthly) "\n\nSe repite cada mes: se quitará de todos los meses." else ""
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    toDelete = null
-                    onDelete(movement.id)
-                }) { Text("Borrar", color = MaterialTheme.colorScheme.error) }
-            },
-            dismissButton = { TextButton(onClick = { toDelete = null }) { Text("Cancelar") } }
+    editing?.let { movement ->
+        MovementSheet(
+            type = movement.type,
+            today = today,
+            initial = movement,
+            onDismiss = { editing = null },
+            onSave = { amountCents, category, date, note, repeatsMonthly ->
+                editing = null
+                onSave(movement.type, amountCents, category, date, note, repeatsMonthly, movement.id)
+            }
         )
     }
+
+    selected
+        ?.let { sel -> movements?.occurrences?.firstOrNull { it.movement.id == sel.id && it.date == sel.date } }
+        ?.let { occurrence ->
+            MovementDetailSheet(
+                occurrence = occurrence,
+                onDismiss = { selected = null },
+                onEdit = {
+                    selected = null
+                    editing = occurrence.movement
+                },
+                onPrint = { onPrint(occurrence) },
+                onDelete = {
+                    selected = null
+                    onDelete(occurrence.movement.id)
+                }
+            )
+        }
 }
 
 /** Hoja del "+" de Ahorros, con el mismo aspecto que la de "Crear nuevo" de Inicio. */

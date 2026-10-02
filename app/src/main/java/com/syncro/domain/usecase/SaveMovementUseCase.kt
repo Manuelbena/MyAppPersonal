@@ -15,9 +15,10 @@ class SaveMovementUseCase @Inject constructor(
     private val repository: MovementRepository
 ) {
     /**
-     * Registra un ingreso o un gasto. Falla sin guardar nada con [InvalidAmountException] si el
-     * importe no es mayor que 0 (o es desorbitado). Si la categoría es del otro tipo (un gasto en
-     * "Nómina"), se guarda en "Otros" del tipo correcto en vez de mezclar los totales.
+     * Registra un ingreso o un gasto (sin [id]) o edita uno existente (con su [id]; si es mensual,
+     * el cambio vale para todos los meses). Falla sin guardar nada con [InvalidAmountException] si
+     * el importe no es mayor que 0 (o es desorbitado). Si la categoría es del otro tipo (un gasto
+     * en "Nómina"), se guarda en "Otros" del tipo correcto en vez de mezclar los totales.
      */
     suspend operator fun invoke(
         type: MovementType,
@@ -25,12 +26,13 @@ class SaveMovementUseCase @Inject constructor(
         category: MovementCategory,
         date: LocalDate,
         note: String,
-        repeatsMonthly: Boolean
+        repeatsMonthly: Boolean,
+        id: String? = null
     ): Result<Unit> {
         if (amountCents !in 1..MAX_AMOUNT_CENTS) return Result.failure(InvalidAmountException())
 
         val movement = Movement(
-            id = UUID.randomUUID().toString(),
+            id = id ?: UUID.randomUUID().toString(),
             type = type,
             amountCents = amountCents,
             category = category.takeIf { it.type == type } ?: MovementCategory.other(type),

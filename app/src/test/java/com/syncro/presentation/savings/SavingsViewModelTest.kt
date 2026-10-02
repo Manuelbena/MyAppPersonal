@@ -88,6 +88,18 @@ class SavingsViewModelTest {
     }
 
     @Test
+    fun `editar avisa de que se ha actualizado`() = runTest {
+        repository.insertMovement(aMovement(id = "m1", date = today))
+        val viewModel = createViewModel()
+        val messages = collectMessages(viewModel)
+
+        viewModel.save(MovementType.EXPENSE, 2_000, MovementCategory.GROCERIES, today, "Mercadona", false, id = "m1")
+
+        assertEquals(listOf("Gasto actualizado"), messages)
+        assertEquals(2_000L, repository.movements.value.getValue("m1").amountCents)
+    }
+
+    @Test
     fun `un importe no valido avisa y no guarda`() = runTest {
         val viewModel = createViewModel()
         val messages = collectMessages(viewModel)

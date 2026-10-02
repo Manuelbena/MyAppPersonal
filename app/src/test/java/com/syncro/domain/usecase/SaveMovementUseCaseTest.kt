@@ -52,6 +52,19 @@ class SaveMovementUseCaseTest {
     }
 
     @Test
+    fun `editar conserva el id y sustituye los datos, sin duplicar`() = runTest {
+        save(MovementType.EXPENSE, 1_299, MovementCategory.SUBSCRIPTIONS, DAY, "Netflix", repeatsMonthly = true)
+        val id = repository.movements.value.keys.single()
+
+        save(MovementType.EXPENSE, 1_799, MovementCategory.SUBSCRIPTIONS, DAY, "Netflix premium", repeatsMonthly = true, id = id)
+
+        val edited = repository.movements.value.values.single()
+        assertEquals(id, edited.id)
+        assertEquals(1_799L, edited.amountCents)
+        assertEquals("Netflix premium", edited.note)
+    }
+
+    @Test
     fun `una categoria del otro tipo se guarda en Otros del tipo correcto`() = runTest {
         save(MovementType.EXPENSE, 1_000, MovementCategory.SALARY, DAY, "", false)
 

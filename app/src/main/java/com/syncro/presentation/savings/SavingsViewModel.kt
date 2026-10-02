@@ -51,13 +51,16 @@ class SavingsViewModel @Inject constructor(
         category: MovementCategory,
         date: LocalDate,
         note: String,
-        repeatsMonthly: Boolean
+        repeatsMonthly: Boolean,
+        // Con id se edita ese movimiento; sin él se crea uno nuevo
+        id: String? = null
     ) {
         viewModelScope.launch {
-            val result = saveMovementUseCase(type, amountCents, category, date, note, repeatsMonthly)
+            val result = saveMovementUseCase(type, amountCents, category, date, note, repeatsMonthly, id)
+            val what = if (type == MovementType.INCOME) "Ingreso" else "Gasto"
             _messages.send(
                 result.fold(
-                    onSuccess = { if (type == MovementType.INCOME) "Ingreso guardado" else "Gasto guardado" },
+                    onSuccess = { if (id == null) "$what guardado" else "$what actualizado" },
                     onFailure = { it.message ?: "No se pudo guardar" }
                 )
             )
