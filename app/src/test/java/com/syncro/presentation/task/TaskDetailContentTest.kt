@@ -27,7 +27,8 @@ class TaskDetailContentTest {
         compose.setContent {
             TaskDetailContent(
                 task = aTask(title = "Llamar al banco", description = "Preguntar por la tarjeta", time = at("09:30")),
-                onToggleCompleted = { toggles++ }
+                onToggleCompleted = { toggles++ },
+                onDelete = {}
             )
         }
 
@@ -42,11 +43,25 @@ class TaskDetailContentTest {
     @Test
     fun `una tarea completada de todo el dia`() {
         compose.setContent {
-            TaskDetailContent(task = aTask(time = at("00:00"), isCompleted = true), onToggleCompleted = {})
+            TaskDetailContent(task = aTask(time = at("00:00"), isCompleted = true), onToggleCompleted = {}, onDelete = {})
         }
 
         compose.onNodeWithText("Todo el día").assertIsDisplayed()
         compose.onNodeWithText("Completada").assertIsDisplayed()
         compose.onNodeWithText("Marcar como pendiente").assertIsDisplayed()
+    }
+
+    @Test
+    fun `eliminar una tarea de Google pide confirmacion y avisa`() {
+        var deleted = 0
+        compose.setContent {
+            TaskDetailContent(task = aTask().copy(remoteId = "g-1"), onToggleCompleted = {}, onDelete = { deleted++ })
+        }
+
+        compose.onNodeWithText("Eliminar tarea").performScrollTo().performClick()
+        compose.onNodeWithText("Se borrará también de tu Google Tasks", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("Eliminar").performClick()
+
+        assertEquals(1, deleted)
     }
 }

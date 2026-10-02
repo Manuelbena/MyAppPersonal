@@ -3,6 +3,7 @@ package com.syncro
 import android.app.Application
 import com.syncro.data.notifications.DigestAlarmScheduler
 import com.syncro.domain.repository.SettingsRepository
+import com.syncro.presentation.widget.TodayWidgetUpdater
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -17,6 +18,7 @@ class SyncroApp : Application() {
 
     @Inject lateinit var digestScheduler: DigestAlarmScheduler
     @Inject lateinit var settingsRepository: SettingsRepository
+    @Inject lateinit var todayWidgetUpdater: TodayWidgetUpdater
 
     // Vive lo que el proceso: no hay nada que cancelar
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -31,5 +33,7 @@ class SyncroApp : Application() {
                 .distinctUntilChanged()
                 .collect { digestScheduler.scheduleAll(it) }
         }
+        // El widget "Tu día" sigue los cambios de tareas y eventos mientras la app está viva
+        appScope.launch { todayWidgetUpdater.run() }
     }
 }

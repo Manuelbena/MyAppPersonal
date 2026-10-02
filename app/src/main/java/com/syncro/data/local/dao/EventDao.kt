@@ -14,11 +14,11 @@ import kotlinx.coroutines.flow.Flow
 interface EventDao {
     @Transaction
     // Todos los que tocan el día (incluidos los que empezaron antes); la regla exacta está en el dominio
-    @Query("SELECT * FROM events WHERE date <= :dateEpoch AND endDate >= :dateEpoch")
+    @Query("SELECT * FROM events WHERE date <= :dateEpoch AND endDate >= :dateEpoch AND isDeleted = 0")
     fun getEventsByDate(dateEpoch: Long): Flow<List<EventWithSubtasks>>
 
     @Transaction
-    @Query("SELECT * FROM events WHERE date <= :endEpoch AND endDate >= :startEpoch")
+    @Query("SELECT * FROM events WHERE date <= :endEpoch AND endDate >= :startEpoch AND isDeleted = 0")
     fun getEventsInRange(startEpoch: Long, endEpoch: Long): Flow<List<EventWithSubtasks>>
 
     @Query("SELECT * FROM events WHERE id = :id")
@@ -55,6 +55,10 @@ interface EventDao {
 
     @Query("UPDATE events SET pendingChanges = pendingChanges + 1 WHERE id = :eventId")
     suspend fun markEventChanged(eventId: String)
+
+    /** Borrado en la app: deja de verse y queda pendiente de borrar en Google (ver pushEvent). */
+    @Query("UPDATE events SET isDeleted = 1, pendingChanges = pendingChanges + 1 WHERE id = :eventId")
+    suspend fun markEventDeleted(eventId: String)
 
     /** Las subtareas se sincronizan dentro de la descripción del evento: cambiar una marca el evento. */
     @Transaction

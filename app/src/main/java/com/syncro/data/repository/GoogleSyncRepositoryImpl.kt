@@ -213,6 +213,19 @@ class GoogleSyncRepositoryImpl @Inject constructor(
     private suspend fun pushTaskInternal(taskId: String) {
         val task = taskDao.getTaskById(taskId) ?: return
         if (task.remoteId != null && task.pendingChanges == 0) return
+        if (task.isDeleted) {
+            // Borrada en la app: se borra en Google (si llegó a subirse) y después del todo en local.
+            // Si en Google ya no existía (404/410), el resultado es el mismo
+            task.remoteId?.let { remoteId ->
+                try {
+                    remote.deleteTask(task.taskListId ?: DEFAULT_TASK_LIST, remoteId)
+                } catch (e: GoogleJsonResponseException) {
+                    if (!e.isNotFound()) throw e
+                }
+            }
+            taskDao.deleteTaskById(task.id)
+            return
+        }
 
         val body = Task().apply {
             setTitle(task.title)
@@ -250,6 +263,19 @@ class GoogleSyncRepositoryImpl @Inject constructor(
     private suspend fun pushEventInternal(eventId: String) {
         val local = eventDao.getEventById(eventId) ?: return
         if (local.remoteId != null && local.pendingChanges == 0) return
+        if (local.isDeleted) {
+            // Borrado en la app: se borra en Google (si llegó a subirse) y después del todo en local.
+            // Si en Google ya no existía (404/410), el resultado es el mismo
+            local.remoteId?.let { remoteId ->
+                try {
+                    remote.deleteEvent(remoteId)
+                } catch (e: GoogleJsonResponseException) {
+                    if (!e.isNotFound()) throw e
+                }
+            }
+            eventDao.deleteEventById(local.id)
+            return
+        }
         val start = LocalDate.ofEpochDay(local.date).atTime(LocalTime.parse(local.startTime))
         val end = LocalDate.ofEpochDay(local.endDate).atTime(LocalTime.parse(local.endTime))
         if (!isValidEventRange(start, end)) {

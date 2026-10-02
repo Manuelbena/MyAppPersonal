@@ -62,7 +62,8 @@ class EventRepositoryImpl @Inject constructor(
     }
 
     override suspend fun getEventById(eventId: String): SyncroItem.Event? {
-        return dao.getEventById(eventId)?.let { entity ->
+        // Un evento borrado ya no existe para la app, aunque siga en la tabla hasta borrarse en Google
+        return dao.getEventById(eventId)?.takeUnless { it.isDeleted }?.let { entity ->
             val subtasks = dao.getSubtasksForEvent(eventId)
             EventWithSubtasks(entity, subtasks).toDomain()
         }
@@ -94,5 +95,9 @@ class EventRepositoryImpl @Inject constructor(
 
     override suspend fun toggleEventCompletion(eventId: String) {
         dao.toggleEventCompletion(eventId)
+    }
+
+    override suspend fun deleteEvent(eventId: String) {
+        dao.markEventDeleted(eventId)
     }
 }

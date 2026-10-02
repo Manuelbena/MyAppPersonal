@@ -1,7 +1,10 @@
 package com.syncro.presentation.calendar
 
+import com.syncro.domain.usecase.DeleteEventUseCase
+import com.syncro.domain.usecase.DeleteTaskUseCase
 import com.syncro.domain.usecase.GetEventsInRangeUseCase
 import com.syncro.domain.usecase.GetTasksInRangeUseCase
+import com.syncro.domain.usecase.SaveTaskUseCase
 import com.syncro.domain.usecase.SyncGoogleCalendarUseCase
 import com.syncro.domain.usecase.SyncGoogleTasksUseCase
 import com.syncro.domain.usecase.ToggleEventCompletionUseCase
@@ -58,7 +61,10 @@ class CalendarViewModelTest {
         syncGoogleTasksUseCase = SyncGoogleTasksUseCase(google),
         toggleEventCompletionUseCase = ToggleEventCompletionUseCase(events, google),
         toggleSubtaskCompletionUseCase = ToggleSubtaskCompletionUseCase(events, google),
-        toggleTaskCompletionUseCase = ToggleTaskCompletionUseCase(tasks, google)
+        toggleTaskCompletionUseCase = ToggleTaskCompletionUseCase(tasks, google),
+        deleteEventUseCase = DeleteEventUseCase(events, google),
+        deleteTaskUseCase = DeleteTaskUseCase(tasks, google),
+        saveTaskUseCase = SaveTaskUseCase(tasks, google)
     )
 
     @Test

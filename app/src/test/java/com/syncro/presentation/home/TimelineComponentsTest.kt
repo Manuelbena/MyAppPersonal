@@ -1,7 +1,7 @@
 package com.syncro.presentation.home
 
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.hasSetTextAction
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -16,18 +16,20 @@ import androidx.compose.ui.unit.dp
 import com.syncro.domain.model.Subtask
 import com.syncro.presentation.home.components.EventCard
 import com.syncro.presentation.home.components.NowIndicator
-import com.syncro.presentation.home.components.QuickTaskSheet
+import com.syncro.presentation.home.components.QuickTaskContent
+import com.syncro.presentation.home.components.TasksCard
 import com.syncro.presentation.home.components.TaskRow
 import com.syncro.testutil.DAY
 import com.syncro.testutil.aTask
 import com.syncro.testutil.anEvent
 import com.syncro.testutil.at
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
-import java.time.LocalTime
+import java.time.LocalDate
 
 /** Cómo se ven las horas en el timeline y el formulario de tarea rápida. */
 @RunWith(RobolectricTestRunner::class)
@@ -136,15 +138,40 @@ class TimelineComponentsTest {
     }
 
     @Test
-    fun `en tarea rapida el chip Todo el dia guarda la tarea a las 00-00`() {
-        var savedTime: LocalTime? = null
-        compose.setContent { QuickTaskSheet(onDismiss = {}, onSave = { _, _, _, time -> savedTime = time }) }
+    fun `la tarea nueva solo pide el dia, y Manana lo cambia`() {
+        var saved: Pair<String, LocalDate>? = null
+        compose.setContent {
+            QuickTaskContent(initialDate = DAY, today = DAY, onSave = { title, _, date -> saved = title to date })
+        }
 
-        // El título es el único campo editable visible (la descripción se abre con "Detalles")
-        compose.onNode(hasSetTextAction()).performTextInput("Tomar creatina")
-        compose.onNodeWithText("Todo el día").performClick()
+        compose.onNodeWithText("¿Qué tienes que hacer?").performTextInput("Tomar creatina")
+        compose.onNodeWithText("Mañana").performClick()
         compose.onNodeWithText("Guardar").performClick()
 
-        assertEquals(LocalTime.MIDNIGHT, savedTime)
+        assertEquals("Tomar creatina" to DAY.plusDays(1), saved)
+    }
+
+    @Test
+    fun `la tarea nueva no se puede guardar sin titulo`() {
+        compose.setContent { QuickTaskContent(initialDate = DAY, today = DAY, onSave = { _, _, _ -> }) }
+
+        compose.onNodeWithText("Guardar").assertIsNotEnabled()
+    }
+
+    @Test
+    fun `la tarjeta de tareas pone las pendientes primero y cuenta las hechas`() {
+        compose.setContent {
+            TasksCard(
+                tasks = listOf(aTask(id = "1", title = "Hecha", isCompleted = true), aTask(id = "2", title = "Pendiente")),
+                onToggle = {},
+                onClick = {}
+            )
+        }
+
+        compose.onNodeWithText("✅ Tareas").assertIsDisplayed()
+        compose.onNodeWithText("1/2").assertIsDisplayed()
+        val pendingTop = compose.onNodeWithText("Pendiente").fetchSemanticsNode().boundsInRoot.top
+        val doneTop = compose.onNodeWithText("Hecha").fetchSemanticsNode().boundsInRoot.top
+        assertTrue(pendingTop < doneTop)
     }
 }

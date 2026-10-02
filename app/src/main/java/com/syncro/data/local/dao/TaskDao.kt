@@ -9,10 +9,10 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface TaskDao {
-    @Query("SELECT * FROM tasks WHERE date = :dateEpoch ORDER BY time ASC")
+    @Query("SELECT * FROM tasks WHERE date = :dateEpoch AND isDeleted = 0 ORDER BY time ASC")
     fun getTasksByDate(dateEpoch: Long): Flow<List<TaskEntity>>
 
-    @Query("SELECT * FROM tasks WHERE date >= :startEpoch AND date <= :endEpoch ORDER BY date ASC, time ASC")
+    @Query("SELECT * FROM tasks WHERE date >= :startEpoch AND date <= :endEpoch AND isDeleted = 0 ORDER BY date ASC, time ASC")
     fun getTasksInRange(startEpoch: Long, endEpoch: Long): Flow<List<TaskEntity>>
 
     @Query("SELECT * FROM tasks WHERE id = :id")
@@ -27,12 +27,16 @@ interface TaskDao {
     @Query("UPDATE tasks SET isCompleted = NOT isCompleted, pendingChanges = pendingChanges + 1 WHERE id = :id")
     suspend fun toggleTaskCompletion(id: String)
 
+    /** Borrada en la app: deja de verse y queda pendiente de borrar en Google (ver pushTask). */
+    @Query("UPDATE tasks SET isDeleted = 1, pendingChanges = pendingChanges + 1 WHERE id = :id")
+    suspend fun markTaskDeleted(id: String)
+
     /** Cambia la tarea de día (misma hora) y marca que la nueva fecha debe subirse a Google. */
     @Query("UPDATE tasks SET date = :dateEpoch, dateChanged = 1, pendingChanges = pendingChanges + 1 WHERE id = :id")
     suspend fun moveTask(id: String, dateEpoch: Long)
 
     /** Tareas sin hacer hasta ese día incluido (las atrasadas de días anteriores también). */
-    @Query("SELECT * FROM tasks WHERE isCompleted = 0 AND date <= :untilEpoch ORDER BY date ASC, time ASC")
+    @Query("SELECT * FROM tasks WHERE isCompleted = 0 AND isDeleted = 0 AND date <= :untilEpoch ORDER BY date ASC, time ASC")
     fun getUnfinishedTasksUntil(untilEpoch: Long): Flow<List<TaskEntity>>
 
     // region Sincronización

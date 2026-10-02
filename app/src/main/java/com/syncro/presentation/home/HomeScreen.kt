@@ -42,6 +42,9 @@ import java.util.*
 @Composable
 fun HomeScreen(
     onOpenSettings: () -> Unit,
+    // El "+" del widget: abrir la hoja de nueva tarea nada más entrar
+    openQuickTask: Boolean = false,
+    onQuickTaskOpened: () -> Unit = {},
     onNavigateToNotes: () -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel()
 ) {
@@ -53,6 +56,12 @@ fun HomeScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     var showAddItemSheet by remember { mutableStateOf(false) }
     var showQuickTaskSheet by remember { mutableStateOf(false) }
+    LaunchedEffect(openQuickTask) {
+        if (openQuickTask) {
+            showQuickTaskSheet = true
+            onQuickTaskOpened()
+        }
+    }
     var showDetailedEventSheet by remember { mutableStateOf(false) }
     var selectedEventForEdit by remember { mutableStateOf<com.syncro.domain.model.SyncroItem.Event?>(null) }
     var showAddNoteSheet by remember { mutableStateOf(false) }
@@ -94,7 +103,7 @@ fun HomeScreen(
         today.dayOfMonth + " de " + 
         today.month.getDisplayName(TextStyle.FULL, Locale("es", "ES"))
 
-    val tasksTitle = "Tareas del día ${uiState.selectedDate.dayOfMonth}"
+    val dayTitle = "Agenda del día ${uiState.selectedDate.dayOfMonth}"
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -167,55 +176,60 @@ fun HomeScreen(
                             )
                         }
 
-                        // Timeline de items (Eventos y Tareas)
-                        Column(
-                            modifier = Modifier
-                                .padding(horizontal = 16.dp)
-                        ) {
-                            Text(
-                                text = tasksTitle,
-                                style = MaterialTheme.typography.titleLarge.copy(
-                                    fontFamily = NotebookFontFamily,
-                                    fontStyle = FontStyle.Italic,
-                                    fontWeight = FontWeight.Medium
-                                ),
-                                color = MaterialTheme.colorScheme.onBackground,
-                                modifier = Modifier.padding(vertical = 16.dp)
-                            )
+                        // Las tareas solo tienen día: van agrupadas en su tarjeta, encima de los eventos
+                        val dayTasks = uiState.timelineItems.filterIsInstance<SyncroItem.Task>()
+                        val dayEvents = uiState.timelineItems.filterIsInstance<SyncroItem.Event>()
 
-                            if (!uiState.isLoading && uiState.timelineItems.isEmpty()) {
+                        Text(
+                            text = dayTitle,
+                            style = MaterialTheme.typography.titleLarge.copy(
+                                fontFamily = NotebookFontFamily,
+                                fontStyle = FontStyle.Italic,
+                                fontWeight = FontWeight.Medium
+                            ),
+                            color = MaterialTheme.colorScheme.onBackground,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp)
+                        )
+
+                        if (!uiState.isLoading && dayTasks.isEmpty() && dayEvents.isEmpty()) {
+                            Box(modifier = Modifier.padding(horizontal = 16.dp)) {
                                 EmptyStateView(
                                     onAddEventClick = { showAddItemSheet = true }
                                 )
                             }
+                        }
 
-                            val nowIndex = nowIndicatorIndex(uiState.timelineItems, uiState.selectedDate, now)
-                            uiState.timelineItems.forEachIndexed { index, item ->
+                        if (dayTasks.isNotEmpty()) {
+                            TasksCard(
+                                tasks = dayTasks,
+                                onToggle = { viewModel.toggleTaskCompletion(it.id) },
+                                onClick = { selectedTaskIdForDetail = it.id }
+                            )
+                        }
+
+                        // Timeline de eventos
+                        Column(
+                            modifier = Modifier
+                                .padding(horizontal = 16.dp)
+                                .padding(top = if (dayTasks.isNotEmpty()) 8.dp else 0.dp)
+                        ) {
+                            val nowIndex = nowIndicatorIndex(dayEvents, uiState.selectedDate, now)
+                            dayEvents.forEachIndexed { index, event ->
                                 if (index == nowIndex) NowIndicator(now)
-                                when (item) {
-                                    is SyncroItem.Event -> EventCard(
-                                        event = item,
-                                        onSubtaskToggle = { subtaskTitle ->
-                                            viewModel.toggleSubtaskCompletion(item.id, subtaskTitle)
-                                        },
-                                        onToggleEvent = {
-                                            viewModel.toggleEventCompletion(item.id)
-                                        },
-                                        onClick = { selectedEventIdForDetail = item.id },
-                                        now = now
-                                    )
-                                    is SyncroItem.Task -> TaskRow(
-                                        task = item,
-                                        onToggle = { viewModel.toggleTaskCompletion(item.id) },
-                                        onClick = { selectedTaskIdForDetail = item.id }
-                                    )
-                                    is SyncroItem.Note -> {
-                                        // Las notas se muestran en el carrusel, no en el timeline
-                                    }
-                                }
+                                EventCard(
+                                    event = event,
+                                    onSubtaskToggle = { subtaskTitle ->
+                                        viewModel.toggleSubtaskCompletion(event.id, subtaskTitle)
+                                    },
+                                    onToggleEvent = {
+                                        viewModel.toggleEventCompletion(event.id)
+                                    },
+                                    onClick = { selectedEventIdForDetail = event.id },
+                                    now = now
+                                )
                             }
-                            // Si ya empezó todo lo del día, la línea "Ahora" va al final
-                            if (nowIndex == uiState.timelineItems.size) NowIndicator(now)
+                            // Si ya empezaron todos los eventos del día, la línea "Ahora" va al final
+                            if (nowIndex == dayEvents.size) NowIndicator(now)
                         }
 
                         if (uiState.notes.isNotEmpty()) {
@@ -332,10 +346,12 @@ fun HomeScreen(
     if (showQuickTaskSheet) {
         QuickTaskSheet(
             onDismiss = { showQuickTaskSheet = false },
-            onSave = { title, description, date, time ->
-                viewModel.saveQuickTask(title, description, date, time)
+            onSave = { title, description, date ->
+                viewModel.saveQuickTask(title, description, date)
                 showQuickTaskSheet = false
-            }
+            },
+            // Se crea en el día que se está mirando (hoy, si se mira un día pasado)
+            initialDate = maxOf(uiState.selectedDate, LocalDate.now())
         )
     }
 
@@ -351,7 +367,11 @@ fun HomeScreen(
                     selectedEventIdForDetail = null
                     selectedEventForEdit = event
                 },
-                onShare = { context.shareEvent(event) }
+                onShare = { context.shareEvent(event) },
+                onDelete = {
+                    selectedEventIdForDetail = null
+                    viewModel.deleteEvent(event.id)
+                }
             )
         }
 
@@ -361,7 +381,11 @@ fun HomeScreen(
             TaskDetailSheet(
                 task = task,
                 onDismiss = { selectedTaskIdForDetail = null },
-                onToggleCompleted = { viewModel.toggleTaskCompletion(task.id) }
+                onToggleCompleted = { viewModel.toggleTaskCompletion(task.id) },
+                onDelete = {
+                    selectedTaskIdForDetail = null
+                    viewModel.deleteTask(task.id)
+                }
             )
         }
 }

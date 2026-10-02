@@ -66,6 +66,9 @@ fun MainScaffold(
     // La notificación de pendientes pide abrir el chat del asistente
     openAssistant: Boolean = false,
     onAssistantOpened: () -> Unit = {},
+    // El "+" del widget pide abrir la hoja de nueva tarea en Inicio
+    addTask: Boolean = false,
+    onAddTaskOpened: () -> Unit = {},
     themeViewModel: ThemeViewModel = hiltViewModel(),
     authViewModel: AuthViewModel = hiltViewModel(),
     // Uno solo para el chat y el número de la barra, así nunca se desincronizan
@@ -121,6 +124,11 @@ fun MainScaffold(
                     navController.navigate(AppScreen.Login.route) {
                         popUpTo(navController.graph.id) { inclusive = true }
                     }
+                }
+            }
+            LaunchedEffect(addTask, session) {
+                if (addTask && session is SessionState.LoggedIn && navController.currentDestination?.route != AppScreen.Home.route) {
+                    navigateToTab(AppScreen.Home)
                 }
             }
             LaunchedEffect(openAssistant, session) {
@@ -221,6 +229,8 @@ fun MainScaffold(
                 composable(AppScreen.Home.route) {
                      HomeScreen(
                          onOpenSettings = { navController.navigate(AppScreen.Settings.route) },
+                         openQuickTask = addTask && session is SessionState.LoggedIn,
+                         onQuickTaskOpened = onAddTaskOpened,
                          onNavigateToNotes = { navController.navigate(AppScreen.NotesList.route) }
                      )
                 }

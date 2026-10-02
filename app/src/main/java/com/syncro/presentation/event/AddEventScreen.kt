@@ -295,32 +295,7 @@ fun AddEventContent(
             // Categoría
             Column {
                 SectionTitle(Icons.Rounded.LocalOffer, "Categoría")
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    categories.forEach { category ->
-                        val isSelected = selectedCategory == category.name
-                        FilterChip(
-                            selected = isSelected,
-                            onClick = { selectedCategory = category.name },
-                            label = { Text(category.name, fontWeight = FontWeight.SemiBold, maxLines = 1) },
-                            leadingIcon = { Icon(category.icon, contentDescription = null, modifier = Modifier.size(18.dp)) },
-                            shape = RoundedCornerShape(12.dp),
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = category.color.copy(alpha = 0.18f),
-                                selectedLabelColor = category.color,
-                                selectedLeadingIconColor = category.color,
-                                iconColor = category.color
-                            ),
-                            border = FilterChipDefaults.filterChipBorder(
-                                enabled = true,
-                                selected = isSelected,
-                                borderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f),
-                                selectedBorderColor = category.color.copy(alpha = 0.6f)
-                            )
-                        )
-                    }
-                }
+                CategoryChips(categories, selectedCategory, onSelect = { selectedCategory = it })
             }
 
             // Prioridad
@@ -513,6 +488,38 @@ fun AddEventContent(
     }
 }
 
+/** Chips de categoría, cada uno con su color e icono. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun CategoryChips(categories: List<CategoryItem>, selected: String, onSelect: (String) -> Unit) {
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        categories.forEach { category ->
+            val isSelected = selected == category.name
+            FilterChip(
+                selected = isSelected,
+                onClick = { onSelect(category.name) },
+                label = { Text(category.name, fontWeight = FontWeight.SemiBold, maxLines = 1) },
+                leadingIcon = { Icon(category.icon, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                shape = RoundedCornerShape(12.dp),
+                colors = FilterChipDefaults.filterChipColors(
+                    selectedContainerColor = category.color.copy(alpha = 0.18f),
+                    selectedLabelColor = category.color,
+                    selectedLeadingIconColor = category.color,
+                    iconColor = category.color
+                ),
+                border = FilterChipDefaults.filterChipBorder(
+                    enabled = true,
+                    selected = isSelected,
+                    borderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f),
+                    selectedBorderColor = category.color.copy(alpha = 0.6f)
+                )
+            )
+        }
+    }
+}
+
 /** Fila "Empieza"/"Termina" con dos botones separados: la fecha y (si no es todo el día) la hora. */
 @Composable
 private fun DateTimeRow(
@@ -544,7 +551,7 @@ private fun DateTimeRow(
 }
 
 @Composable
-private fun PickerButton(text: String, onClick: () -> Unit) {
+internal fun PickerButton(text: String, onClick: () -> Unit) {
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(12.dp),
@@ -559,7 +566,7 @@ private fun PickerButton(text: String, onClick: () -> Unit) {
 
 /** Icono en un cuadrado suave del color del evento, igual que en el detalle. */
 @Composable
-private fun IconBadge(icon: ImageVector, accent: Color) {
+internal fun IconBadge(icon: ImageVector, accent: Color) {
     Box(
         modifier = Modifier
             .size(40.dp)
@@ -572,7 +579,7 @@ private fun IconBadge(icon: ImageVector, accent: Color) {
 }
 
 @Composable
-private fun FieldRow(
+internal fun FieldRow(
     icon: ImageVector,
     accent: Color,
     value: String,
@@ -599,7 +606,7 @@ private fun FieldRow(
 }
 
 @Composable
-private fun transparentTextFieldColors() = TextFieldDefaults.colors(
+internal fun transparentTextFieldColors() = TextFieldDefaults.colors(
     focusedContainerColor = Color.Transparent,
     unfocusedContainerColor = Color.Transparent,
     disabledContainerColor = Color.Transparent,

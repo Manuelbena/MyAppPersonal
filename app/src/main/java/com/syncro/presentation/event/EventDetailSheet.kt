@@ -34,7 +34,8 @@ fun EventDetailSheet(
     onToggleCompleted: () -> Unit,
     onSubtaskToggle: (String) -> Unit,
     onEdit: () -> Unit,
-    onShare: () -> Unit
+    onShare: () -> Unit,
+    onDelete: () -> Unit
 ) {
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -49,7 +50,8 @@ fun EventDetailSheet(
             onToggleCompleted = onToggleCompleted,
             onSubtaskToggle = onSubtaskToggle,
             onEdit = onEdit,
-            onShare = onShare
+            onShare = onShare,
+            onDelete = onDelete
         )
     }
 }
@@ -60,7 +62,8 @@ fun EventDetailContent(
     onToggleCompleted: () -> Unit,
     onSubtaskToggle: (String) -> Unit,
     onEdit: () -> Unit,
-    onShare: () -> Unit
+    onShare: () -> Unit,
+    onDelete: () -> Unit
 ) {
     // Igual que en la tarjeta: verde si está completado, si no el color de la categoría
     val accent = if (event.isCompleted) Emerald500 else event.categoryColor.toColor()
@@ -135,6 +138,13 @@ fun EventDetailContent(
             }
 
             SyncStatus(isSynced = event.remoteId != null)
+
+            DeleteItemButton(
+                label = "Eliminar evento",
+                confirmTitle = "¿Eliminar este evento?",
+                warning = deleteWarning(isSynced = event.remoteId != null, googleService = "Google Calendar"),
+                onDelete = onDelete
+            )
         }
     }
 }

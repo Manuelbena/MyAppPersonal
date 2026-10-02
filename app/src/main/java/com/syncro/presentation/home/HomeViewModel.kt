@@ -17,6 +17,8 @@ import com.syncro.domain.usecase.SyncGoogleTasksUseCase
 import com.syncro.domain.usecase.ToggleEventCompletionUseCase
 import com.syncro.domain.usecase.ToggleSubtaskCompletionUseCase
 import com.syncro.domain.usecase.ToggleTaskCompletionUseCase
+import com.syncro.domain.usecase.DeleteEventUseCase
+import com.syncro.domain.usecase.DeleteTaskUseCase
 import com.syncro.domain.usecase.DeleteNoteUseCase
 import com.syncro.domain.usecase.GetNotesUseCase
 import com.syncro.domain.usecase.GetDailyFocusUseCase
@@ -41,6 +43,7 @@ data class HomeUiState(
     val selectedDate: LocalDate = LocalDate.now(),
     val quote: String = "",
     val quoteAuthor: String = "",
+    /** Todo lo del día seleccionado, en orden `sortedForDay`. */
     val timelineItems: List<SyncroItem> = emptyList(),
     /** Las prioridades elegidas para el día seleccionado (en el orden en que se eligieron). */
     val focusTasks: List<SyncroItem.Task> = emptyList(),
@@ -63,6 +66,8 @@ class HomeViewModel @Inject constructor(
     private val toggleTaskCompletionUseCase: ToggleTaskCompletionUseCase,
     private val toggleSubtaskCompletionUseCase: ToggleSubtaskCompletionUseCase,
     private val toggleEventCompletionUseCase: ToggleEventCompletionUseCase,
+    private val deleteEventUseCase: DeleteEventUseCase,
+    private val deleteTaskUseCase: DeleteTaskUseCase,
     private val syncGoogleTasksUseCase: SyncGoogleTasksUseCase,
     private val syncGoogleCalendarUseCase: SyncGoogleCalendarUseCase,
     private val pushPendingChangesUseCase: com.syncro.domain.usecase.PushPendingChangesUseCase,
@@ -172,18 +177,18 @@ class HomeViewModel @Inject constructor(
         _uiState.update { it.copy(selectedDate = date) }
     }
 
+    /** Las tareas solo tienen día: se guardan a las 00:00 ("todo el día"), como las de Google Tasks. */
     fun saveQuickTask(
-        title: String, 
-        description: String, 
-        date: LocalDate, 
-        time: LocalTime
+        title: String,
+        description: String,
+        date: LocalDate
     ) {
         viewModelScope.launch {
             val result = saveTaskUseCase(
-                title = title, 
-                description = description, 
-                date = date, 
-                time = time
+                title = title,
+                description = description,
+                date = date,
+                time = LocalTime.MIDNIGHT
             )
             val msg = result.fold(
                 onSuccess = { "Tarea creada correctamente" },
@@ -240,6 +245,14 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch {
             toggleEventCompletionUseCase(eventId)
         }
+    }
+
+    fun deleteEvent(eventId: String) {
+        viewModelScope.launch { deleteEventUseCase(eventId) }
+    }
+
+    fun deleteTask(taskId: String) {
+        viewModelScope.launch { deleteTaskUseCase(taskId) }
     }
 
     fun toggleSubtaskCompletion(eventId: String, subtaskTitle: String) {

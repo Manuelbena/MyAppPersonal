@@ -23,5 +23,8 @@ data class EventEntity(
     val notificationEnabled: Boolean = true,
     val isCompleted: Boolean = false,
     // Cambios locales aún no confirmados por Google (0 = sincronizado)
-    @ColumnInfo(defaultValue = "0") val pendingChanges: Int = 0
+    @ColumnInfo(defaultValue = "0") val pendingChanges: Int = 0,
+    // Borrado en la app pero aún no en Google: no se muestra, y la subida lo borrará allí. Sin esta
+    // marca, la siguiente sincronización lo volvería a traer
+    @ColumnInfo(defaultValue = "0") val isDeleted: Boolean = false
 )

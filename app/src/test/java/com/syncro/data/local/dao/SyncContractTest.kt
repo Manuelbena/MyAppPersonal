@@ -179,6 +179,31 @@ class SyncContractTest {
     }
 
     @Test
+    fun `una tarea borrada no se muestra en ninguna lista pero sigue pendiente`() = runTest {
+        taskDao.insertTask(aSyncedTaskEntity(id = "t1", remoteId = "g-1"))
+
+        taskDao.markTaskDeleted("t1")
+
+        assertTrue(taskDao.getTasksByDate(DAY.toEpochDay()).first().isEmpty())
+        assertTrue(taskDao.getTasksInRange(DAY.toEpochDay(), DAY.toEpochDay()).first().isEmpty())
+        assertTrue(taskDao.getUnfinishedTasksUntil(DAY.toEpochDay()).first().isEmpty())
+        assertTrue("t1" in taskDao.getPendingTaskIds())
+        assertTrue("La sync no debe borrarla (lo haría sin avisar a Google)", "g-1" !in taskDao.getSyncedRemoteIds())
+    }
+
+    @Test
+    fun `un evento borrado no se muestra pero sigue pendiente y la sync no lo toca`() = runTest {
+        eventDao.insertEvent(aSyncedEventEntity(id = "e1", remoteId = "g-1"))
+
+        eventDao.markEventDeleted("e1")
+
+        assertTrue(eventDao.getEventsByDate(DAY.toEpochDay()).first().isEmpty())
+        assertTrue(eventDao.getEventsInRange(DAY.toEpochDay(), DAY.toEpochDay()).first().isEmpty())
+        assertTrue("e1" in eventDao.getPendingEventIds())
+        assertTrue("La sync no debe borrarlo (lo haría sin avisar a Google)", eventDao.getSyncedRemoteIdsInRange(DAY.toEpochDay(), DAY.toEpochDay()).isEmpty())
+    }
+
+    @Test
     fun `los eventos confirman la subida con la misma regla`() = runTest {
         eventDao.insertEvent(aSyncedEventEntity(id = "e1", remoteId = null, pendingChanges = 1))
         eventDao.toggleEventCompletion("e1")

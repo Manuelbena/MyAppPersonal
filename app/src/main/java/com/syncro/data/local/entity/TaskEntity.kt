@@ -21,5 +21,8 @@ data class TaskEntity(
     @ColumnInfo(defaultValue = "0") val pendingChanges: Int = 0,
     // La fecha se cambió en la app (p. ej. al pasar la tarea a mañana) y hay que mandarla a Google.
     // Sin esta marca el patch no envía la fecha, para no ponérsela a las tareas de Google que no tienen
-    @ColumnInfo(defaultValue = "0") val dateChanged: Boolean = false
+    @ColumnInfo(defaultValue = "0") val dateChanged: Boolean = false,
+    // Borrada en la app pero aún no en Google: no se muestra, y la subida la borrará allí. Sin esta
+    // marca, la siguiente sincronización la volvería a traer
+    @ColumnInfo(defaultValue = "0") val isDeleted: Boolean = false
 )

@@ -37,7 +37,8 @@ class EventDetailContentTest {
                 onToggleCompleted = { calls += "toggle" },
                 onSubtaskToggle = { calls += "subtask:$it" },
                 onEdit = { calls += "edit" },
-                onShare = { calls += "share" }
+                onShare = { calls += "share" },
+                onDelete = { calls += "delete" }
             )
         }
     }
@@ -88,6 +89,21 @@ class EventDetailContentTest {
         compose.onNodeWithText("Pendiente").performClick()
         compose.onNodeWithText("Solo en este dispositivo").performScrollTo().assertIsDisplayed()
         assertEquals(listOf("toggle"), calls)
+    }
+
+    @Test
+    fun `eliminar pide confirmacion y avisa de que se borra de Google`() {
+        show(anEvent(title = "Dentista").copy(remoteId = "g-1"))
+
+        compose.onNodeWithText("Eliminar evento").performScrollTo().performClick()
+        compose.onNodeWithText("Se borrará también de tu Google Calendar", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("Cancelar").performClick()
+        assertEquals("Cancelar no borra", emptyList<String>(), calls)
+
+        compose.onNodeWithText("Eliminar evento").performScrollTo().performClick()
+        compose.onNodeWithText("Eliminar").performClick()
+
+        assertEquals(listOf("delete"), calls)
     }
 
     @Test

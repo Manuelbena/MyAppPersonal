@@ -48,11 +48,16 @@ class TaskRepositoryImpl @Inject constructor(
     }
 
     override suspend fun getTaskById(taskId: String): SyncroItem.Task? {
-        return dao.getTaskById(taskId)?.toDomain()
+        // Una tarea borrada ya no existe para la app, aunque siga en la tabla hasta borrarse en Google
+        return dao.getTaskById(taskId)?.takeUnless { it.isDeleted }?.toDomain()
     }
 
     override suspend fun toggleTaskCompletion(taskId: String) {
         dao.toggleTaskCompletion(taskId)
+    }
+
+    override suspend fun deleteTask(taskId: String) {
+        dao.markTaskDeleted(taskId)
     }
 
     override suspend fun moveTask(taskId: String, date: LocalDate) {

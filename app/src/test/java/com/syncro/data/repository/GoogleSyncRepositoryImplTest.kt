@@ -334,6 +334,59 @@ class GoogleSyncRepositoryImplTest {
     // region Subida de tareas
 
     @Test
+    fun `borrar una tarea la borra en su lista de Google y despues en local`() = runTest {
+        google.addTask(googleTask("g-1", "Llamar al banco"), taskListId = "lista-trabajo")
+        taskDao.insertTask(aSyncedTaskEntity(id = "t1", remoteId = "g-1").copy(taskListId = "lista-trabajo"))
+
+        taskDao.markTaskDeleted("t1")
+        assertTrue(repository.pushTask("t1").isSuccess)
+
+        assertEquals(listOf("deleteTask(lista-trabajo, g-1)"), google.calls)
+        assertNull(google.task("g-1"))
+        assertNull(taskDao.getTaskById("t1"))
+    }
+
+    @Test
+    fun `una tarea que nunca se subio se borra sin llamar a Google`() = runTest {
+        taskDao.insertTask(aSyncedTaskEntity(id = "t1", remoteId = null, pendingChanges = 1))
+
+        taskDao.markTaskDeleted("t1")
+        repository.pushTask("t1")
+
+        assertTrue(google.calls.isEmpty())
+        assertNull(taskDao.getTaskById("t1"))
+    }
+
+    @Test
+    fun `si la tarea ya no existia en Google el borrado local se completa igual`() = runTest {
+        taskDao.insertTask(aSyncedTaskEntity(id = "t1", remoteId = "g-que-ya-no-existe"))
+
+        taskDao.markTaskDeleted("t1")
+
+        assertTrue(repository.pushTask("t1").isSuccess)
+        assertNull(taskDao.getTaskById("t1"))
+    }
+
+    @Test
+    fun `tarea borrada sin conexion no vuelve al sincronizar y se completa al volver la red`() = runTest {
+        google.addTask(googleTask("g-1", "Llamar al banco", due = DAY))
+        taskDao.insertTask(aSyncedTaskEntity(id = "t1", remoteId = "g-1"))
+        google.networkError = IOException("Sin conexión")
+
+        taskDao.markTaskDeleted("t1")
+        assertTrue(repository.pushTask("t1").isFailure)
+
+        google.networkError = null
+        repository.syncTasks(force = true)
+        assertTrue("Sigue marcada como borrada", taskDao.getTaskById("t1")!!.isDeleted)
+        assertTrue(taskDao.getTasksByDate(DAY.toEpochDay()).first().isEmpty())
+
+        assertTrue(repository.pushPendingChanges().isSuccess)
+        assertNull(google.task("g-1"))
+        assertNull(taskDao.getTaskById("t1"))
+    }
+
+    @Test
     fun `subir una tarea nueva la crea en la lista principal con su fecha`() = runTest {
         taskDao.insertTask(aSyncedTaskEntity(id = "t1", remoteId = null, pendingChanges = 1).copy(title = "Nueva"))
 
@@ -439,6 +492,60 @@ class GoogleSyncRepositoryImplTest {
     // endregion
 
     // region Subida de eventos
+
+    @Test
+    fun `borrar un evento lo borra en Google y despues en local`() = runTest {
+        google.addEvent(timedEvent("g-1", "Dentista", DAY, at("10:00"), at("11:00")))
+        eventDao.insertEvent(aSyncedEventEntity(id = "e1", remoteId = "g-1"))
+
+        eventDao.markEventDeleted("e1")
+        assertTrue(repository.pushEvent("e1").isSuccess)
+
+        assertNull(google.events["g-1"])
+        assertNull(eventDao.getEventById("e1"))
+    }
+
+    @Test
+    fun `un evento que nunca se subio se borra sin llamar a Google`() = runTest {
+        eventDao.insertEvent(aSyncedEventEntity(id = "e1", remoteId = null, pendingChanges = 1))
+
+        eventDao.markEventDeleted("e1")
+        repository.pushEvent("e1")
+
+        assertTrue(google.calls.none { it.startsWith("deleteEvent") || it == "insertEvent" })
+        assertNull(eventDao.getEventById("e1"))
+    }
+
+    @Test
+    fun `si ya no existia en Google el borrado local se completa igual`() = runTest {
+        eventDao.insertEvent(aSyncedEventEntity(id = "e1", remoteId = "g-que-ya-no-existe"))
+
+        eventDao.markEventDeleted("e1")
+
+        assertTrue(repository.pushEvent("e1").isSuccess)
+        assertNull(eventDao.getEventById("e1"))
+    }
+
+    // Regresión preventiva: si el borrado solo quitara la fila, la siguiente descarga lo traería de vuelta
+    @Test
+    fun `borrado sin conexion no vuelve al sincronizar y se completa al volver la red`() = runTest {
+        google.addEvent(timedEvent("g-1", "Dentista", DAY, at("10:00"), at("11:00")))
+        eventDao.insertEvent(aSyncedEventEntity(id = "e1", remoteId = "g-1"))
+        google.networkError = IOException("Sin conexión")
+
+        eventDao.markEventDeleted("e1")
+        assertTrue(repository.pushEvent("e1").isFailure)
+        assertEquals(1, scheduler.scheduledPushes)
+
+        google.networkError = null
+        repository.syncCalendar(DAY)
+        assertTrue("Sigue marcado como borrado", eventDao.getEventById("e1")!!.isDeleted)
+        assertTrue(eventDao.getEventsByDate(DAY.toEpochDay()).first().isEmpty())
+
+        assertTrue(repository.pushPendingChanges().isSuccess)
+        assertNull(google.events["g-1"])
+        assertNull(eventDao.getEventById("e1"))
+    }
 
     @Test
     fun `subir un evento nuevo lo crea con sus subtareas en la descripcion`() = runTest {

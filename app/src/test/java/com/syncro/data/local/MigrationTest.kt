@@ -96,6 +96,27 @@ class MigrationTest {
         assertFalse(task.dateChanged)
     }
 
+    @Test
+    fun `migrar de la version 11 conserva los eventos, ninguno borrado`() = runTest {
+        createDatabase(Schema11.CREATE_STATEMENTS, Schema11.VERSION) { insertEvent(id = "e1", startTime = "10:00", endTime = "11:00") }
+
+        val event = openCurrentVersion().eventDao.getEventById("e1")!!
+
+        assertFalse(event.isDeleted)
+    }
+
+    @Test
+    fun `migrar de la version 12 conserva las tareas, ninguna borrada`() = runTest {
+        createDatabase(Schema12.CREATE_STATEMENTS, Schema12.VERSION) {
+            execSQL("INSERT INTO tasks (id, remoteId, taskListId, title, description, date, time, isCompleted, pendingChanges, dateChanged) VALUES ('t1', 'g-t1', NULL, 'Llamar al banco', '', ${DAY.toEpochDay()}, '17:00', 0, 0, 0)")
+        }
+
+        val task = openCurrentVersion().taskDao.getTaskById("t1")!!
+
+        assertEquals("Llamar al banco", task.title)
+        assertFalse(task.isDeleted)
+    }
+
     private fun createVersion9Database(seed: SQLiteDatabase.() -> Unit) =
         createDatabase(Schema9.CREATE_STATEMENTS, Schema9.VERSION, seed)
 
@@ -120,7 +141,7 @@ class MigrationTest {
     /** Igual que en AppModule pero sin fallbackToDestructiveMigration: un fallo debe verse. */
     private fun openCurrentVersion(): SyncroDatabase =
         Room.databaseBuilder(context, SyncroDatabase::class.java, DB_NAME)
-            .addMigrations(MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11)
+            .addMigrations(MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13)
             .allowMainThreadQueries()
             .build()
             .also { database = it }

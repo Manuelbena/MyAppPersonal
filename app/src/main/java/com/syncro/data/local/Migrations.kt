@@ -39,3 +39,17 @@ val MIGRATION_10_11 = object : Migration(10, 11) {
         db.execSQL("ALTER TABLE tasks ADD COLUMN dateChanged INTEGER NOT NULL DEFAULT 0")
     }
 }
+
+/** Marca de "borrado en la app, pendiente de borrar en Google", para borrar eventos sin conexión. */
+val MIGRATION_11_12 = object : Migration(11, 12) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE events ADD COLUMN isDeleted INTEGER NOT NULL DEFAULT 0")
+    }
+}
+
+/** Marca de "borrada en la app, pendiente de borrar en Google", para borrar tareas sin conexión. */
+val MIGRATION_12_13 = object : Migration(12, 13) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE tasks ADD COLUMN isDeleted INTEGER NOT NULL DEFAULT 0")
+    }
+}

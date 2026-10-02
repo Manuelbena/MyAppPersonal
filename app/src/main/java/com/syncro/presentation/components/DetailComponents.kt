@@ -6,9 +6,14 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CloudDone
+import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.PhoneAndroid
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -250,3 +255,41 @@ fun SubtaskProgress(done: Int, total: Int, color: Color, modifier: Modifier = Mo
         modifier = modifier.height(6.dp)
     )
 }
+
+/**
+ * Botón rojo de borrar al final de un detalle, separado de las acciones rápidas para no tocarlo sin
+ * querer, con confirmación. [warning] explica qué pasa (p. ej. que también se borra en Google).
+ */
+@Composable
+fun DeleteItemButton(label: String, confirmTitle: String, warning: String, onDelete: () -> Unit) {
+    var confirm by remember { mutableStateOf(false) }
+    OutlinedButton(
+        onClick = { confirm = true },
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.5f)),
+        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
+    ) {
+        Icon(Icons.Rounded.DeleteOutline, contentDescription = null, modifier = Modifier.size(20.dp))
+        Spacer(Modifier.width(8.dp))
+        Text(label)
+    }
+    if (confirm) {
+        AlertDialog(
+            onDismissRequest = { confirm = false },
+            title = { Text(confirmTitle) },
+            text = { Text(warning) },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirm = false
+                    onDelete()
+                }) { Text("Eliminar", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = { TextButton(onClick = { confirm = false }) { Text("Cancelar") } }
+        )
+    }
+}
+
+/** Qué se borra, según si el elemento llegó a subirse a Google. */
+fun deleteWarning(isSynced: Boolean, googleService: String): String =
+    if (isSynced) "Se borrará también de tu $googleService. No se puede deshacer." else "No se puede deshacer."

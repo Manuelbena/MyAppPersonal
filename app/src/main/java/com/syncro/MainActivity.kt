@@ -20,6 +20,8 @@ class MainActivity : ComponentActivity() {
 
     // La notificación de pendientes pide abrir el chat del asistente; se consume al navegar
     private var openAssistant by mutableStateOf(false)
+    // El "+" del widget pide abrir la hoja de nueva tarea; se consume al abrirla
+    private var addTask by mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -37,7 +39,9 @@ class MainActivity : ComponentActivity() {
                 // el Scaffold con el menú flotante y el NavHost.
                 MainScaffold(
                     openAssistant = openAssistant,
-                    onAssistantOpened = { openAssistant = false }
+                    onAssistantOpened = { openAssistant = false },
+                    addTask = addTask,
+                    onAddTaskOpened = { addTask = false }
                 )
             }
         }
@@ -48,7 +52,13 @@ class MainActivity : ComponentActivity() {
         handleIntent(intent)
     }
 
+    companion object {
+        /** Extra del intent: abrir la hoja de nueva tarea (lo usa el widget). */
+        const val EXTRA_ADD_TASK = "add_task"
+    }
+
     private fun handleIntent(intent: Intent?) {
         if (intent?.getBooleanExtra(DigestNotifier.EXTRA_OPEN_ASSISTANT, false) == true) openAssistant = true
+        if (intent?.getBooleanExtra(EXTRA_ADD_TASK, false) == true) addTask = true
     }
 }

@@ -215,11 +215,12 @@ fun CalendarScreen(
     if (showQuickTaskSheet) {
         QuickTaskSheet(
             onDismiss = { showQuickTaskSheet = false },
-            onSave = { _, _, _, _ ->
-                // En Calendar ViewModel no tenemos implementado save aún, 
-                // pero conectamos la UI
-                showQuickTaskSheet = false 
-            }
+            onSave = { title, description, date ->
+                viewModel.saveTask(title, description, date)
+                showQuickTaskSheet = false
+            },
+            // Se crea en el día seleccionado del calendario (hoy, si no hay ninguno o ya pasó)
+            initialDate = maxOf(uiState.selectedDate ?: LocalDate.now(), LocalDate.now())
         )
     }
 }
@@ -245,7 +246,11 @@ fun DayDetailsDialog(
             TaskDetailSheet(
                 task = task,
                 onDismiss = { selectedTaskId = null },
-                onToggleCompleted = { viewModel.toggleTaskCompletion(task.id) }
+                onToggleCompleted = { viewModel.toggleTaskCompletion(task.id) },
+                onDelete = {
+                    selectedTaskId = null
+                    viewModel.deleteTask(task.id)
+                }
             )
         }
 
@@ -261,7 +266,11 @@ fun DayDetailsDialog(
                     selectedEventId = null
                     onEditEvent(event)
                 },
-                onShare = { context.shareEvent(event) }
+                onShare = { context.shareEvent(event) },
+                onDelete = {
+                    selectedEventId = null
+                    viewModel.deleteEvent(event.id)
+                }
             )
         }
 

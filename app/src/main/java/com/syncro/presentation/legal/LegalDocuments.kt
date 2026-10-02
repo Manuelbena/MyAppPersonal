@@ -44,7 +44,7 @@ data class OpenSourceComponent(val name: String, val author: String, val license
 private const val APACHE = "licenses/Apache-2.0.txt"
 
 val openSourceComponents = listOf(
-    OpenSourceComponent("Android Jetpack (AndroidX, Jetpack Compose, Material 3, Room, WorkManager, DataStore, Navigation, Credential Manager)", "The Android Open Source Project", "Apache License 2.0", APACHE),
+    OpenSourceComponent("Android Jetpack (AndroidX, Jetpack Compose, Material 3, Room, WorkManager, DataStore, Navigation, Credential Manager, Glance)", "The Android Open Source Project", "Apache License 2.0", APACHE),
     OpenSourceComponent("Kotlin y kotlinx.coroutines", "JetBrains s.r.o. y colaboradores", "Apache License 2.0", APACHE),
     OpenSourceComponent("Dagger / Hilt", "The Dagger Authors", "Apache License 2.0", APACHE),
     OpenSourceComponent("Media3 (ExoPlayer)", "The Android Open Source Project", "Apache License 2.0", APACHE),

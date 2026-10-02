@@ -4,8 +4,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.syncro.domain.model.SyncroItem
 import com.syncro.domain.model.sortedForDay
+import com.syncro.domain.usecase.DeleteEventUseCase
+import com.syncro.domain.usecase.DeleteTaskUseCase
 import com.syncro.domain.usecase.GetEventsInRangeUseCase
 import com.syncro.domain.usecase.GetTasksInRangeUseCase
+import com.syncro.domain.usecase.SaveTaskUseCase
 import com.syncro.domain.usecase.SyncGoogleCalendarUseCase
 import com.syncro.domain.usecase.SyncGoogleTasksUseCase
 import com.syncro.domain.usecase.ToggleEventCompletionUseCase
@@ -19,6 +22,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.time.LocalDate
+import java.time.LocalTime
 import java.time.YearMonth
 import javax.inject.Inject
 
@@ -38,7 +42,10 @@ class CalendarViewModel @Inject constructor(
     private val syncGoogleTasksUseCase: SyncGoogleTasksUseCase,
     private val toggleEventCompletionUseCase: ToggleEventCompletionUseCase,
     private val toggleSubtaskCompletionUseCase: ToggleSubtaskCompletionUseCase,
-    private val toggleTaskCompletionUseCase: ToggleTaskCompletionUseCase
+    private val toggleTaskCompletionUseCase: ToggleTaskCompletionUseCase,
+    private val deleteEventUseCase: DeleteEventUseCase,
+    private val deleteTaskUseCase: DeleteTaskUseCase,
+    private val saveTaskUseCase: SaveTaskUseCase
 ) : ViewModel() {
 
     private val _selectedMonth = MutableStateFlow(YearMonth.now())
@@ -86,6 +93,13 @@ class CalendarViewModel @Inject constructor(
         _selectedDate.value = date
     }
 
+    /** Las tareas solo tienen día: se guardan a las 00:00 ("todo el día"), igual que en Inicio. */
+    fun saveTask(title: String, description: String, date: LocalDate) {
+        viewModelScope.launch {
+            saveTaskUseCase(title, description, date, LocalTime.MIDNIGHT)
+        }
+    }
+
     fun toggleTaskCompletion(taskId: String) {
         viewModelScope.launch {
             toggleTaskCompletionUseCase(taskId)
@@ -96,6 +110,14 @@ class CalendarViewModel @Inject constructor(
         viewModelScope.launch {
             toggleEventCompletionUseCase(eventId)
         }
+    }
+
+    fun deleteEvent(eventId: String) {
+        viewModelScope.launch { deleteEventUseCase(eventId) }
+    }
+
+    fun deleteTask(taskId: String) {
+        viewModelScope.launch { deleteTaskUseCase(taskId) }
     }
 
     fun toggleSubtaskCompletion(eventId: String, subtaskTitle: String) {

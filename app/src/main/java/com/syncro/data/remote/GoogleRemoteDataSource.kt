@@ -21,10 +21,16 @@ interface GoogleRemoteDataSource {
 
     suspend fun patchTask(taskListId: String, taskId: String, task: Task)
 
+    /** Borra la tarea en Google. Si ya no existe, lanza 404/410 (quien llama decide si le importa). */
+    suspend fun deleteTask(taskListId: String, taskId: String)
+
     /** Eventos del calendario principal que se solapan con [timeMin, timeMax), uno por repetición. */
     suspend fun listEvents(timeMin: DateTime, timeMax: DateTime): List<Event>
 
     suspend fun insertEvent(event: Event): Event
 
     suspend fun patchEvent(eventId: String, event: Event)
+
+    /** Borra el evento en Google. Si ya no existe, lanza 404/410 (quien llama decide si le importa). */
+    suspend fun deleteEvent(eventId: String)
 }

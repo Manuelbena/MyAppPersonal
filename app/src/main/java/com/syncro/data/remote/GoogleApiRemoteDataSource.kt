@@ -51,6 +51,10 @@ class GoogleApiRemoteDataSource @Inject constructor(
         tasksService().tasks().patch(taskListId, taskId, task).execute()
     }
 
+    override suspend fun deleteTask(taskListId: String, taskId: String) {
+        tasksService().tasks().delete(taskListId, taskId).execute()
+    }
+
     override suspend fun listEvents(timeMin: DateTime, timeMax: DateTime): List<Event> {
         val service = calendarService()
         val events = mutableListOf<Event>()
@@ -75,6 +79,10 @@ class GoogleApiRemoteDataSource @Inject constructor(
     override suspend fun patchEvent(eventId: String, event: Event) {
         // Patch y no update: conserva en Google lo que la app no gestiona (invitados, avisos…)
         calendarService().events().patch(PRIMARY_CALENDAR, eventId, event).execute()
+    }
+
+    override suspend fun deleteEvent(eventId: String) {
+        calendarService().events().delete(PRIMARY_CALENDAR, eventId).execute()
     }
 
     private suspend fun credentialFor(scope: String): GoogleAccountCredential {

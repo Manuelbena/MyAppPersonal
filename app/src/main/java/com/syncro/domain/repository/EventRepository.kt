@@ -13,4 +13,6 @@ interface EventRepository {
     suspend fun getEventById(eventId: String): SyncroItem.Event?
     suspend fun toggleSubtaskCompletion(eventId: String, subtaskTitle: String)
     suspend fun toggleEventCompletion(eventId: String)
+    /** Lo quita de la app al momento; el borrado en Google queda pendiente de subir. */
+    suspend fun deleteEvent(eventId: String)
 }

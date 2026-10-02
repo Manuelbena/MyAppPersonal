@@ -11,6 +11,8 @@ interface TaskRepository {
     suspend fun insertTask(task: SyncroItem.Task)
     suspend fun getTaskById(taskId: String): SyncroItem.Task?
     suspend fun toggleTaskCompletion(taskId: String)
+    /** La quita de la app al momento; el borrado en Google queda pendiente de subir. */
+    suspend fun deleteTask(taskId: String)
     /** Pasa la tarea a otro día (misma hora); la nueva fecha queda pendiente de subir a Google. */
     suspend fun moveTask(taskId: String, date: LocalDate)
     /** Tareas sin hacer hasta ese día incluido, también las atrasadas. */

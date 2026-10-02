@@ -59,6 +59,11 @@ class FakeTaskRepository(private val log: CallLog = CallLog()) : TaskRepository 
         }
     }
 
+    override suspend fun deleteTask(taskId: String) {
+        log.calls += "deleteTask($taskId)"
+        tasks.update { it - taskId }
+    }
+
     override suspend fun moveTask(taskId: String, date: LocalDate) {
         log.calls += "moveTask($taskId, $date)"
         tasks.update { all ->
@@ -105,6 +110,11 @@ class FakeEventRepository(private val log: CallLog = CallLog()) : EventRepositor
             val event = all[eventId] ?: return@update all
             all + (eventId to event.copy(isCompleted = !event.isCompleted))
         }
+    }
+
+    override suspend fun deleteEvent(eventId: String) {
+        log.calls += "deleteEvent($eventId)"
+        events.update { it - eventId }
     }
 }
 

@@ -5,6 +5,8 @@ import androidx.compose.ui.graphics.Color
 import com.google.android.gms.auth.UserRecoverableAuthException
 import com.google.api.client.googleapis.extensions.android.gms.auth.UserRecoverableAuthIOException
 import com.syncro.domain.model.User
+import com.syncro.domain.usecase.DeleteEventUseCase
+import com.syncro.domain.usecase.DeleteTaskUseCase
 import com.syncro.domain.usecase.DeleteNoteUseCase
 import com.syncro.domain.model.DailyFocus
 import com.syncro.domain.model.FocusedTask
@@ -48,6 +50,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import java.time.Clock
+import java.time.LocalTime
 import java.time.ZoneOffset
 
 /**
@@ -91,6 +94,8 @@ class HomeViewModelTest {
         toggleTaskCompletionUseCase = ToggleTaskCompletionUseCase(tasks, google),
         toggleSubtaskCompletionUseCase = ToggleSubtaskCompletionUseCase(events, google),
         toggleEventCompletionUseCase = ToggleEventCompletionUseCase(events, google),
+        deleteEventUseCase = DeleteEventUseCase(events, google),
+        deleteTaskUseCase = DeleteTaskUseCase(tasks, google),
         syncGoogleTasksUseCase = SyncGoogleTasksUseCase(google),
         syncGoogleCalendarUseCase = SyncGoogleCalendarUseCase(google),
         pushPendingChangesUseCase = PushPendingChangesUseCase(google),
@@ -239,10 +244,22 @@ class HomeViewModelTest {
         val viewModel = createViewModel()
         val effects = collectEffects(viewModel)
 
-        viewModel.saveQuickTask(title = "Comprar pan", description = "", date = DAY, time = at("10:00"))
+        viewModel.saveQuickTask(title = "Comprar pan", description = "", date = DAY)
 
         assertEquals(listOf(HomeEffect.ShowSnackbar("Tarea creada correctamente")), effects)
         assertEquals(1, tasks.tasks.value.size)
+    }
+
+    @Test
+    fun `una tarea nueva solo tiene dia y se guarda de todo el dia sin categoria`() = runTest {
+        val viewModel = createViewModel()
+
+        viewModel.saveQuickTask(title = "Comprar pan", description = "", date = DAY)
+
+        val task = tasks.tasks.value.values.single()
+        assertEquals(LocalTime.MIDNIGHT, task.time)
+        assertTrue(task.isAllDay)
+        assertEquals(null, task.categoryText)
     }
 
     // endregion

@@ -22,7 +22,8 @@ import com.syncro.presentation.theme.toColor
 fun TaskDetailSheet(
     task: SyncroItem.Task,
     onDismiss: () -> Unit,
-    onToggleCompleted: () -> Unit
+    onToggleCompleted: () -> Unit,
+    onDelete: () -> Unit
 ) {
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -32,14 +33,15 @@ fun TaskDetailSheet(
         containerColor = MaterialTheme.colorScheme.surface,
         shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
     ) {
-        TaskDetailContent(task = task, onToggleCompleted = onToggleCompleted)
+        TaskDetailContent(task = task, onToggleCompleted = onToggleCompleted, onDelete = onDelete)
     }
 }
 
 @Composable
 fun TaskDetailContent(
     task: SyncroItem.Task,
-    onToggleCompleted: () -> Unit
+    onToggleCompleted: () -> Unit,
+    onDelete: () -> Unit
 ) {
     val taskColor = task.categoryColor?.toColor() ?: MaterialTheme.colorScheme.primary
     val accent = if (task.isCompleted) Emerald500 else taskColor
@@ -93,6 +95,13 @@ fun TaskDetailContent(
             }
 
             SyncStatus(isSynced = task.remoteId != null)
+
+            DeleteItemButton(
+                label = "Eliminar tarea",
+                confirmTitle = "¿Eliminar esta tarea?",
+                warning = deleteWarning(isSynced = task.remoteId != null, googleService = "Google Tasks"),
+                onDelete = onDelete
+            )
         }
     }
 }

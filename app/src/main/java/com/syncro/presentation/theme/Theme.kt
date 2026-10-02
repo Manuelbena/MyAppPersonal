@@ -16,7 +16,8 @@ import androidx.compose.ui.platform.LocalView
 import android.app.Activity
 import androidx.core.view.WindowCompat
 
-private val DarkColorScheme = darkColorScheme(
+/** También los usa el widget (Glance), que no puede leer el tema de Compose. */
+internal val DarkColorScheme = darkColorScheme(
     primary = Cyan400,
     secondary = Emerald500,
     tertiary = Indigo500,
@@ -31,7 +32,7 @@ private val DarkColorScheme = darkColorScheme(
     outline = Slate500.copy(alpha = 0.5f)
 )
 
-private val LightColorScheme = lightColorScheme(
+internal val LightColorScheme = lightColorScheme(
     primary = Cyan800,
     onPrimary = Color.White,
     primaryContainer = Cyan100,

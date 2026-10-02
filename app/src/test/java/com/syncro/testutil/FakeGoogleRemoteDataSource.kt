@@ -77,6 +77,11 @@ class FakeGoogleRemoteDataSource : GoogleRemoteDataSource {
         existing.applyPatch(task)
     }
 
+    override suspend fun deleteTask(taskListId: String, taskId: String) {
+        record("deleteTask($taskListId, $taskId)")
+        taskLists[resolve(taskListId)]?.remove(taskId) ?: throw notFound()
+    }
+
     override suspend fun listEvents(timeMin: DateTime, timeMax: DateTime): List<Event> {
         record("listEvents")
         return events.values
@@ -97,6 +102,11 @@ class FakeGoogleRemoteDataSource : GoogleRemoteDataSource {
         failIfRejected(event.summary)
         val existing = events[eventId] ?: throw notFound()
         existing.applyPatch(event)
+    }
+
+    override suspend fun deleteEvent(eventId: String) {
+        record("deleteEvent($eventId)")
+        events.remove(eventId) ?: throw notFound()
     }
 
     private fun record(call: String) {
