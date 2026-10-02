@@ -5,8 +5,7 @@ import com.syncro.domain.repository.AccountDataRepository
 import javax.inject.Inject
 
 /** Qué se perdería al cerrar sesión ahora, para avisar antes de hacerlo. */
-class
-ahorGetDataLossSummaryUseCase @Inject constructor(
+class GetDataLossSummaryUseCase @Inject constructor(
     private val accountData: AccountDataRepository
 ) {
     suspend operator fun invoke(): DataLossSummary = accountData.dataLossSummary()
