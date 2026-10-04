@@ -27,7 +27,8 @@ class GetLeftoverTasksUseCase @Inject constructor(
         val now = LocalDateTime.now(clock)
         val eveningFrom = settingsRepository.settings.map { it.digest.eveningTime }.distinctUntilChanged()
         return combine(repository.getUnfinishedTasksUntil(LocalDate.now(clock)), eveningFrom) { unfinished, evening ->
-            leftoverTasks(unfinished, now, evening)
+            // Las que se repiten no se proponen pasar a otro día: ya viene la siguiente repetición
+            leftoverTasks(unfinished.filter { it.seriesId == null }, now, evening)
         }
     }
 }

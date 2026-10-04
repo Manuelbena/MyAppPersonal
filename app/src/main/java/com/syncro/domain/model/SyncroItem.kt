@@ -28,7 +28,11 @@ sealed class SyncroItem {
         val priority: Priority? = null,
         val subtasks: List<Subtask> = emptyList(),
         val isCompleted: Boolean = false,
-        val location: String? = null
+        val location: String? = null,
+        /** La serie de la que es una repetición (ver `RepeatSeries`); null si no se repite. */
+        val seriesId: String? = null,
+        /** Cómo se repite su serie, para mostrarlo; null si no se repite. */
+        val repeat: Recurrence? = null
     ) : SyncroItem() {
         /**
          * Los eventos de día completo se guardan como 00:00–00:00 (así llegan también desde
@@ -62,7 +66,11 @@ sealed class SyncroItem {
         val time: LocalTime,
         val isCompleted: Boolean,
         val categoryText: String? = null,
-        val categoryColor: ArgbColor? = null
+        val categoryColor: ArgbColor? = null,
+        /** La serie de la que es una repetición (ver `RepeatSeries`); null si no se repite. */
+        val seriesId: String? = null,
+        /** Cómo se repite su serie, para mostrarlo; null si no se repite. */
+        val repeat: Recurrence? = null
     ) : SyncroItem() {
         /**
          * Tarea sin hora concreta. Se guarda a las 00:00 (misma convención que los eventos de día

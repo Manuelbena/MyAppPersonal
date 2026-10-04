@@ -24,6 +24,7 @@ import com.syncro.domain.model.HomeSavings
 import com.syncro.domain.model.emoji
 import com.syncro.domain.model.label
 import com.syncro.presentation.savings.formatEuros
+import com.syncro.presentation.savings.title
 import com.syncro.presentation.theme.Amber500
 import com.syncro.presentation.theme.Emerald500
 import com.syncro.presentation.theme.Rose500
@@ -44,7 +45,13 @@ fun HomeSavingsCard(
     modifier: Modifier = Modifier
 ) {
     val accent = if (savings.balanceCents >= 0) Emerald500 else Rose500
-    val monthName = savings.month.month.getDisplayName(TextStyle.FULL, Locale("es", "ES"))
+    // Mes natural: "de octubre"; de nómina a nómina, las fechas: "· 27 sep – 26 oct 2026"
+    val period = savings.period
+    val title = if (period.isCalendarMonth) {
+        "de " + period.month.month.getDisplayName(TextStyle.FULL, Locale("es", "ES"))
+    } else {
+        "· " + period.title()
+    }
 
     Surface(
         onClick = onOpenSavings,
@@ -62,7 +69,7 @@ fun HomeSavingsCard(
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    "💶 Ahorros de $monthName",
+                    "💶 Ahorros $title",
                     modifier = Modifier.weight(1f),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,

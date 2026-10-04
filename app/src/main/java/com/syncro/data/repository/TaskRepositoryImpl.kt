@@ -3,31 +3,35 @@ package com.syncro.data.repository
 import com.syncro.data.local.toLocalTimeOrMidnight
 import com.syncro.data.local.toStoredTime
 import com.syncro.domain.model.ArgbColor
+import com.syncro.data.local.dao.RepeatSeriesDao
 import com.syncro.data.local.dao.TaskDao
 import com.syncro.data.local.entity.TaskEntity
+import com.syncro.domain.model.Recurrence
 import com.syncro.domain.model.SyncroItem
 import com.syncro.domain.repository.TaskRepository
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import java.time.LocalDate
 import javax.inject.Inject
 
 class TaskRepositoryImpl @Inject constructor(
-    private val dao: TaskDao
+    private val dao: TaskDao,
+    private val seriesDao: RepeatSeriesDao
 ) : TaskRepository {
 
-    override fun getTasksByDate(date: LocalDate): Flow<List<SyncroItem.Task>> {
-        val epochDay = date.toEpochDay()
-        return dao.getTasksByDate(epochDay).map { entities ->
-            entities.map { it.toDomain() }
-        }
-    }
+    // Cómo se repite cada serie, para enseñarlo en cada repetición
+    private val repeats: Flow<Map<String, Recurrence?>> =
+        seriesDao.observeAll().map { all -> all.associate { it.id to it.toRecurrence() } }
 
-    override fun getTasksInRange(startDate: LocalDate, endDate: LocalDate): Flow<List<SyncroItem.Task>> {
-        return dao.getTasksInRange(startDate.toEpochDay(), endDate.toEpochDay()).map { entities ->
-            entities.map { it.toDomain() }
-        }
-    }
+    private fun Flow<List<TaskEntity>>.toDomain(): Flow<List<SyncroItem.Task>> =
+        combine(this, repeats) { entities, repeats -> entities.map { it.toDomain(repeats) } }
+
+    override fun getTasksByDate(date: LocalDate): Flow<List<SyncroItem.Task>> =
+        dao.getTasksByDate(date.toEpochDay()).toDomain()
+
+    override fun getTasksInRange(startDate: LocalDate, endDate: LocalDate): Flow<List<SyncroItem.Task>> =
+        dao.getTasksInRange(startDate.toEpochDay(), endDate.toEpochDay()).toDomain()
 
     override suspend fun insertTask(task: SyncroItem.Task) {
         require(task.id.isNotBlank()) { "El id de la tarea lo asigna el dominio" }
@@ -42,14 +46,17 @@ class TaskRepositoryImpl @Inject constructor(
                 isCompleted = task.isCompleted,
                 categoryText = task.categoryText,
                 categoryColor = task.categoryColor?.argb,
-                pendingChanges = 1
+                pendingChanges = 1,
+                seriesId = task.seriesId
             )
         )
     }
 
     override suspend fun getTaskById(taskId: String): SyncroItem.Task? {
         // Una tarea borrada ya no existe para la app, aunque siga en la tabla hasta borrarse en Google
-        return dao.getTaskById(taskId)?.takeUnless { it.isDeleted }?.toDomain()
+        val entity = dao.getTaskById(taskId)?.takeUnless { it.isDeleted } ?: return null
+        val repeats = entity.seriesId?.let { id -> mapOf(id to seriesDao.getById(id)?.toRecurrence()) }.orEmpty()
+        return entity.toDomain(repeats)
     }
 
     override suspend fun toggleTaskCompletion(taskId: String) {
@@ -69,9 +76,12 @@ class TaskRepositoryImpl @Inject constructor(
     }
 
     override fun getUnfinishedTasksUntil(date: LocalDate): Flow<List<SyncroItem.Task>> =
-        dao.getUnfinishedTasksUntil(date.toEpochDay()).map { entities -> entities.map { it.toDomain() } }
+        dao.getUnfinishedTasksUntil(date.toEpochDay()).toDomain()
 
-    private fun TaskEntity.toDomain(): SyncroItem.Task {
+    override suspend fun getTaskIdsInSeries(seriesId: String, from: LocalDate): List<String> =
+        dao.getIdsInSeries(seriesId, from.toEpochDay())
+
+    private fun TaskEntity.toDomain(repeats: Map<String, Recurrence?>): SyncroItem.Task {
         return SyncroItem.Task(
             id = id,
             remoteId = remoteId,
@@ -81,7 +91,9 @@ class TaskRepositoryImpl @Inject constructor(
             time = time.toLocalTimeOrMidnight(),
             isCompleted = isCompleted,
             categoryText = categoryText,
-            categoryColor = categoryColor?.let { ArgbColor(it) }
+            categoryColor = categoryColor?.let { ArgbColor(it) },
+            seriesId = seriesId,
+            repeat = seriesId?.let { repeats[it] }
         )
     }
 }

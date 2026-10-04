@@ -3,6 +3,7 @@ package com.syncro.domain.usecase
 import com.syncro.testutil.CallLog
 import com.syncro.testutil.FakeEventRepository
 import com.syncro.testutil.FakeGoogleSyncRepository
+import com.syncro.testutil.FakeRepeatSeriesRepository
 import com.syncro.testutil.FakeNoteRepository
 import com.syncro.testutil.FakeTaskRepository
 import com.syncro.testutil.aNote
@@ -26,6 +27,7 @@ class UndoDeleteUseCasesTest {
     private val tasks = FakeTaskRepository(log)
     private val events = FakeEventRepository(log)
     private val google = FakeGoogleSyncRepository(log)
+    private val series = FakeRepeatSeriesRepository()
 
     @Test
     fun `con uploadNow a false el borrado no se sube`() = runTest {
@@ -33,8 +35,8 @@ class UndoDeleteUseCasesTest {
         events.insertEvent(anEvent(id = "e1"))
         log.calls.clear()
 
-        DeleteTaskUseCase(tasks, google)("t1", uploadNow = false)
-        DeleteEventUseCase(events, google)("e1", uploadNow = false)
+        DeleteTaskUseCase(tasks, google, series)("t1", uploadNow = false)
+        DeleteEventUseCase(events, google, series)("e1", uploadNow = false)
 
         assertEquals(listOf("deleteTask(t1)", "deleteEvent(e1)"), log.calls)
     }
@@ -43,7 +45,7 @@ class UndoDeleteUseCasesTest {
     fun `deshacer recupera la misma tarea y despues la sube`() = runTest {
         val task = aTask(id = "t1", title = "Llamar al banco")
         tasks.insertTask(task)
-        DeleteTaskUseCase(tasks, google)("t1", uploadNow = false)
+        DeleteTaskUseCase(tasks, google, series)("t1", uploadNow = false)
         log.calls.clear()
 
         assertTrue(UndoDeleteTaskUseCase(tasks, google)("t1"))

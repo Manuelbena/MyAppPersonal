@@ -75,11 +75,25 @@ fun Movement.dateIn(month: YearMonth): LocalDate? {
     }
 }
 
+/**
+ * Días en que el movimiento cuenta dentro de [period]. El periodo puede abarcar dos meses (del 27
+ * al 26), así que uno mensual se busca en los dos y se queda el que cae dentro.
+ */
+fun Movement.datesIn(period: SavingsPeriod): List<LocalDate> =
+    listOf(period.month, YearMonth.from(period.end))
+        .distinct()
+        .mapNotNull { dateIn(it) }
+        .filter { it in period }
+
 /** Un movimiento en un mes concreto (los mensuales aparecen una vez en cada mes). */
 data class MovementOccurrence(val movement: Movement, val date: LocalDate)
 
-/** Lo que pasa con el dinero en un mes: los movimientos (más recientes primero) y los totales. */
-data class MonthMovements(val month: YearMonth, val occurrences: List<MovementOccurrence>) {
+/**
+ * Lo que pasa con el dinero en un mes ([period]: el natural o de nómina a nómina): los movimientos
+ * (más recientes primero) y los totales.
+ */
+data class MonthMovements(val period: SavingsPeriod, val occurrences: List<MovementOccurrence>) {
+    val month: YearMonth get() = period.month
     val incomeCents: Long = occurrences.filter { it.movement.type == MovementType.INCOME }.sumOf { it.movement.amountCents }
     val expenseCents: Long = occurrences.filter { it.movement.type == MovementType.EXPENSE }.sumOf { it.movement.amountCents }
     val balanceCents: Long get() = incomeCents - expenseCents
@@ -113,12 +127,16 @@ fun MonthMovements.totalsByCategory(type: MovementType): List<CategoryTotal> {
         .sortedByDescending { it.cents }
 }
 
-fun monthMovements(month: YearMonth, movements: List<Movement>): MonthMovements = MonthMovements(
-    month = month,
+fun monthMovements(period: SavingsPeriod, movements: List<Movement>): MonthMovements = MonthMovements(
+    period = period,
     occurrences = movements
-        .mapNotNull { movement -> movement.dateIn(month)?.let { MovementOccurrence(movement, it) } }
+        .flatMap { movement -> movement.datesIn(period).map { MovementOccurrence(movement, it) } }
         .sortedByDescending { it.date }
 )
+
+/** El mes natural (sin día de nómina). */
+fun monthMovements(month: YearMonth, movements: List<Movement>): MonthMovements =
+    monthMovements(SavingsPeriod.of(month), movements)
 
 /** Importe máximo de un movimiento: mil millones de euros (más es casi seguro un error al teclear). */
 const val MAX_AMOUNT_CENTS = 100_000_000_000L

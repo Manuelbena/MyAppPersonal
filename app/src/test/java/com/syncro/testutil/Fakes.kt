@@ -5,6 +5,8 @@ import com.syncro.domain.model.Budget
 import com.syncro.domain.model.DailyFocus
 import com.syncro.domain.model.DataLossSummary
 import com.syncro.domain.model.Movement
+import com.syncro.domain.model.RepeatSeries
+import com.syncro.domain.model.SavingsPeriod
 import com.syncro.domain.model.MovementCategory
 import com.syncro.domain.model.SyncroItem
 import com.syncro.domain.repository.AccountDataRepository
@@ -17,6 +19,7 @@ import com.syncro.domain.repository.EventRepository
 import com.syncro.domain.repository.GoogleSyncRepository
 import com.syncro.domain.repository.MovementRepository
 import com.syncro.domain.repository.NoteRepository
+import com.syncro.domain.repository.RepeatSeriesRepository
 import com.syncro.domain.repository.TaskRepository
 import com.syncro.domain.repository.UserRepository
 import com.syncro.domain.model.User
@@ -30,7 +33,6 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.ZoneOffset
-import java.time.YearMonth
 
 /*
  * Dobles de prueba para los casos de uso.
@@ -99,6 +101,9 @@ class FakeTaskRepository(private val log: CallLog = CallLog()) : TaskRepository 
 
     override fun getUnfinishedTasksUntil(date: LocalDate): Flow<List<SyncroItem.Task>> =
         tasks.map { all -> all.values.filter { !it.isCompleted && !it.date.isAfter(date) }.sortedWith(compareBy({ it.date }, { it.time })) }
+
+    override suspend fun getTaskIdsInSeries(seriesId: String, from: LocalDate): List<String> =
+        tasks.value.values.filter { it.seriesId == seriesId && !it.date.isBefore(from) }.map { it.id }
 }
 
 class FakeEventRepository(private val log: CallLog = CallLog()) : EventRepository {
@@ -152,6 +157,25 @@ class FakeEventRepository(private val log: CallLog = CallLog()) : EventRepositor
         deletedEvents.update { it - eventId }
         events.update { it + (eventId to event) }
         return true
+    }
+
+    override suspend fun getEventIdsInSeries(seriesId: String, from: LocalDate): List<String> =
+        events.value.values.filter { it.seriesId == seriesId && !it.date.isBefore(from) }.map { it.id }
+}
+
+class FakeRepeatSeriesRepository : RepeatSeriesRepository {
+    val series = MutableStateFlow<Map<String, RepeatSeries>>(emptyMap())
+
+    override suspend fun getAllSeries(): List<RepeatSeries> = series.value.values.toList()
+
+    override suspend fun getSeries(id: String): RepeatSeries? = series.value[id]
+
+    override suspend fun saveSeries(series: RepeatSeries) {
+        this.series.update { it + (series.id to series) }
+    }
+
+    override suspend fun deleteSeries(id: String) {
+        series.update { it - id }
     }
 }
 
@@ -245,12 +269,12 @@ class FakeNoteRepository : NoteRepository {
     override suspend fun getNoteById(id: String): SyncroItem.Note? = notes.value[id]
 }
 
-/** Como el DAO real: devuelve los del mes y los mensuales que empezaron antes (un superconjunto). */
+/** Como el DAO real: devuelve los del periodo y los mensuales que empezaron antes (un superconjunto). */
 class FakeMovementRepository : MovementRepository {
     val movements = MutableStateFlow<Map<String, Movement>>(emptyMap())
 
-    override fun observeForMonth(month: YearMonth): Flow<List<Movement>> = movements.map { all ->
-        all.values.filter { YearMonth.from(it.date) == month || (it.repeatsMonthly && !it.date.isAfter(month.atEndOfMonth())) }
+    override fun observeForPeriod(period: SavingsPeriod): Flow<List<Movement>> = movements.map { all ->
+        all.values.filter { it.date in period || (it.repeatsMonthly && !it.date.isAfter(period.end)) }
     }
 
     override suspend fun getAllMovements(): List<Movement> = movements.value.values.sortedBy { it.date }

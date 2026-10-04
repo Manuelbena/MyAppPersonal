@@ -11,12 +11,13 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
-import java.time.YearMonth
+import java.time.LocalDate
 import javax.inject.Inject
 
 /**
- * El resumen de Ahorros de Inicio para [month]: null si está apagado en Ajustes (lo de fábrica),
- * si no el balance del mes y los presupuestos que van justos o pasados.
+ * El resumen de Ahorros de Inicio para el mes en que cae [today] (de nómina a nómina si hay día de
+ * nómina): null si está apagado en Ajustes (lo de fábrica), si no el balance del mes y los
+ * presupuestos que van justos o pasados.
  */
 class ObserveHomeSavingsUseCase @Inject constructor(
     private val settings: SettingsRepository,
@@ -24,7 +25,7 @@ class ObserveHomeSavingsUseCase @Inject constructor(
     private val getBudgets: GetBudgetsUseCase
 ) {
     @OptIn(ExperimentalCoroutinesApi::class)
-    operator fun invoke(month: YearMonth): Flow<HomeSavings?> =
+    operator fun invoke(today: LocalDate): Flow<HomeSavings?> =
         settings.settings
             .map { it.assistant.homeSavingsEnabled }
             .distinctUntilChanged()
@@ -32,9 +33,9 @@ class ObserveHomeSavingsUseCase @Inject constructor(
                 if (!enabled) {
                     flowOf(null)
                 } else {
-                    combine(getMonthMovements(month), getBudgets()) { movements, budgets ->
+                    combine(getMonthMovements(today), getBudgets()) { movements, budgets ->
                         HomeSavings(
-                            month = month,
+                            period = movements.period,
                             incomeCents = movements.incomeCents,
                             expenseCents = movements.expenseCents,
                             hasMovements = movements.occurrences.isNotEmpty(),

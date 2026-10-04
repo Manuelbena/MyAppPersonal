@@ -12,6 +12,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -140,6 +141,20 @@ class MigrationTest {
 
         assertEquals(1, db.movementDao.count())
         assertTrue(db.budgetDao.observeBudgets().first().isEmpty())
+    }
+
+    @Test
+    fun `migrar de la version 15 conserva tareas y eventos, ninguno repetido, y crea las series vacias`() = runTest {
+        createDatabase(Schema15.CREATE_STATEMENTS, Schema15.VERSION) {
+            execSQL("INSERT INTO tasks (id, remoteId, title, description, date, time, isCompleted) VALUES ('t1', 'g-t1', 'Tarea', '', ${DAY.toEpochDay()}, '00:00', 0)")
+            insertEvent("e1", "10:00", "11:00")
+        }
+
+        val db = openCurrentVersion()
+
+        assertNull(db.taskDao.getTaskById("t1")!!.seriesId)
+        assertNull(db.eventDao.getEventById("e1")!!.seriesId)
+        assertTrue(db.repeatSeriesDao.getAll().isEmpty())
     }
 
     // Sin borrado automático (solo para versiones 1–6), olvidar una migración haría fallar la

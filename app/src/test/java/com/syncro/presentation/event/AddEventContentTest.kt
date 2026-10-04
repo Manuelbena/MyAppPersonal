@@ -55,7 +55,7 @@ class AddEventContentTest {
             AddEventContent(
                 eventToEdit = eventToEdit,
                 onDismiss = {},
-                onSave = { title, _, _, date, endDate, start, end, category, color, _, subtasks ->
+                onSave = { title, _, _, date, endDate, start, end, category, color, _, subtasks, _, _ ->
                     saved = Saved(title, date, endDate, start, end, category, color, subtasks)
                 }
             )

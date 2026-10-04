@@ -52,6 +52,8 @@ import com.syncro.testutil.FakeDailyQuoteRepository
 import com.syncro.testutil.FakeSettingsRepository
 import com.syncro.testutil.FakeEventRepository
 import com.syncro.testutil.FakeGoogleSyncRepository
+import com.syncro.testutil.FakeRepeatSeriesRepository
+import com.syncro.domain.usecase.GenerateRepeatsUseCase
 import com.syncro.testutil.FakeNoteRepository
 import com.syncro.testutil.FakeTaskRepository
 import com.syncro.testutil.FakeUserRepository
@@ -106,6 +108,7 @@ class HomeViewModelTest {
     private lateinit var tasks: FakeTaskRepository
     private lateinit var events: FakeEventRepository
     private lateinit var google: FakeGoogleSyncRepository
+    private val series = FakeRepeatSeriesRepository()
     private lateinit var notes: FakeNoteRepository
     private lateinit var users: FakeUserRepository
     private val focus = FakeDailyFocusRepository()
@@ -122,13 +125,13 @@ class HomeViewModelTest {
 
     private fun createViewModel() = HomeViewModel(
         getTimelineUseCase = GetTimelineUseCase(tasks, events),
-        saveTaskUseCase = SaveTaskUseCase(tasks, google),
-        saveEventUseCase = SaveEventUseCase(events, google),
+        saveTaskUseCase = SaveTaskUseCase(tasks, google, series, GenerateRepeatsUseCase(series, tasks, events, google, clock)),
+        saveEventUseCase = SaveEventUseCase(events, google, series, GenerateRepeatsUseCase(series, tasks, events, google, clock)),
         toggleTaskCompletionUseCase = ToggleTaskCompletionUseCase(tasks, google),
         toggleSubtaskCompletionUseCase = ToggleSubtaskCompletionUseCase(events, google),
         toggleEventCompletionUseCase = ToggleEventCompletionUseCase(events, google),
-        deleteEventUseCase = DeleteEventUseCase(events, google),
-        deleteTaskUseCase = DeleteTaskUseCase(tasks, google),
+        deleteEventUseCase = DeleteEventUseCase(events, google, series),
+        deleteTaskUseCase = DeleteTaskUseCase(tasks, google, series),
         syncGoogleTasksUseCase = SyncGoogleTasksUseCase(google),
         syncGoogleCalendarUseCase = SyncGoogleCalendarUseCase(google),
         pushPendingChangesUseCase = PushPendingChangesUseCase(google),
@@ -146,7 +149,8 @@ class HomeViewModelTest {
         undoDeleteTaskUseCase = UndoDeleteTaskUseCase(tasks, google),
         undoDeleteEventUseCase = UndoDeleteEventUseCase(events, google),
         undoDeleteNoteUseCase = UndoDeleteNoteUseCase(notes),
-        observeHomeSavingsUseCase = ObserveHomeSavingsUseCase(settings, GetMonthMovementsUseCase(movements), GetBudgetsUseCase(budgets))
+        observeHomeSavingsUseCase = ObserveHomeSavingsUseCase(settings, GetMonthMovementsUseCase(movements, settings), GetBudgetsUseCase(budgets)),
+        generateRepeatsUseCase = GenerateRepeatsUseCase(series, tasks, events, google, clock)
     )
 
     /** Recoge los efectos de un solo uso (snackbars, petición de permisos) que emite el ViewModel. */

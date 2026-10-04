@@ -3,6 +3,9 @@ package com.syncro.presentation.calendar
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.syncro.domain.model.ArgbColor
+import com.syncro.domain.model.Recurrence
+import com.syncro.domain.model.RepeatScope
+import com.syncro.domain.usecase.GenerateRepeatsUseCase
 import com.syncro.domain.model.SyncroItem
 import com.syncro.domain.model.sortedForDay
 import com.syncro.domain.usecase.DeleteEventUseCase
@@ -48,7 +51,8 @@ class CalendarViewModel @Inject constructor(
     private val deleteEventUseCase: DeleteEventUseCase,
     private val deleteTaskUseCase: DeleteTaskUseCase,
     private val saveTaskUseCase: SaveTaskUseCase,
-    private val saveNoteUseCase: SaveNoteUseCase
+    private val saveNoteUseCase: SaveNoteUseCase,
+    private val generateRepeatsUseCase: GenerateRepeatsUseCase
 ) : ViewModel() {
 
     private val _selectedMonth = MutableStateFlow(YearMonth.now())
@@ -83,13 +87,20 @@ class CalendarViewModel @Inject constructor(
     init {
         // Carga inicial
         syncMonth(_selectedMonth.value)
+        generateRepeatsFor(_selectedMonth.value)
     }
 
     fun onMonthChanged(month: YearMonth) {
         if (_selectedMonth.value != month) {
             _selectedMonth.value = month
             syncMonth(month)
+            generateRepeatsFor(month)
         }
+    }
+
+    /** Al mirar un mes más adelante, se crean las repeticiones que caen en él (con tope de un año). */
+    private fun generateRepeatsFor(month: YearMonth) {
+        viewModelScope.launch { generateRepeatsUseCase(until = month.atEndOfMonth()) }
     }
 
     fun onDateSelected(date: LocalDate?) {
@@ -102,9 +113,9 @@ class CalendarViewModel @Inject constructor(
         viewModelScope.launch { saveNoteUseCase(title = title, content = content, color = color) }
     }
 
-    fun saveTask(title: String, description: String, date: LocalDate) {
+    fun saveTask(title: String, description: String, date: LocalDate, repeat: Recurrence? = null) {
         viewModelScope.launch {
-            saveTaskUseCase(title, description, date, LocalTime.MIDNIGHT)
+            saveTaskUseCase(title, description, date, LocalTime.MIDNIGHT, repeat = repeat)
         }
     }
 
@@ -126,6 +137,16 @@ class CalendarViewModel @Inject constructor(
 
     fun deleteTask(taskId: String) {
         viewModelScope.launch { deleteTaskUseCase(taskId) }
+    }
+
+    /** Una repetición y las siguientes de su serie. */
+    fun deleteEventAndFollowing(eventId: String) {
+        viewModelScope.launch { deleteEventUseCase(eventId, scope = RepeatScope.THIS_AND_FOLLOWING) }
+    }
+
+    /** Ver [deleteEventAndFollowing]. */
+    fun deleteTaskAndFollowing(taskId: String) {
+        viewModelScope.launch { deleteTaskUseCase(taskId, scope = RepeatScope.THIS_AND_FOLLOWING) }
     }
 
     fun toggleSubtaskCompletion(eventId: String, subtaskTitle: String) {

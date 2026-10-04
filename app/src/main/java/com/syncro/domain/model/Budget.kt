@@ -1,6 +1,7 @@
 package com.syncro.domain.model
 
 import java.time.LocalDate
+import java.time.YearMonth
 
 /*
  * Presupuestos: un límite de gasto al mes por categoría ("Supermercado: 300 €"). Vale para todos
@@ -54,8 +55,17 @@ fun MonthMovements.budgetStatuses(budgets: List<Budget>): List<BudgetStatus> = b
 /**
  * Un aviso del asistente: el día en que lo gastado en una categoría llegó al 80 % del límite
  * ([BudgetLevel.WARNING]) o lo pasó ([BudgetLevel.EXCEEDED]), y cuánto se llevaba ese día.
+ *
+ * @param month el mes del aviso (el de inicio del periodo si va de nómina a nómina): un periodo del
+ * 27 al 26 tiene avisos en dos meses naturales, y el id del mensaje no puede repetirse
  */
-data class BudgetAlert(val budget: Budget, val level: BudgetLevel, val date: LocalDate, val spentCents: Long)
+data class BudgetAlert(
+    val budget: Budget,
+    val level: BudgetLevel,
+    val date: LocalDate,
+    val spentCents: Long,
+    val month: YearMonth = YearMonth.from(date)
+)
 
 /**
  * Los avisos de presupuesto del mes hasta [today]: se recorren los gastos de cada categoría por
@@ -74,11 +84,11 @@ fun MonthMovements.budgetAlerts(budgets: List<Budget>, today: LocalDate): List<B
             val level = BudgetStatus(budget, spent).level
             if (level == BudgetLevel.EXCEEDED) {
                 // Si un solo gasto lo pasa de golpe, basta con este aviso (no dos el mismo día)
-                add(BudgetAlert(budget, BudgetLevel.EXCEEDED, occurrence.date, spent))
+                add(BudgetAlert(budget, BudgetLevel.EXCEEDED, occurrence.date, spent, month))
                 break
             }
             if (!warned && level == BudgetLevel.WARNING) {
-                add(BudgetAlert(budget, BudgetLevel.WARNING, occurrence.date, spent))
+                add(BudgetAlert(budget, BudgetLevel.WARNING, occurrence.date, spent, month))
                 warned = true
             }
         }

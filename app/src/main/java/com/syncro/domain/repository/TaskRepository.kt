@@ -20,4 +20,6 @@ interface TaskRepository {
     suspend fun moveTask(taskId: String, date: LocalDate)
     /** Tareas sin hacer hasta ese día incluido, también las atrasadas. */
     fun getUnfinishedTasksUntil(date: LocalDate): Flow<List<SyncroItem.Task>>
+    /** Ids de las repeticiones de la serie desde [from] incluido (sin las borradas). */
+    suspend fun getTaskIdsInSeries(seriesId: String, from: LocalDate): List<String>
 }

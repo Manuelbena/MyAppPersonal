@@ -15,6 +15,8 @@ import com.syncro.domain.usecase.ToggleTaskCompletionUseCase
 import com.syncro.testutil.CallLog
 import com.syncro.testutil.FakeEventRepository
 import com.syncro.testutil.FakeGoogleSyncRepository
+import com.syncro.testutil.FakeRepeatSeriesRepository
+import com.syncro.domain.usecase.GenerateRepeatsUseCase
 import com.syncro.testutil.FakeNoteRepository
 import com.syncro.testutil.FakeTaskRepository
 import com.syncro.testutil.MainDispatcherRule
@@ -49,6 +51,7 @@ class CalendarViewModelTest {
     private lateinit var tasks: FakeTaskRepository
     private lateinit var events: FakeEventRepository
     private lateinit var google: FakeGoogleSyncRepository
+    private val series = FakeRepeatSeriesRepository()
     private val notes = FakeNoteRepository()
     private val clock = Clock.systemDefaultZone()
 
@@ -68,10 +71,11 @@ class CalendarViewModelTest {
         toggleEventCompletionUseCase = ToggleEventCompletionUseCase(events, google),
         toggleSubtaskCompletionUseCase = ToggleSubtaskCompletionUseCase(events, google),
         toggleTaskCompletionUseCase = ToggleTaskCompletionUseCase(tasks, google),
-        deleteEventUseCase = DeleteEventUseCase(events, google),
-        deleteTaskUseCase = DeleteTaskUseCase(tasks, google),
-        saveTaskUseCase = SaveTaskUseCase(tasks, google),
-        saveNoteUseCase = SaveNoteUseCase(notes, clock)
+        deleteEventUseCase = DeleteEventUseCase(events, google, series),
+        deleteTaskUseCase = DeleteTaskUseCase(tasks, google, series),
+        saveTaskUseCase = SaveTaskUseCase(tasks, google, series, GenerateRepeatsUseCase(series, tasks, events, google, clock)),
+        saveNoteUseCase = SaveNoteUseCase(notes, clock),
+        generateRepeatsUseCase = GenerateRepeatsUseCase(series, tasks, events, google, clock)
     )
 
     @Test

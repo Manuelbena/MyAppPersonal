@@ -43,7 +43,6 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.Clock
 import java.time.LocalDate
-import java.time.YearMonth
 import javax.inject.Inject
 
 data class AssistantUiState(val conversation: AssistantConversation, val unreadCount: Int)
@@ -98,7 +97,8 @@ class AssistantViewModel @Inject constructor(
         if (date == null || date.isBefore(historySince)) {
             flowOf(PaydayState(null))
         } else {
-            getMonthMovements(YearMonth.from(date)).map { month -> PaydayState(Payday(date, month.salaryCents(), answers[date])) }
+            // El mes que empieza con esa nómina
+            getMonthMovements(date).map { month -> PaydayState(Payday(date, month.salaryCents(), answers[date])) }
         }
     }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
@@ -109,9 +109,9 @@ class AssistantViewModel @Inject constructor(
         if (budgets.isEmpty()) return@flatMapLatest flowOf(emptyList())
         val today = LocalDate.now(clock)
         val since = historySince
-        val months = listOf(YearMonth.from(since), YearMonth.from(today)).distinct()
-        combine(months.map { getMonthMovements(it) }) { monthly ->
-            monthly.flatMap { it.budgetAlerts(budgets, today) }.filter { !it.date.isBefore(since) }
+        // Los meses (o periodos de nómina) en que caen hace una semana y hoy; si son el mismo, una vez
+        combine(listOf(since, today).map { getMonthMovements(it) }) { monthly ->
+            monthly.distinctBy { it.period }.flatMap { it.budgetAlerts(budgets, today) }.filter { !it.date.isBefore(since) }
         }
     }
 

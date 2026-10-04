@@ -10,6 +10,10 @@ import com.syncro.testutil.DAY
 import com.syncro.testutil.at
 import com.syncro.testutil.FakeEventRepository
 import com.syncro.testutil.FakeGoogleSyncRepository
+import com.syncro.testutil.FakeRepeatSeriesRepository
+import com.syncro.testutil.FakeTaskRepository
+import java.time.Clock
+import java.time.ZoneOffset
 import com.syncro.testutil.anEvent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -35,13 +39,16 @@ class SaveEventUseCaseTest {
     private lateinit var events: FakeEventRepository
     private lateinit var google: FakeGoogleSyncRepository
     private lateinit var saveEvent: SaveEventUseCase
+    private val series = FakeRepeatSeriesRepository()
+    private val tasks = FakeTaskRepository()
+    private val clock = Clock.fixed(DAY.atTime(9, 0).toInstant(ZoneOffset.UTC), ZoneOffset.UTC)
 
     @Before
     fun setUp() {
         log = CallLog()
         events = FakeEventRepository(log)
         google = FakeGoogleSyncRepository(log)
-        saveEvent = SaveEventUseCase(events, google)
+        saveEvent = SaveEventUseCase(events, google, series, GenerateRepeatsUseCase(series, tasks, events, google, clock))
     }
 
     // region Crear

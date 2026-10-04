@@ -31,10 +31,14 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.syncro.presentation.components.SheetDragHandle
 import com.syncro.presentation.components.GradientSheetInsets
 import com.syncro.domain.model.Priority
+import com.syncro.domain.model.Recurrence
+import com.syncro.domain.model.RepeatScope
 import com.syncro.domain.model.SyncroItem
 import com.syncro.domain.model.isValidEventRange
 import com.syncro.presentation.components.DetailCard
 import com.syncro.presentation.components.InfoDivider
+import com.syncro.presentation.components.RepeatPicker
+import com.syncro.presentation.components.RepeatScopeDialog
 import com.syncro.presentation.components.SectionTitle
 import com.syncro.presentation.components.categoryIcon
 import com.syncro.presentation.components.toDisplayTime
@@ -72,7 +76,7 @@ fun AddEventScreen(
             eventToEdit = eventToEdit,
             initialDate = initialDate,
             onDismiss = onDismiss,
-            onSave = { title, desc, loc, date, endDate, start, end, catText, catCol, priority, subs ->
+            onSave = { title, desc, loc, date, endDate, start, end, catText, catCol, priority, subs, repeat, scope ->
                 viewModel.saveDetailedEvent(
                     id = eventToEdit?.id,
                     title = title,
@@ -85,7 +89,9 @@ fun AddEventScreen(
                     categoryText = catText,
                     categoryColor = catCol,
                     priority = priority,
-                    subtasks = subs
+                    subtasks = subs,
+                    repeat = repeat,
+                    scope = scope
                 )
                 onDismiss()
             }
@@ -116,7 +122,7 @@ fun AddEventContent(
     eventToEdit: SyncroItem.Event? = null,
     initialDate: LocalDate? = null,
     onDismiss: () -> Unit,
-    onSave: (String, String?, String?, LocalDate, LocalDate, LocalTime, LocalTime, String, Color, Priority?, List<String>) -> Unit
+    onSave: (String, String?, String?, LocalDate, LocalDate, LocalTime, LocalTime, String, Color, Priority?, List<String>, Recurrence?, RepeatScope) -> Unit
 ) {
     var title by remember { mutableStateOf(eventToEdit?.title ?: "") }
     var description by remember { mutableStateOf(eventToEdit?.description ?: "") }
@@ -153,6 +159,10 @@ fun AddEventContent(
 
     var picker by remember { mutableStateOf<PickerTarget?>(null) }
 
+    // Repetición: al editar una repetición se pregunta si el cambio es solo para ella o también para las siguientes
+    var repeat by remember { mutableStateOf(eventToEdit?.repeat) }
+    var askScope by remember { mutableStateOf(false) }
+
     // "Todo el día" se guarda como 00:00–00:00: así lo entienden el resto de la app y la sync con Google
     val effectiveStartTime = if (isAllDay) LocalTime.MIDNIGHT else startTime
     val effectiveEndTime = if (isAllDay) LocalTime.MIDNIGHT else endTime
@@ -169,6 +179,32 @@ fun AddEventContent(
     }
     val categoryColor = categories.firstOrNull { it.name == selectedCategory }?.color ?: Emerald500
     val accent by animateColorAsState(categoryColor, label = "eventAccent")
+
+    fun save(scope: RepeatScope) = onSave(
+        title,
+        description.ifBlank { null },
+        location.ifBlank { null },
+        startDate,
+        endDate,
+        effectiveStartTime,
+        effectiveEndTime,
+        selectedCategory,
+        categoryColor,
+        selectedPriority,
+        subtasks.toList(),
+        repeat,
+        scope
+    )
+
+    fun onSaveClick() {
+        val wasRepeating = eventToEdit?.repeat != null
+        when {
+            !wasRepeating -> save(RepeatScope.THIS)
+            // Cambiar la regla (o dejar de repetir) solo tiene sentido de aquí en adelante
+            repeat != eventToEdit?.repeat -> save(RepeatScope.THIS_AND_FOLLOWING)
+            else -> askScope = true
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -200,21 +236,7 @@ fun AddEventContent(
                     modifier = Modifier.weight(1f)
                 )
                 Button(
-                    onClick = {
-                        onSave(
-                            title,
-                            description.ifBlank { null },
-                            location.ifBlank { null },
-                            startDate,
-                            endDate,
-                            effectiveStartTime,
-                            effectiveEndTime,
-                            selectedCategory,
-                            categoryColor,
-                            selectedPriority,
-                            subtasks.toList()
-                        )
-                    },
+                    onClick = { onSaveClick() },
                     colors = ButtonDefaults.buttonColors(containerColor = accent, contentColor = Color.White),
                     shape = RoundedCornerShape(12.dp),
                     enabled = canSave,
@@ -298,6 +320,12 @@ fun AddEventContent(
                     fontSize = 13.sp,
                     modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 14.dp, top = 2.dp)
                 )
+            }
+
+            // Repetir: cada día, semana (con sus días), mes o año
+            Column {
+                SectionTitle(Icons.Rounded.Repeat, "Repetir")
+                DetailCard { RepeatPicker(repeat = repeat, startDate = startDate, accent = accent, onChange = { repeat = it }) }
             }
 
             // Categoría
@@ -441,6 +469,19 @@ fun AddEventContent(
                 }
             }
         }
+    }
+
+    if (askScope) {
+        RepeatScopeDialog(
+            title = "Este evento se repite",
+            text = "¿Guardas los cambios solo en este o también en los siguientes?",
+            feminine = false,
+            onChoose = { scope ->
+                askScope = false
+                save(scope)
+            },
+            onDismiss = { askScope = false }
+        )
     }
 
     when (val target = picker) {

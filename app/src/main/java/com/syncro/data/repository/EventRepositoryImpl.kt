@@ -4,33 +4,38 @@ import com.syncro.data.local.toLocalTimeOrMidnight
 import com.syncro.data.local.toStoredTime
 import com.syncro.domain.model.ArgbColor
 import com.syncro.data.local.dao.EventDao
+import com.syncro.data.local.dao.RepeatSeriesDao
 import com.syncro.data.local.entity.EventEntity
 import com.syncro.data.local.entity.EventWithSubtasks
 import com.syncro.data.local.entity.SubtaskEntity
 import com.syncro.domain.model.Priority
+import com.syncro.domain.model.Recurrence
 import com.syncro.domain.model.Subtask
 import com.syncro.domain.model.SyncroItem
 import com.syncro.domain.repository.EventRepository
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import java.time.LocalDate
 import javax.inject.Inject
 
 class EventRepositoryImpl @Inject constructor(
-    private val dao: EventDao
+    private val dao: EventDao,
+    private val seriesDao: RepeatSeriesDao
 ) : EventRepository {
 
-    override fun getEventsByDate(date: LocalDate): Flow<List<SyncroItem.Event>> {
-        return dao.getEventsByDate(date.toEpochDay()).map { relations ->
-            relations.map { it.toDomain() }
-        }
-    }
+    // Cómo se repite cada serie, para enseñarlo en cada repetición
+    private val repeats: Flow<Map<String, Recurrence?>> =
+        seriesDao.observeAll().map { all -> all.associate { it.id to it.toRecurrence() } }
 
-    override fun getEventsInRange(startDate: LocalDate, endDate: LocalDate): Flow<List<SyncroItem.Event>> {
-        return dao.getEventsInRange(startDate.toEpochDay(), endDate.toEpochDay()).map { relations ->
-            relations.map { it.toDomain() }
-        }
-    }
+    private fun Flow<List<EventWithSubtasks>>.toDomain(): Flow<List<SyncroItem.Event>> =
+        combine(this, repeats) { relations, repeats -> relations.map { it.toDomain(repeats) } }
+
+    override fun getEventsByDate(date: LocalDate): Flow<List<SyncroItem.Event>> =
+        dao.getEventsByDate(date.toEpochDay()).toDomain()
+
+    override fun getEventsInRange(startDate: LocalDate, endDate: LocalDate): Flow<List<SyncroItem.Event>> =
+        dao.getEventsInRange(startDate.toEpochDay(), endDate.toEpochDay()).toDomain()
 
     override suspend fun insertEvent(event: SyncroItem.Event) {
         require(event.id.isNotBlank()) { "El id del evento lo asigna el dominio" }
@@ -50,7 +55,8 @@ class EventRepositoryImpl @Inject constructor(
             priority = event.priority?.name,
             location = event.location,
             isCompleted = event.isCompleted,
-            pendingChanges = (existing?.pendingChanges ?: 0) + 1
+            pendingChanges = (existing?.pendingChanges ?: 0) + 1,
+            seriesId = event.seriesId
         )
 
         // insertEventWithSubtasks siempre limpia las subtareas previas antes de reinsertar,
@@ -63,13 +69,13 @@ class EventRepositoryImpl @Inject constructor(
 
     override suspend fun getEventById(eventId: String): SyncroItem.Event? {
         // Un evento borrado ya no existe para la app, aunque siga en la tabla hasta borrarse en Google
-        return dao.getEventById(eventId)?.takeUnless { it.isDeleted }?.let { entity ->
-            val subtasks = dao.getSubtasksForEvent(eventId)
-            EventWithSubtasks(entity, subtasks).toDomain()
-        }
+        val entity = dao.getEventById(eventId)?.takeUnless { it.isDeleted } ?: return null
+        val subtasks = dao.getSubtasksForEvent(eventId)
+        val repeats = entity.seriesId?.let { id -> mapOf(id to seriesDao.getById(id)?.toRecurrence()) }.orEmpty()
+        return EventWithSubtasks(entity, subtasks).toDomain(repeats)
     }
 
-    private fun EventWithSubtasks.toDomain(): SyncroItem.Event {
+    private fun EventWithSubtasks.toDomain(repeats: Map<String, Recurrence?>): SyncroItem.Event {
         val subtasks = subtasks.map { Subtask(title = it.title, isCompleted = it.isCompleted) }
         return SyncroItem.Event(
             id = event.id,
@@ -85,7 +91,9 @@ class EventRepositoryImpl @Inject constructor(
             priority = event.priority?.let { Priority.valueOf(it) },
             subtasks = subtasks,
             isCompleted = event.isCompleted,
-            location = event.location
+            location = event.location,
+            seriesId = event.seriesId,
+            repeat = event.seriesId?.let { repeats[it] }
         )
     }
 
@@ -104,4 +112,7 @@ class EventRepositoryImpl @Inject constructor(
     override suspend fun restoreEvent(eventId: String): Boolean {
         return dao.restoreEvent(eventId) > 0
     }
+
+    override suspend fun getEventIdsInSeries(seriesId: String, from: LocalDate): List<String> =
+        dao.getIdsInSeries(seriesId, from.toEpochDay())
 }

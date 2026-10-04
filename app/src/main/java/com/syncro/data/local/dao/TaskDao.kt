@@ -43,6 +43,9 @@ interface TaskDao {
     @Query("SELECT * FROM tasks WHERE isCompleted = 0 AND isDeleted = 0 AND date <= :untilEpoch ORDER BY date ASC, time ASC")
     fun getUnfinishedTasksUntil(untilEpoch: Long): Flow<List<TaskEntity>>
 
+    @Query("SELECT id FROM tasks WHERE seriesId = :seriesId AND date >= :fromEpoch AND isDeleted = 0")
+    suspend fun getIdsInSeries(seriesId: String, fromEpoch: Long): List<String>
+
     // region Sincronización
 
     /** Tareas con cambios locales sin subir o que nunca llegaron a Google. */

@@ -26,5 +26,7 @@ data class EventEntity(
     @ColumnInfo(defaultValue = "0") val pendingChanges: Int = 0,
     // Borrado en la app pero aún no en Google: no se muestra, y la subida lo borrará allí. Sin esta
     // marca, la siguiente sincronización lo volvería a traer
-    @ColumnInfo(defaultValue = "0") val isDeleted: Boolean = false
+    @ColumnInfo(defaultValue = "0") val isDeleted: Boolean = false,
+    // Serie de la que es una repetición (repeat_series.id); null si no se repite
+    val seriesId: String? = null
 )

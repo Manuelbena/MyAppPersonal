@@ -5,19 +5,19 @@ import com.syncro.data.local.entity.MovementEntity
 import com.syncro.domain.model.Movement
 import com.syncro.domain.model.MovementCategory
 import com.syncro.domain.model.MovementType
+import com.syncro.domain.model.SavingsPeriod
 import com.syncro.domain.repository.MovementRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import java.time.LocalDate
-import java.time.YearMonth
 import javax.inject.Inject
 
 class MovementRepositoryImpl @Inject constructor(
     private val dao: MovementDao
 ) : MovementRepository {
 
-    override fun observeForMonth(month: YearMonth): Flow<List<Movement>> =
-        dao.observeForRange(month.atDay(1).toEpochDay(), month.atEndOfMonth().toEpochDay())
+    override fun observeForPeriod(period: SavingsPeriod): Flow<List<Movement>> =
+        dao.observeForRange(period.start.toEpochDay(), period.end.toEpochDay())
             .map { entities -> entities.mapNotNull { it.toDomain() } }
 
     override suspend fun getAllMovements(): List<Movement> = dao.getAll().mapNotNull { it.toDomain() }

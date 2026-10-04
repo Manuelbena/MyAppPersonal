@@ -329,6 +329,30 @@ class GoogleSyncRepositoryImplTest {
         assertEquals("Versión local", eventDao.getEventById("e1")!!.title)
     }
 
+    // Regresión: la descarga rehacía el evento entero y perdía la serie; ya no se podía borrar
+    // "este y los siguientes" de una repetición que había ido y vuelto de Google
+    @Test
+    fun `una repeticion descargada de Google sigue en su serie`() = runTest {
+        eventDao.insertEvent(aSyncedEventEntity(id = "e1", remoteId = "g-1").copy(seriesId = "serie-1"))
+        google.addEvent(timedEvent("g-1", "Gimnasio con Ana", DAY, at("19:00"), at("20:00")))
+
+        repository.syncCalendar(DAY)
+
+        val local = eventDao.getEventById("e1")!!
+        assertEquals("Gimnasio con Ana", local.title)
+        assertEquals("serie-1", local.seriesId)
+    }
+
+    @Test
+    fun `una tarea repetida descargada de Google sigue en su serie`() = runTest {
+        taskDao.insertTask(aSyncedTaskEntity(id = "t1", remoteId = "g-t1").copy(seriesId = "serie-1"))
+        google.addTask(googleTask("g-t1", "Regar las plantas", due = DAY))
+
+        repository.syncTasks(force = true)
+
+        assertEquals("serie-1", taskDao.getTaskById("t1")!!.seriesId)
+    }
+
     // endregion
 
     // region Cambios pendientes (aviso de Inicio)

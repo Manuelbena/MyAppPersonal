@@ -35,7 +35,9 @@ fun EventDetailSheet(
     onSubtaskToggle: (String) -> Unit,
     onEdit: () -> Unit,
     onShare: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    // Si se repite: borrar también las siguientes repeticiones
+    onDeleteFollowing: () -> Unit = {}
 ) {
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -53,7 +55,8 @@ fun EventDetailSheet(
             onSubtaskToggle = onSubtaskToggle,
             onEdit = onEdit,
             onShare = onShare,
-            onDelete = onDelete
+            onDelete = onDelete,
+            onDeleteFollowing = onDeleteFollowing
         )
     }
 }
@@ -65,7 +68,8 @@ fun EventDetailContent(
     onSubtaskToggle: (String) -> Unit,
     onEdit: () -> Unit,
     onShare: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onDeleteFollowing: () -> Unit = {}
 ) {
     // Igual que en la tarjeta: verde si está completado, si no el color de la categoría
     val accent = if (event.isCompleted) Emerald500 else event.categoryColor.toColor()
@@ -84,6 +88,7 @@ fun EventDetailContent(
             pills = {
                 Pill(categoryIcon(event.categoryText), event.categoryText, event.categoryColor.toColor())
                 event.priority?.let { Pill(Icons.Rounded.Flag, it.label, it.color) }
+                event.repeat?.let { Pill(Icons.Rounded.Repeat, it.shortLabel, event.categoryColor.toColor()) }
                 if (event.isCompleted) Pill(Icons.Rounded.CheckCircle, "Completado", Emerald500)
             },
             actions = {
@@ -106,6 +111,10 @@ fun EventDetailContent(
         ) {
             DetailCard {
                 InfoRow(Icons.Rounded.Schedule, accent, "Cuándo", whenText.headline, whenText.detail)
+                event.repeat?.let { repeat ->
+                    InfoDivider()
+                    InfoRow(Icons.Rounded.Repeat, accent, "Se repite", repeat.describe(event.date))
+                }
                 if (!event.location.isNullOrBlank()) {
                     InfoDivider()
                     InfoRow(Icons.Rounded.Place, accent, "Dónde", event.location)
@@ -145,7 +154,9 @@ fun EventDetailContent(
                 label = "Eliminar evento",
                 confirmTitle = "¿Eliminar este evento?",
                 warning = deleteWarning(isSynced = event.remoteId != null, googleService = "Google Calendar"),
-                onDelete = onDelete
+                onDelete = onDelete,
+                onDeleteFollowing = onDeleteFollowing.takeIf { event.repeat != null },
+                feminine = false
             )
         }
     }

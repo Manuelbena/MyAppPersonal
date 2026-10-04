@@ -23,7 +23,9 @@ fun TaskDetailSheet(
     task: SyncroItem.Task,
     onDismiss: () -> Unit,
     onToggleCompleted: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    // Si se repite: borrar también las siguientes repeticiones
+    onDeleteFollowing: () -> Unit = {}
 ) {
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -35,7 +37,7 @@ fun TaskDetailSheet(
         containerColor = MaterialTheme.colorScheme.surface,
         shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
     ) {
-        TaskDetailContent(task = task, onToggleCompleted = onToggleCompleted, onDelete = onDelete)
+        TaskDetailContent(task = task, onToggleCompleted = onToggleCompleted, onDelete = onDelete, onDeleteFollowing = onDeleteFollowing)
     }
 }
 
@@ -43,7 +45,8 @@ fun TaskDetailSheet(
 fun TaskDetailContent(
     task: SyncroItem.Task,
     onToggleCompleted: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onDeleteFollowing: () -> Unit = {}
 ) {
     val taskColor = task.categoryColor?.toColor() ?: MaterialTheme.colorScheme.primary
     val accent = if (task.isCompleted) Emerald500 else taskColor
@@ -61,6 +64,7 @@ fun TaskDetailContent(
             pills = {
                 Pill(Icons.Rounded.TaskAlt, "Tarea", taskColor)
                 task.categoryText?.takeIf { it.isNotBlank() }?.let { Pill(categoryIcon(it), it, taskColor) }
+                task.repeat?.let { Pill(Icons.Rounded.Repeat, it.shortLabel, taskColor) }
                 if (task.isCompleted) Pill(Icons.Rounded.CheckCircle, "Completada", Emerald500)
             },
             actions = {
@@ -87,6 +91,10 @@ fun TaskDetailContent(
                     headline = task.date.toLongDisplayDate(),
                     detail = if (task.isAllDay) "Todo el día" else task.time.toDisplayTime()
                 )
+                task.repeat?.let { repeat ->
+                    InfoDivider()
+                    InfoRow(Icons.Rounded.Repeat, accent, "Se repite", repeat.describe(task.date))
+                }
             }
 
             if (!task.description.isNullOrBlank()) {
@@ -102,7 +110,9 @@ fun TaskDetailContent(
                 label = "Eliminar tarea",
                 confirmTitle = "¿Eliminar esta tarea?",
                 warning = deleteWarning(isSynced = task.remoteId != null, googleService = "Google Tasks"),
-                onDelete = onDelete
+                onDelete = onDelete,
+                onDeleteFollowing = onDeleteFollowing.takeIf { task.repeat != null },
+                feminine = true
             )
         }
     }

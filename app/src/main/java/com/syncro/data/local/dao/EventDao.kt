@@ -71,6 +71,9 @@ interface EventDao {
         markEventChanged(eventId)
     }
 
+    @Query("SELECT id FROM events WHERE seriesId = :seriesId AND date >= :fromEpoch AND isDeleted = 0")
+    suspend fun getIdsInSeries(seriesId: String, fromEpoch: Long): List<String>
+
     // region Sincronización
 
     /** Eventos con cambios locales sin subir o que nunca llegaron a Google. */

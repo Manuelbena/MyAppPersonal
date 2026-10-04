@@ -468,8 +468,8 @@ fun HomeScreen(
     if (showQuickTaskSheet) {
         QuickTaskSheet(
             onDismiss = { showQuickTaskSheet = false },
-            onSave = { title, description, date ->
-                viewModel.saveQuickTask(title, description, date)
+            onSave = { title, description, date, repeat ->
+                viewModel.saveQuickTask(title, description, date, repeat)
                 showQuickTaskSheet = false
             },
             // Se crea en el día que se está mirando (hoy, si se mira un día pasado)
@@ -494,6 +494,10 @@ fun HomeScreen(
                 onDelete = {
                     selectedEventIdForDetail = null
                     viewModel.deleteEvent(event.id)
+                },
+                onDeleteFollowing = {
+                    selectedEventIdForDetail = null
+                    viewModel.deleteEventAndFollowing(event.id)
                 }
             )
         }
@@ -508,6 +512,10 @@ fun HomeScreen(
                 onDelete = {
                     selectedTaskIdForDetail = null
                     viewModel.deleteTask(task.id)
+                },
+                onDeleteFollowing = {
+                    selectedTaskIdForDetail = null
+                    viewModel.deleteTaskAndFollowing(task.id)
                 }
             )
         }

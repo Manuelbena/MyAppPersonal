@@ -141,7 +141,7 @@ class TimelineComponentsTest {
     fun `la tarea nueva solo pide el dia, y Manana lo cambia`() {
         var saved: Pair<String, LocalDate>? = null
         compose.setContent {
-            QuickTaskContent(initialDate = DAY, today = DAY, onSave = { title, _, date -> saved = title to date })
+            QuickTaskContent(initialDate = DAY, today = DAY, onSave = { title, _, date, _ -> saved = title to date })
         }
 
         compose.onNodeWithText("¿Qué tienes que hacer?").performTextInput("Tomar creatina")
@@ -153,7 +153,7 @@ class TimelineComponentsTest {
 
     @Test
     fun `la tarea nueva no se puede guardar sin titulo`() {
-        compose.setContent { QuickTaskContent(initialDate = DAY, today = DAY, onSave = { _, _, _ -> }) }
+        compose.setContent { QuickTaskContent(initialDate = DAY, today = DAY, onSave = { _, _, _, _ -> }) }
 
         compose.onNodeWithText("Guardar").assertIsNotEnabled()
     }

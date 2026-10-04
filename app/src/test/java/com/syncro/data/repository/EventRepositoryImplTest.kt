@@ -48,7 +48,7 @@ class EventRepositoryImplTest {
     fun setUp() {
         db = createInMemoryDatabase()
         dao = db.eventDao
-        repository = EventRepositoryImpl(dao)
+        repository = EventRepositoryImpl(dao, db.repeatSeriesDao)
     }
 
     @After

@@ -3,6 +3,7 @@ package com.syncro.domain.usecase
 import com.syncro.testutil.CallLog
 import com.syncro.testutil.FakeEventRepository
 import com.syncro.testutil.FakeGoogleSyncRepository
+import com.syncro.testutil.FakeRepeatSeriesRepository
 import com.syncro.testutil.anEvent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -18,13 +19,14 @@ class DeleteEventUseCaseTest {
     private val log = CallLog()
     private val events = FakeEventRepository(log)
     private val google = FakeGoogleSyncRepository(log)
+    private val series = FakeRepeatSeriesRepository()
 
     @Test
     fun `borra en local y despues lo sube a Google`() = runTest {
         events.insertEvent(anEvent(id = "e1"))
         log.calls.clear()
 
-        DeleteEventUseCase(events, google)("e1")
+        DeleteEventUseCase(events, google, series)("e1")
 
         assertEquals(listOf("deleteEvent(e1)", "pushEvent(e1)"), log.calls)
         assertNull(events.getEventById("e1"))
@@ -35,7 +37,7 @@ class DeleteEventUseCaseTest {
         events.insertEvent(anEvent(id = "e1"))
         google.isOffline = true
 
-        DeleteEventUseCase(events, google)("e1")
+        DeleteEventUseCase(events, google, series)("e1")
 
         assertNull(events.getEventById("e1"))
     }

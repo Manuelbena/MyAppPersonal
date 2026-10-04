@@ -1,16 +1,16 @@
 package com.syncro.domain.repository
 
 import com.syncro.domain.model.Movement
+import com.syncro.domain.model.SavingsPeriod
 import kotlinx.coroutines.flow.Flow
-import java.time.YearMonth
 
 /** Ingresos y gastos. Solo se guardan en el móvil: no se sincronizan con Google ni con nada. */
 interface MovementRepository {
     /**
-     * Los movimientos que pueden contar en [month]: los de ese mes y los mensuales que empezaron
-     * antes. Es un superconjunto; quien lo usa decide con `Movement.dateIn`.
+     * Los movimientos que pueden contar en [period]: los de esas fechas y los mensuales que
+     * empezaron antes. Es un superconjunto; quien lo usa decide con `Movement.datesIn`.
      */
-    fun observeForMonth(month: YearMonth): Flow<List<Movement>>
+    fun observeForPeriod(period: SavingsPeriod): Flow<List<Movement>>
     /** Todos, para exportarlos o guardarlos en una copia. */
     suspend fun getAllMovements(): List<Movement>
     suspend fun insertMovement(movement: Movement)

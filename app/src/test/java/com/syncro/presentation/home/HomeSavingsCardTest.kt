@@ -4,6 +4,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import com.syncro.domain.model.SavingsPeriod
 import com.syncro.domain.model.Budget
 import com.syncro.domain.model.BudgetStatus
 import com.syncro.domain.model.HomeSavings
@@ -33,7 +34,7 @@ class HomeSavingsCardTest {
     @get:Rule
     val compose = createComposeRule()
 
-    private val october = YearMonth.of(2026, 10)
+    private val october = SavingsPeriod.of(YearMonth.of(2026, 10))
 
     @Test
     fun `el balance lleva signo segun el mes vaya bien o mal`() {

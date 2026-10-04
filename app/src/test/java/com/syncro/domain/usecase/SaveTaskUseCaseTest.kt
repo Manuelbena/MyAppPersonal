@@ -5,7 +5,11 @@ import com.syncro.testutil.CallLog
 import com.syncro.testutil.DAY
 import com.syncro.testutil.at
 import com.syncro.testutil.FakeGoogleSyncRepository
+import com.syncro.testutil.FakeRepeatSeriesRepository
+import com.syncro.testutil.FakeEventRepository
 import com.syncro.testutil.FakeTaskRepository
+import java.time.Clock
+import java.time.ZoneOffset
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -25,13 +29,16 @@ class SaveTaskUseCaseTest {
     private lateinit var tasks: FakeTaskRepository
     private lateinit var google: FakeGoogleSyncRepository
     private lateinit var saveTask: SaveTaskUseCase
+    private val series = FakeRepeatSeriesRepository()
+    private val events = FakeEventRepository()
+    private val clock = Clock.fixed(DAY.atTime(9, 0).toInstant(ZoneOffset.UTC), ZoneOffset.UTC)
 
     @Before
     fun setUp() {
         log = CallLog()
         tasks = FakeTaskRepository(log)
         google = FakeGoogleSyncRepository(log)
-        saveTask = SaveTaskUseCase(tasks, google)
+        saveTask = SaveTaskUseCase(tasks, google, series, GenerateRepeatsUseCase(series, tasks, events, google, clock))
     }
 
     @Test

@@ -1,7 +1,6 @@
 package com.syncro.domain.model
 
 import java.time.LocalDate
-import java.time.YearMonth
 
 /** Lo que el usuario contestó a "¿Te recuerdo tu día?". */
 enum class DigestAnswer { ACCEPTED, DECLINED }
@@ -316,7 +315,7 @@ private fun budgetAlertMessage(alert: BudgetAlert): ChatMessage {
         }
     }
     val level = if (alert.level == BudgetLevel.EXCEEDED) "exceeded" else "warning"
-    return assistant("budget-${YearMonth.from(alert.date)}-${budget.category.name}-$level", text)
+    return assistant("budget-${alert.month}-${budget.category.name}-$level", text)
 }
 
 // endregion

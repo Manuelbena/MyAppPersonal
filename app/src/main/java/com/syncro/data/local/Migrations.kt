@@ -69,11 +69,20 @@ val MIGRATION_14_15 = object : Migration(14, 15) {
     }
 }
 
+/** Tareas y eventos que se repiten: tabla de series (solo locales) y la serie de cada repetición. */
+val MIGRATION_15_16 = object : Migration(15, 16) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("CREATE TABLE IF NOT EXISTS `repeat_series` (`id` TEXT NOT NULL, `kind` TEXT NOT NULL, `frequency` TEXT NOT NULL, `weekdays` TEXT NOT NULL, `startDate` INTEGER NOT NULL, `untilDate` INTEGER, `generatedUntil` INTEGER NOT NULL, `title` TEXT NOT NULL, `description` TEXT, `location` TEXT, `startTime` TEXT NOT NULL, `endTime` TEXT NOT NULL, `spanDays` INTEGER NOT NULL, `categoryText` TEXT, `categoryColor` INTEGER, `priority` TEXT, `subtasks` TEXT NOT NULL, PRIMARY KEY(`id`))")
+        db.execSQL("ALTER TABLE tasks ADD COLUMN seriesId TEXT")
+        db.execSQL("ALTER TABLE events ADD COLUMN seriesId TEXT")
+    }
+}
+
 /**
  * Todas las migraciones, en orden. AppModule y los tests las registran desde aquí: una migración
  * nueva se añade a esta lista y no puede olvidarse en uno de los dos sitios.
  */
 val ALL_MIGRATIONS = arrayOf(
     MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12,
-    MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15
+    MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16
 )

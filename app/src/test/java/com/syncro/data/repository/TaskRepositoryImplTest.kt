@@ -46,7 +46,7 @@ class TaskRepositoryImplTest {
     fun setUp() {
         db = createInMemoryDatabase()
         dao = db.taskDao
-        repository = TaskRepositoryImpl(dao)
+        repository = TaskRepositoryImpl(dao, db.repeatSeriesDao)
     }
 
     @After

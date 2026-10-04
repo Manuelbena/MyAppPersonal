@@ -170,7 +170,9 @@ class GoogleSyncRepositoryImpl @Inject constructor(
             priority = "MEDIUM",
             isAllDay = isAllDay,
             location = googleEvent.location,
-            isCompleted = isCompletedTitle(title)
+            isCompleted = isCompletedTitle(title),
+            // Google no sabe de la serie (solo le llegan repeticiones sueltas): se conserva la local
+            seriesId = existing?.seriesId
         )
         eventDao.insertEventWithSubtasks(entity, subtasks)
     }

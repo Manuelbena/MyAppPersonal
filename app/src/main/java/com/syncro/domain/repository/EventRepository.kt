@@ -18,4 +18,6 @@ interface EventRepository {
 
     /** Deshace [deleteEvent] si el borrado aún no se ha subido a Google; false si ya no se puede. */
     suspend fun restoreEvent(eventId: String): Boolean
+    /** Ids de las repeticiones de la serie que empiezan desde [from] incluido (sin las borradas). */
+    suspend fun getEventIdsInSeries(seriesId: String, from: LocalDate): List<String>
 }

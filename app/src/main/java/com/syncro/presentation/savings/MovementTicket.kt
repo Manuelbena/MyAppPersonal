@@ -13,7 +13,6 @@ import com.syncro.domain.model.MovementType
 import com.syncro.domain.model.totalsByCategory
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
-import java.time.format.TextStyle
 import java.util.Locale
 import kotlin.math.abs
 
@@ -207,12 +206,11 @@ suspend fun Context.shareMonthStatement(month: MonthMovements, budgets: List<Bud
     shareTicket(
         ticket = monthStatement(month, issuedAt, budgets),
         caption = monthShareText(month, budgets),
-        fileName = "resumen-${month.month}",
+        fileName = "resumen-" + if (month.period.isCalendarMonth) "${month.month}" else "${month.period.start}",
         chooserTitle = "Compartir resumen del mes"
     )
 
-private fun MonthMovements.monthName(): String =
-    month.month.getDisplayName(TextStyle.FULL_STANDALONE, SPANISH) + " de ${month.year}"
+private fun MonthMovements.monthName(): String = period.name()
 
 /** Verde si se ahorró, rojo si se gastó de más, neutro si quedó a cero. */
 private fun MonthMovements.balanceType(): MovementType? = when {

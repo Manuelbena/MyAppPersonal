@@ -2,6 +2,7 @@ package com.syncro.data.repository
 
 import com.syncro.data.local.SyncroDatabase
 import com.syncro.data.local.entity.MovementEntity
+import com.syncro.domain.model.SavingsPeriod
 import com.syncro.domain.model.MovementCategory
 import com.syncro.domain.model.MovementType
 import com.syncro.testutil.aMovement
@@ -31,7 +32,7 @@ class MovementRepositoryImplTest {
     private lateinit var db: SyncroDatabase
     private lateinit var repository: MovementRepositoryImpl
 
-    private val october = YearMonth.of(2026, 10)
+    private val october = SavingsPeriod.of(YearMonth.of(2026, 10))
 
     @Before
     fun setUp() {
@@ -50,7 +51,7 @@ class MovementRepositoryImplTest {
 
         repository.insertMovement(movement)
 
-        assertEquals(listOf(movement), repository.observeForMonth(october).first())
+        assertEquals(listOf(movement), repository.observeForPeriod(october).first())
     }
 
     @Test
@@ -61,7 +62,7 @@ class MovementRepositoryImplTest {
         repository.insertMovement(aMovement(id = "noviembre", date = LocalDate.of(2026, 11, 1)))
         repository.insertMovement(aMovement(id = "mensual-futuro", date = LocalDate.of(2026, 11, 1), repeatsMonthly = true))
 
-        val ids = repository.observeForMonth(october).first().map { it.id }.toSet()
+        val ids = repository.observeForPeriod(october).first().map { it.id }.toSet()
 
         assertEquals(setOf("octubre", "alquiler"), ids)
     }
@@ -72,7 +73,7 @@ class MovementRepositoryImplTest {
 
         repository.deleteMovement("netflix")
 
-        assertEquals(emptyList<Any>(), repository.observeForMonth(october).first())
+        assertEquals(emptyList<Any>(), repository.observeForPeriod(october).first())
         assertEquals(0, db.movementDao.count())
     }
 
@@ -82,7 +83,7 @@ class MovementRepositoryImplTest {
             MovementEntity("viejo", "EXPENSE", 500, "CATEGORIA_RENOMBRADA", LocalDate.of(2026, 10, 2).toEpochDay(), null, false)
         )
 
-        assertEquals(MovementCategory.OTHER_EXPENSE, repository.observeForMonth(october).first().single().category)
+        assertEquals(MovementCategory.OTHER_EXPENSE, repository.observeForPeriod(october).first().single().category)
     }
 
     @Test
@@ -91,6 +92,6 @@ class MovementRepositoryImplTest {
             MovementEntity("raro", "TRANSFER", 500, "OTHER_EXPENSE", LocalDate.of(2026, 10, 2).toEpochDay(), null, false)
         )
 
-        assertEquals(emptyList<Any>(), repository.observeForMonth(october).first())
+        assertEquals(emptyList<Any>(), repository.observeForPeriod(october).first())
     }
 }

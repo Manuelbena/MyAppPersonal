@@ -31,6 +31,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.syncro.domain.model.label
 import com.syncro.domain.model.Budget
 import com.syncro.domain.model.MonthMovements
+import com.syncro.domain.model.SavingsPeriod
 import com.syncro.domain.model.budgetStatuses
 import com.syncro.domain.model.Movement
 import com.syncro.domain.model.MovementCategory
@@ -47,9 +48,7 @@ import com.syncro.presentation.theme.Rose500
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.LocalDateTime
-import java.time.YearMonth
 import java.time.format.DateTimeFormatter
-import java.time.format.TextStyle
 import java.util.Locale
 
 private val SPANISH = Locale("es", "ES")
@@ -62,7 +61,7 @@ fun SavingsScreen(
     viewModel: SavingsViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsState()
-    val month by viewModel.currentMonth.collectAsState()
+    val period by viewModel.currentPeriod.collectAsState()
     val budgets by viewModel.budgets.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
@@ -73,7 +72,7 @@ fun SavingsScreen(
     }
 
     SavingsContent(
-        month = month,
+        period = period,
         movements = state,
         today = viewModel.today,
         snackbarHostState = snackbarHostState,
@@ -104,7 +103,8 @@ private data class SelectedOccurrence(val id: String, val date: LocalDate)
  */
 @Composable
 fun SavingsContent(
-    month: YearMonth,
+    // El mes que se ve (de nómina a nómina si hay día de nómina); null mientras se lee
+    period: SavingsPeriod?,
     movements: MonthMovements?,
     today: LocalDate,
     onPreviousMonth: () -> Unit,
@@ -149,7 +149,7 @@ fun SavingsContent(
                 .padding(padding)
         ) {
             // Fija: el título y el mes; lo de debajo hace scroll
-            SavingsHeader(month, onPreviousMonth, onNextMonth)
+            SavingsHeader(period, onPreviousMonth, onNextMonth)
 
             // Igual que en Inicio: el contenido se desvanece bajo la cabecera y sobre la barra
             Box(modifier = Modifier.fillMaxSize()) {
@@ -296,7 +296,7 @@ fun AddMovementSheet(onDismiss: () -> Unit, onSelect: (MovementType) -> Unit) {
  * salía doble y la cabecera no quedaba a la altura de las demás).
  */
 @Composable
-private fun SavingsHeader(month: YearMonth, onPrevious: () -> Unit, onNext: () -> Unit) {
+private fun SavingsHeader(period: SavingsPeriod?, onPrevious: () -> Unit, onNext: () -> Unit) {
     // Misma cabecera que Asistente: título y subtítulo a la izquierda, botones redondos a la derecha
     Row(
         modifier = Modifier
@@ -313,7 +313,7 @@ private fun SavingsHeader(month: YearMonth, onPrevious: () -> Unit, onNext: () -
                 color = MaterialTheme.colorScheme.onBackground
             )
             Text(
-                month.month.getDisplayName(TextStyle.FULL_STANDALONE, SPANISH).replaceFirstChar { it.uppercase() } + " ${month.year}",
+                period?.title().orEmpty(),
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.primary
             )

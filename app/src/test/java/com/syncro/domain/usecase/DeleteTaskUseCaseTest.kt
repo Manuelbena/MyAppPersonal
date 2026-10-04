@@ -2,6 +2,7 @@ package com.syncro.domain.usecase
 
 import com.syncro.testutil.CallLog
 import com.syncro.testutil.FakeGoogleSyncRepository
+import com.syncro.testutil.FakeRepeatSeriesRepository
 import com.syncro.testutil.FakeTaskRepository
 import com.syncro.testutil.aTask
 import kotlinx.coroutines.test.runTest
@@ -18,13 +19,14 @@ class DeleteTaskUseCaseTest {
     private val log = CallLog()
     private val tasks = FakeTaskRepository(log)
     private val google = FakeGoogleSyncRepository(log)
+    private val series = FakeRepeatSeriesRepository()
 
     @Test
     fun `borra en local y despues lo sube a Google`() = runTest {
         tasks.insertTask(aTask(id = "t1"))
         log.calls.clear()
 
-        DeleteTaskUseCase(tasks, google)("t1")
+        DeleteTaskUseCase(tasks, google, series)("t1")
 
         assertEquals(listOf("deleteTask(t1)", "pushTask(t1)"), log.calls)
         assertNull(tasks.getTaskById("t1"))
@@ -35,7 +37,7 @@ class DeleteTaskUseCaseTest {
         tasks.insertTask(aTask(id = "t1"))
         google.isOffline = true
 
-        DeleteTaskUseCase(tasks, google)("t1")
+        DeleteTaskUseCase(tasks, google, series)("t1")
 
         assertNull(tasks.getTaskById("t1"))
     }

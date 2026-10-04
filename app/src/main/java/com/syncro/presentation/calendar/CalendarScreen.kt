@@ -254,8 +254,8 @@ fun CalendarScreen(
     if (showQuickTaskSheet) {
         QuickTaskSheet(
             onDismiss = { showQuickTaskSheet = false },
-            onSave = { title, description, date ->
-                viewModel.saveTask(title, description, date)
+            onSave = { title, description, date, repeat ->
+                viewModel.saveTask(title, description, date, repeat)
                 showQuickTaskSheet = false
             },
             // Se crea en el día seleccionado del calendario (hoy, si no hay ninguno o ya pasó)
@@ -331,6 +331,10 @@ fun DayDetailsContent(
                 onDelete = {
                     selectedTaskId = null
                     viewModel.deleteTask(task.id)
+                },
+                onDeleteFollowing = {
+                    selectedTaskId = null
+                    viewModel.deleteTaskAndFollowing(task.id)
                 }
             )
         }
@@ -351,6 +355,10 @@ fun DayDetailsContent(
                 onDelete = {
                     selectedEventId = null
                     viewModel.deleteEvent(event.id)
+                },
+                onDeleteFollowing = {
+                    selectedEventId = null
+                    viewModel.deleteEventAndFollowing(event.id)
                 }
             )
         }

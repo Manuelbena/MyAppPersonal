@@ -8,9 +8,12 @@ import androidx.lifecycle.viewModelScope
 import com.google.api.client.googleapis.extensions.android.gms.auth.UserRecoverableAuthIOException
 import androidx.compose.ui.graphics.Color
 import com.syncro.domain.model.Priority
+import com.syncro.domain.model.Recurrence
+import com.syncro.domain.model.RepeatScope
 import com.syncro.domain.model.Quote
 import com.syncro.domain.model.SyncroItem
 import com.syncro.domain.usecase.GetTimelineUseCase
+import com.syncro.domain.usecase.GenerateRepeatsUseCase
 import com.syncro.domain.usecase.SaveEventUseCase
 import com.syncro.domain.usecase.SaveTaskUseCase
 import com.syncro.domain.usecase.SyncGoogleCalendarUseCase
@@ -32,7 +35,6 @@ import com.syncro.domain.model.SyncState
 import com.syncro.domain.model.DayMark
 import com.syncro.domain.model.HomeSavings
 import com.syncro.domain.usecase.ObserveHomeSavingsUseCase
-import java.time.YearMonth
 import com.syncro.domain.model.dayMarks
 import com.syncro.domain.usecase.GetEventsInRangeUseCase
 import com.syncro.domain.usecase.GetTasksInRangeUseCase
@@ -148,7 +150,8 @@ class HomeViewModel @Inject constructor(
     private val undoDeleteTaskUseCase: UndoDeleteTaskUseCase,
     private val undoDeleteEventUseCase: UndoDeleteEventUseCase,
     private val undoDeleteNoteUseCase: UndoDeleteNoteUseCase,
-    observeHomeSavingsUseCase: ObserveHomeSavingsUseCase
+    observeHomeSavingsUseCase: ObserveHomeSavingsUseCase,
+    private val generateRepeatsUseCase: GenerateRepeatsUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HomeUiState(today = LocalDate.now(clock)))
@@ -205,11 +208,18 @@ class HomeViewModel @Inject constructor(
             }
             .launchIn(viewModelScope)
 
-        // Ahorros del mes en curso (cambia el día 1 aunque la app siga abierta)
+        // Repeticiones de tareas y eventos: al abrir y cada día nuevo se crean las que falten por delante
         _uiState
-            .map { YearMonth.from(it.today) }
+            .map { it.today }
             .distinctUntilChanged()
-            .flatMapLatest { month -> observeHomeSavingsUseCase(month) }
+            .onEach { generateRepeatsUseCase() }
+            .launchIn(viewModelScope)
+
+        // Ahorros del mes en curso (cambia el día 1, o el de nómina, aunque la app siga abierta)
+        _uiState
+            .map { it.today }
+            .distinctUntilChanged()
+            .flatMapLatest { today -> observeHomeSavingsUseCase(today) }
             .onEach { savings -> _uiState.update { it.copy(savings = savings) } }
             .launchIn(viewModelScope)
 
@@ -335,17 +345,19 @@ class HomeViewModel @Inject constructor(
     fun saveQuickTask(
         title: String,
         description: String,
-        date: LocalDate
+        date: LocalDate,
+        repeat: Recurrence? = null
     ) {
         viewModelScope.launch {
             val result = saveTaskUseCase(
                 title = title,
                 description = description,
                 date = date,
-                time = LocalTime.MIDNIGHT
+                time = LocalTime.MIDNIGHT,
+                repeat = repeat
             )
             val msg = result.fold(
-                onSuccess = { "Tarea creada correctamente" },
+                onSuccess = { if (repeat == null) "Tarea creada correctamente" else "Tarea creada: se repetirá" },
                 onFailure = { it.message ?: "No se pudo guardar la tarea" }
             )
             _effect.send(HomeEffect.ShowSnackbar(msg))
@@ -364,7 +376,9 @@ class HomeViewModel @Inject constructor(
         categoryText: String,
         categoryColor: Color,
         priority: Priority?,
-        subtasks: List<String>
+        subtasks: List<String>,
+        repeat: Recurrence? = null,
+        scope: RepeatScope = RepeatScope.THIS
     ) {
         viewModelScope.launch {
             val result = saveEventUseCase(
@@ -379,7 +393,9 @@ class HomeViewModel @Inject constructor(
                 categoryText = categoryText,
                 categoryColor = categoryColor.toArgbColor(),
                 priority = priority,
-                subtasks = subtasks
+                subtasks = subtasks,
+                repeat = repeat,
+                scope = scope
             )
             val msg = result.fold(
                 onSuccess = { if (id == null) "Evento creado correctamente" else "Evento actualizado correctamente" },
@@ -419,6 +435,22 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch {
             deleteTaskUseCase(taskId, uploadNow = false)
             _effect.send(HomeEffect.OfferUndo("Tarea eliminada", HomeUndo.DeletedTask(taskId)))
+        }
+    }
+
+    /** Un evento que se repite y los siguientes. Son varios: se borran sin "Deshacer". */
+    fun deleteEventAndFollowing(eventId: String) {
+        viewModelScope.launch {
+            deleteEventUseCase(eventId, scope = RepeatScope.THIS_AND_FOLLOWING)
+            _effect.send(HomeEffect.ShowSnackbar("Eliminados este evento y los siguientes"))
+        }
+    }
+
+    /** Ver [deleteEventAndFollowing]. */
+    fun deleteTaskAndFollowing(taskId: String) {
+        viewModelScope.launch {
+            deleteTaskUseCase(taskId, scope = RepeatScope.THIS_AND_FOLLOWING)
+            _effect.send(HomeEffect.ShowSnackbar("Eliminadas esta tarea y las siguientes"))
         }
     }
 

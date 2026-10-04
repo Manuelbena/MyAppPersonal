@@ -9,8 +9,12 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import com.syncro.domain.model.MovementCategory
 import com.syncro.domain.model.MovementCategory.*
 import com.syncro.domain.model.MovementType
+import com.syncro.domain.model.SavingsPeriod
 import com.syncro.domain.model.euros
 import com.syncro.presentation.theme.*
+import java.time.LocalDate
+import java.time.format.TextStyle
+import java.util.Locale
 
 /*
  * Cómo se ven los movimientos: icono y color de cada categoría (el nombre y el emoji están en el
@@ -70,6 +74,27 @@ fun formatEuros(cents: Long): String = euros(cents)
 /** Con signo: "+1.200,00 €" para ingresos y "−45,90 €" para gastos. */
 fun formatSignedEuros(cents: Long, type: MovementType): String =
     (if (type == MovementType.INCOME) "+" else "−") + formatEuros(cents)
+
+private val SPANISH = Locale("es", "ES")
+
+/** "27 sep": el mes en tres letras a mano (lo abreviado de Java cambia según versión: "sept.", "sep"). */
+private fun LocalDate.shortDay(): String =
+    "$dayOfMonth " + month.getDisplayName(TextStyle.FULL_STANDALONE, SPANISH).take(3)
+
+/**
+ * El mes que se ve en Ahorros: "Octubre 2026" si es el mes natural; de nómina a nómina, las
+ * fechas: "27 sep – 26 oct 2026".
+ */
+fun SavingsPeriod.title(): String =
+    if (isCalendarMonth) {
+        month.month.getDisplayName(TextStyle.FULL_STANDALONE, SPANISH).replaceFirstChar { it.uppercase() } + " ${month.year}"
+    } else {
+        "${start.shortDay()} – ${end.shortDay()} ${end.year}"
+    }
+
+/** Para una frase: "octubre de 2026" o "27 sep – 26 oct 2026" (resumen del mes). */
+fun SavingsPeriod.name(): String =
+    if (isCalendarMonth) month.month.getDisplayName(TextStyle.FULL_STANDALONE, SPANISH) + " de ${month.year}" else title()
 
 /** El importe como se teclea en el formulario, para editarlo: "45,90" o "1200" (sin miles ni €). */
 internal fun Long.toAmountInput(): String =

@@ -9,6 +9,7 @@ import com.syncro.data.local.dao.BudgetDao
 import com.syncro.data.local.dao.EventDao
 import com.syncro.data.local.dao.MovementDao
 import com.syncro.data.local.dao.NoteDao
+import com.syncro.data.local.dao.RepeatSeriesDao
 import com.syncro.data.local.dao.TaskDao
 import com.syncro.data.local.dao.UserDao
 import com.syncro.data.repository.AccountDataRepositoryImpl
@@ -20,6 +21,7 @@ import com.syncro.data.repository.EventRepositoryImpl
 import com.syncro.data.repository.GoogleSyncRepositoryImpl
 import com.syncro.data.repository.MovementRepositoryImpl
 import com.syncro.data.repository.NoteRepositoryImpl
+import com.syncro.data.repository.RepeatSeriesRepositoryImpl
 import com.syncro.data.repository.TaskRepositoryImpl
 import com.syncro.data.repository.UserRepositoryImpl
 import com.syncro.data.remote.GoogleApiRemoteDataSource
@@ -38,6 +40,7 @@ import com.syncro.domain.repository.EventRepository
 import com.syncro.domain.repository.GoogleSyncRepository
 import com.syncro.domain.repository.MovementRepository
 import com.syncro.domain.repository.NoteRepository
+import com.syncro.domain.repository.RepeatSeriesRepository
 import com.syncro.domain.repository.TaskRepository
 import com.syncro.domain.repository.UserRepository
 import dagger.Module
@@ -96,8 +99,19 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun provideTaskRepository(dao: TaskDao): TaskRepository {
-        return TaskRepositoryImpl(dao)
+    fun provideTaskRepository(dao: TaskDao, seriesDao: RepeatSeriesDao): TaskRepository {
+        return TaskRepositoryImpl(dao, seriesDao)
+    }
+
+    @Provides
+    fun provideRepeatSeriesDao(db: SyncroDatabase): RepeatSeriesDao {
+        return db.repeatSeriesDao
+    }
+
+    @Provides
+    @Singleton
+    fun provideRepeatSeriesRepository(dao: RepeatSeriesDao): RepeatSeriesRepository {
+        return RepeatSeriesRepositoryImpl(dao)
     }
 
     @Provides
@@ -136,8 +150,8 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun provideEventRepository(dao: EventDao): EventRepository {
-        return EventRepositoryImpl(dao)
+    fun provideEventRepository(dao: EventDao, seriesDao: RepeatSeriesDao): EventRepository {
+        return EventRepositoryImpl(dao, seriesDao)
     }
 
     @Provides

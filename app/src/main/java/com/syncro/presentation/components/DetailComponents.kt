@@ -26,6 +26,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.syncro.domain.model.RepeatScope
 
 /*
  * Piezas comunes de los detalles de evento y tarea (y de sus tarjetas en el timeline), para que
@@ -282,9 +283,19 @@ fun SubtaskProgress(done: Int, total: Int, color: Color, modifier: Modifier = Mo
 /**
  * Botón rojo de borrar al final de un detalle, separado de las acciones rápidas para no tocarlo sin
  * querer, con confirmación. [warning] explica qué pasa (p. ej. que también se borra en Google).
+ *
+ * Con [onDeleteFollowing] (una repetición de una serie) la confirmación pregunta si se borra solo
+ * esta ([onDelete]) o también las siguientes; [feminine] para "esta"/"este".
  */
 @Composable
-fun DeleteItemButton(label: String, confirmTitle: String, warning: String, onDelete: () -> Unit) {
+fun DeleteItemButton(
+    label: String,
+    confirmTitle: String,
+    warning: String,
+    onDelete: () -> Unit,
+    onDeleteFollowing: (() -> Unit)? = null,
+    feminine: Boolean = true
+) {
     var confirm by remember { mutableStateOf(false) }
     OutlinedButton(
         onClick = { confirm = true },
@@ -297,7 +308,19 @@ fun DeleteItemButton(label: String, confirmTitle: String, warning: String, onDel
         Spacer(Modifier.width(8.dp))
         Text(label)
     }
-    if (confirm) {
+    if (confirm && onDeleteFollowing != null) {
+        RepeatScopeDialog(
+            title = confirmTitle,
+            text = warning,
+            feminine = feminine,
+            destructive = true,
+            onChoose = { scope ->
+                confirm = false
+                if (scope == RepeatScope.THIS) onDelete() else onDeleteFollowing()
+            },
+            onDismiss = { confirm = false }
+        )
+    } else if (confirm) {
         AlertDialog(
             onDismissRequest = { confirm = false },
             title = { Text(confirmTitle) },

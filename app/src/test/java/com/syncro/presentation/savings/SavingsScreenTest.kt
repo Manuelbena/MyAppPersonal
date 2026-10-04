@@ -14,6 +14,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
+import com.syncro.domain.model.SavingsPeriod
 import com.syncro.domain.model.Budget
 import com.syncro.domain.model.MonthMovements
 import com.syncro.domain.model.MovementCategory
@@ -39,7 +40,7 @@ class SavingsScreenTest {
     val compose = createComposeRule()
 
     private val today = LocalDate.of(2026, 10, 2)
-    private val october = YearMonth.of(2026, 10)
+    private val october = SavingsPeriod.of(YearMonth.of(2026, 10))
     private val saved = mutableListOf<String>()
     private val deleted = mutableListOf<String>()
     private val shared = mutableListOf<String>()
@@ -51,7 +52,7 @@ class SavingsScreenTest {
     private fun show(movements: MonthMovements = monthMovements(october, emptyList()), budgets: List<Budget> = emptyList()) {
         compose.setContent {
             SavingsContent(
-                month = october,
+                period = october,
                 movements = movements,
                 today = today,
                 onPreviousMonth = {},
@@ -169,7 +170,7 @@ class SavingsScreenTest {
         var opened = 0
         compose.setContent {
             SavingsContent(
-                month = october,
+                period = october,
                 movements = monthMovements(october, emptyList()),
                 today = today,
                 onPreviousMonth = {},

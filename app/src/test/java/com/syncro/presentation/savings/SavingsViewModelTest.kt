@@ -1,7 +1,10 @@
 package com.syncro.presentation.savings
 
+import com.syncro.domain.model.AppSettings
+import com.syncro.domain.model.AssistantSettings
 import com.syncro.domain.model.MovementCategory
 import com.syncro.domain.model.MovementType
+import com.syncro.domain.model.SavingsPeriod
 import com.syncro.domain.usecase.DeleteBudgetUseCase
 import com.syncro.domain.usecase.DeleteMovementUseCase
 import com.syncro.domain.usecase.GetBudgetsUseCase
@@ -10,6 +13,7 @@ import com.syncro.domain.usecase.GetMonthMovementsUseCase
 import com.syncro.domain.usecase.SaveMovementUseCase
 import com.syncro.testutil.FakeBudgetRepository
 import com.syncro.testutil.FakeMovementRepository
+import com.syncro.testutil.FakeSettingsRepository
 import com.syncro.testutil.MainDispatcherRule
 import com.syncro.testutil.aMovement
 import kotlinx.coroutines.flow.toList
@@ -39,9 +43,10 @@ class SavingsViewModelTest {
     private val clock = Clock.fixed(today.atTime(9, 0).toInstant(ZoneOffset.UTC), ZoneOffset.UTC)
     private val repository = FakeMovementRepository()
     private val budgets = FakeBudgetRepository()
+    private val settings = FakeSettingsRepository()
 
     private fun createViewModel() = SavingsViewModel(
-        getMonthMovementsUseCase = GetMonthMovementsUseCase(repository),
+        getMonthMovementsUseCase = GetMonthMovementsUseCase(repository, settings),
         saveMovementUseCase = SaveMovementUseCase(repository),
         deleteMovementUseCase = DeleteMovementUseCase(repository),
         getBudgetsUseCase = GetBudgetsUseCase(budgets),
@@ -66,7 +71,7 @@ class SavingsViewModelTest {
         val viewModel = createViewModel()
         observeState(viewModel)
 
-        assertEquals(YearMonth.of(2026, 10), viewModel.currentMonth.value)
+        assertEquals(SavingsPeriod.of(YearMonth.of(2026, 10)), viewModel.currentPeriod.value)
         assertEquals(200_000L, viewModel.state.value!!.incomeCents)
     }
 
@@ -91,7 +96,7 @@ class SavingsViewModelTest {
         viewModel.save(MovementType.EXPENSE, 4_590, MovementCategory.GROCERIES, LocalDate.of(2026, 9, 29), "", false)
 
         assertEquals(listOf("Gasto guardado"), messages)
-        assertEquals(YearMonth.of(2026, 9), viewModel.currentMonth.value)
+        assertEquals(SavingsPeriod.of(YearMonth.of(2026, 9)), viewModel.currentPeriod.value)
         assertEquals(4_590L, viewModel.state.value!!.expenseCents)
     }
 
@@ -142,5 +147,44 @@ class SavingsViewModelTest {
         viewModel.delete("m1")
 
         assertTrue(repository.movements.value.isEmpty())
+    }
+
+    private fun payday(day: Int?) {
+        settings.current.value = AppSettings(assistant = AssistantSettings(paydayDay = day))
+    }
+
+    private fun period(start: LocalDate, end: LocalDate) = SavingsPeriod(start, end)
+
+    @Test
+    fun `cobrando el 27 el mes va del 27 al 26 y las flechas saltan de nomina a nomina`() = runTest {
+        payday(27)
+        repository.insertMovement(aMovement(id = "antes", date = LocalDate.of(2026, 9, 26)))
+        repository.insertMovement(aMovement(id = "nomina", date = LocalDate.of(2026, 9, 27)))
+        val viewModel = createViewModel()
+        observeState(viewModel)
+
+        // Hoy es 2 de octubre: del 27 de septiembre al 26 de octubre
+        assertEquals(period(LocalDate.of(2026, 9, 27), LocalDate.of(2026, 10, 26)), viewModel.currentPeriod.value)
+        assertEquals(listOf("nomina"), viewModel.state.value!!.occurrences.map { it.movement.id })
+
+        viewModel.previousMonth()
+        assertEquals(period(LocalDate.of(2026, 8, 27), LocalDate.of(2026, 9, 26)), viewModel.currentPeriod.value)
+        assertEquals(listOf("antes"), viewModel.state.value!!.occurrences.map { it.movement.id })
+
+        viewModel.nextMonth()
+        viewModel.nextMonth()
+        assertEquals(period(LocalDate.of(2026, 10, 27), LocalDate.of(2026, 11, 26)), viewModel.currentPeriod.value)
+    }
+
+    @Test
+    fun `cambiar el dia de nomina en Ajustes recoloca el mes que se ve`() = runTest {
+        val viewModel = createViewModel()
+        observeState(viewModel)
+        assertEquals(SavingsPeriod.of(YearMonth.of(2026, 10)), viewModel.currentPeriod.value)
+
+        payday(27)
+
+        assertEquals(period(LocalDate.of(2026, 9, 27), LocalDate.of(2026, 10, 26)), viewModel.currentPeriod.value)
+        assertEquals(period(LocalDate.of(2026, 9, 27), LocalDate.of(2026, 10, 26)), viewModel.state.value!!.period)
     }
 }
