@@ -113,9 +113,9 @@ class CalendarViewModel @Inject constructor(
         viewModelScope.launch { saveNoteUseCase(title = title, content = content, color = color) }
     }
 
-    fun saveTask(title: String, description: String, date: LocalDate, repeat: Recurrence? = null) {
+    fun saveTask(title: String, description: String, date: LocalDate, repeat: Recurrence? = null, reminderMinutes: Int? = null) {
         viewModelScope.launch {
-            saveTaskUseCase(title, description, date, LocalTime.MIDNIGHT, repeat = repeat)
+            saveTaskUseCase(title, description, date, LocalTime.MIDNIGHT, repeat = repeat, reminderMinutes = reminderMinutes)
         }
     }
 

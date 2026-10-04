@@ -254,8 +254,8 @@ fun CalendarScreen(
     if (showQuickTaskSheet) {
         QuickTaskSheet(
             onDismiss = { showQuickTaskSheet = false },
-            onSave = { title, description, date, repeat ->
-                viewModel.saveTask(title, description, date, repeat)
+            onSave = { title, description, date, repeat, reminder ->
+                viewModel.saveTask(title, description, date, repeat, reminder)
                 showQuickTaskSheet = false
             },
             // Se crea en el día seleccionado del calendario (hoy, si no hay ninguno o ya pasó)

@@ -23,7 +23,7 @@ import com.syncro.data.local.entity.UserEntity
         TaskEntity::class, UserEntity::class, EventEntity::class, SubtaskEntity::class, NoteEntity::class,
         MovementEntity::class, BudgetEntity::class, RepeatSeriesEntity::class
     ],
-    version = 16,
+    version = 17,
     exportSchema = false
 )
 abstract class SyncroDatabase : RoomDatabase() {

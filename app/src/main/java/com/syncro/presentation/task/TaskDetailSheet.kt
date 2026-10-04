@@ -12,6 +12,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.syncro.domain.model.SyncroItem
+import com.syncro.domain.model.startDateTime
+import java.time.LocalDate
 import com.syncro.presentation.components.*
 import com.syncro.presentation.theme.Emerald500
 import com.syncro.presentation.theme.toColor
@@ -94,6 +96,10 @@ fun TaskDetailContent(
                 task.repeat?.let { repeat ->
                     InfoDivider()
                     InfoRow(Icons.Rounded.Repeat, accent, "Se repite", repeat.describe(task.date))
+                }
+                task.reminderMinutes?.let { minutes ->
+                    InfoDivider()
+                    InfoRow(Icons.Rounded.NotificationsActive, accent, "Aviso", reminderLabel(minutes, task.startDateTime, isAllDay = true, today = LocalDate.now()))
                 }
             }
 

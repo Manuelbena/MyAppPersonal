@@ -157,6 +157,25 @@ class MigrationTest {
         assertTrue(db.repeatSeriesDao.getAll().isEmpty())
     }
 
+    @Test
+    fun `migrar de la version 16 conserva tareas, eventos y series, todos sin aviso`() = runTest {
+        createDatabase(Schema16.CREATE_STATEMENTS, Schema16.VERSION) {
+            execSQL("INSERT INTO tasks (id, remoteId, title, description, date, time, isCompleted, seriesId) VALUES ('t1', 'g-t1', 'Tarea', '', ${DAY.toEpochDay()}, '00:00', 0, 's1')")
+            insertEvent("e1", "10:00", "11:00")
+            execSQL(
+                "INSERT INTO repeat_series (id, kind, frequency, weekdays, startDate, untilDate, generatedUntil, title, description, location, startTime, endTime, spanDays, categoryText, categoryColor, priority, subtasks) " +
+                    "VALUES ('s1', 'TASK', 'DAILY', '', ${DAY.toEpochDay()}, NULL, ${DAY.toEpochDay()}, 'Tarea', NULL, NULL, '00:00', '00:00', 0, NULL, NULL, NULL, '')"
+            )
+        }
+
+        val db = openCurrentVersion()
+
+        assertEquals("s1", db.taskDao.getTaskById("t1")!!.seriesId)
+        assertNull(db.taskDao.getTaskById("t1")!!.reminderMinutes)
+        assertNull(db.eventDao.getEventById("e1")!!.reminderMinutes)
+        assertNull(db.repeatSeriesDao.getById("s1")!!.reminderMinutes)
+    }
+
     // Sin borrado automático (solo para versiones 1–6), olvidar una migración haría fallar la
     // app al actualizar: la cadena tiene que ir de la 7 a la versión actual sin huecos
     @Test

@@ -346,7 +346,8 @@ class HomeViewModel @Inject constructor(
         title: String,
         description: String,
         date: LocalDate,
-        repeat: Recurrence? = null
+        repeat: Recurrence? = null,
+        reminderMinutes: Int? = null
     ) {
         viewModelScope.launch {
             val result = saveTaskUseCase(
@@ -354,7 +355,8 @@ class HomeViewModel @Inject constructor(
                 description = description,
                 date = date,
                 time = LocalTime.MIDNIGHT,
-                repeat = repeat
+                repeat = repeat,
+                reminderMinutes = reminderMinutes
             )
             val msg = result.fold(
                 onSuccess = { if (repeat == null) "Tarea creada correctamente" else "Tarea creada: se repetirá" },
@@ -378,7 +380,8 @@ class HomeViewModel @Inject constructor(
         priority: Priority?,
         subtasks: List<String>,
         repeat: Recurrence? = null,
-        scope: RepeatScope = RepeatScope.THIS
+        scope: RepeatScope = RepeatScope.THIS,
+        reminderMinutes: Int? = null
     ) {
         viewModelScope.launch {
             val result = saveEventUseCase(
@@ -395,7 +398,8 @@ class HomeViewModel @Inject constructor(
                 priority = priority,
                 subtasks = subtasks,
                 repeat = repeat,
-                scope = scope
+                scope = scope,
+                reminderMinutes = reminderMinutes
             )
             val msg = result.fold(
                 onSuccess = { if (id == null) "Evento creado correctamente" else "Evento actualizado correctamente" },

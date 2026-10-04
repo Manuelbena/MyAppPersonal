@@ -468,8 +468,8 @@ fun HomeScreen(
     if (showQuickTaskSheet) {
         QuickTaskSheet(
             onDismiss = { showQuickTaskSheet = false },
-            onSave = { title, description, date, repeat ->
-                viewModel.saveQuickTask(title, description, date, repeat)
+            onSave = { title, description, date, repeat, reminder ->
+                viewModel.saveQuickTask(title, description, date, repeat, reminder)
                 showQuickTaskSheet = false
             },
             // Se crea en el día que se está mirando (hoy, si se mira un día pasado)

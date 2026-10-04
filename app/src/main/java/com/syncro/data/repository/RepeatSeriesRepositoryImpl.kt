@@ -51,7 +51,12 @@ class RepeatSeriesRepositoryImpl @Inject constructor(
             categoryText = null,
             categoryColor = null,
             priority = null,
-            subtasks = ""
+            subtasks = "",
+            reminderMinutes = when (val item = template) {
+                is SyncroItem.Task -> item.reminderMinutes
+                is SyncroItem.Event -> item.reminderMinutes
+                is SyncroItem.Note -> null
+            }
         )
         return when (val item = template) {
             is SyncroItem.Task -> common.copy(
@@ -93,7 +98,8 @@ class RepeatSeriesRepositoryImpl @Inject constructor(
                 categoryText = categoryText,
                 categoryColor = categoryColor?.let { ArgbColor(it) },
                 seriesId = id,
-                repeat = recurrence
+                repeat = recurrence,
+                reminderMinutes = reminderMinutes
             )
             KIND_EVENT -> SyncroItem.Event(
                 id = id,
@@ -109,7 +115,8 @@ class RepeatSeriesRepositoryImpl @Inject constructor(
                 subtasks = subtasks.lines().filter { it.isNotBlank() }.map { Subtask(it, isCompleted = false) },
                 location = location,
                 seriesId = id,
-                repeat = recurrence
+                repeat = recurrence,
+                reminderMinutes = reminderMinutes
             )
             else -> return null
         }

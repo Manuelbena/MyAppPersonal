@@ -26,5 +26,6 @@ data class RepeatSeriesEntity(
     val categoryText: String?,
     val categoryColor: Int?,
     val priority: String?,
-    val subtasks: String // Títulos de las subtareas, uno por línea
+    val subtasks: String, // Títulos de las subtareas, uno por línea
+    val reminderMinutes: Int? // Aviso de cada repetición (minutos antes de empezar); null = sin aviso
 )

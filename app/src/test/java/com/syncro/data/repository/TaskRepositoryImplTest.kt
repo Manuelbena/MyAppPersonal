@@ -216,4 +216,19 @@ class TaskRepositoryImplTest {
         repository.insertTask(task)
         return task.id
     }
+
+    @Test
+    fun `las tareas con aviso son las que pueden sonar, con su aviso guardado`() = runTest {
+        save(aTask(id = "con-aviso", date = DAY).copy(reminderMinutes = -540))
+        save(aTask(id = "hecha", date = DAY, isCompleted = true).copy(reminderMinutes = -540))
+        save(aTask(id = "pasada", date = DAY.minusDays(5)).copy(reminderMinutes = -540))
+        save(aTask(id = "sin-aviso", date = DAY))
+        save(aTask(id = "borrada", date = DAY).copy(reminderMinutes = 60))
+        repository.deleteTask("borrada")
+
+        val withReminder = repository.observeTasksWithReminder(DAY.minusDays(1)).first()
+
+        assertEquals(listOf("con-aviso"), withReminder.map { it.id })
+        assertEquals(-540, withReminder.single().reminderMinutes)
+    }
 }

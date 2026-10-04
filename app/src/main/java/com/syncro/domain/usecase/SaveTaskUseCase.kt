@@ -35,7 +35,8 @@ class SaveTaskUseCase @Inject constructor(
         time: LocalTime,
         categoryText: String? = null,
         categoryColor: ArgbColor? = null,
-        repeat: Recurrence? = null
+        repeat: Recurrence? = null,
+        reminderMinutes: Int? = null
     ): Result<Unit> {
         if (title.isBlank()) return Result.failure(BlankTitleException())
 
@@ -47,7 +48,8 @@ class SaveTaskUseCase @Inject constructor(
             time = time,
             isCompleted = false,
             categoryText = categoryText,
-            categoryColor = categoryColor
+            categoryColor = categoryColor,
+            reminderMinutes = reminderMinutes
         )
         if (repeat != null) {
             seriesRepository.saveSeries(

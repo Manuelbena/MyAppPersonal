@@ -12,6 +12,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.syncro.domain.model.SyncroItem
+import com.syncro.domain.model.startDateTime
+import java.time.LocalDate
 import com.syncro.presentation.components.*
 import com.syncro.presentation.home.components.SubtaskRow
 import com.syncro.presentation.theme.Emerald500
@@ -114,6 +116,10 @@ fun EventDetailContent(
                 event.repeat?.let { repeat ->
                     InfoDivider()
                     InfoRow(Icons.Rounded.Repeat, accent, "Se repite", repeat.describe(event.date))
+                }
+                event.reminderMinutes?.let { minutes ->
+                    InfoDivider()
+                    InfoRow(Icons.Rounded.NotificationsActive, accent, "Aviso", reminderLabel(minutes, event.startDateTime, event.isAllDay, LocalDate.now()))
                 }
                 if (!event.location.isNullOrBlank()) {
                     InfoDivider()

@@ -2,6 +2,8 @@ package com.syncro
 
 import android.app.Application
 import com.syncro.data.notifications.DigestAlarmScheduler
+import com.syncro.data.notifications.ReminderAlarmScheduler
+import com.syncro.domain.usecase.ObserveRemindersUseCase
 import com.syncro.domain.repository.SettingsRepository
 import com.syncro.presentation.widget.TodayWidgetUpdater
 import dagger.hilt.android.HiltAndroidApp
@@ -19,6 +21,8 @@ class SyncroApp : Application() {
     @Inject lateinit var digestScheduler: DigestAlarmScheduler
     @Inject lateinit var settingsRepository: SettingsRepository
     @Inject lateinit var todayWidgetUpdater: TodayWidgetUpdater
+    @Inject lateinit var reminderScheduler: ReminderAlarmScheduler
+    @Inject lateinit var observeReminders: ObserveRemindersUseCase
 
     // Vive lo que el proceso: no hay nada que cancelar
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -35,5 +39,8 @@ class SyncroApp : Application() {
         }
         // El widget "Tu día" sigue los cambios de tareas y eventos mientras la app está viva
         appScope.launch { todayWidgetUpdater.run() }
+        // Avisos de tareas y eventos: cada cambio (crear, editar, completar, borrar, sincronizar)
+        // vuelve a programar la alarma del siguiente
+        appScope.launch { observeReminders().collect { reminderScheduler.scheduleNext(it) } }
     }
 }

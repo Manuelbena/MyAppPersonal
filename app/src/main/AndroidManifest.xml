@@ -55,6 +55,14 @@
                 <action android:name="android.intent.action.TIMEZONE_CHANGED" />
             </intent-filter>
         </receiver>
+        <!-- Avisos de tareas y eventos: la alarma del siguiente y los botones de la notificación
+             (solo los lanzan nuestras propias alarmas y notificaciones) -->
+        <receiver
+            android:name=".data.notifications.ReminderAlarmReceiver"
+            android:exported="false" />
+        <receiver
+            android:name=".data.notifications.ReminderActionReceiver"
+            android:exported="false" />
         <!-- Widget "Tu día" de la pantalla de inicio -->
         <receiver
             android:name=".presentation.widget.TodayWidgetReceiver"

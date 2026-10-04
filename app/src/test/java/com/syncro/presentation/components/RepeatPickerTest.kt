@@ -127,7 +127,7 @@ class RepeatPickerTest {
             AddEventContent(
                 eventToEdit = event,
                 onDismiss = {},
-                onSave = { _, _, _, _, _, _, _, _, _, _, _, repeat, scope ->
+                onSave = { _, _, _, _, _, _, _, _, _, _, _, repeat, scope, _ ->
                     savedRepeat = repeat
                     savedScope = scope
                 }
@@ -153,7 +153,7 @@ class RepeatPickerTest {
         showEventForm(weeklyEvent)
 
         compose.onNodeWithText("Cada mes").performScrollTo().performClick()
-        compose.onNodeWithText("Guardar").performClick()
+        compose.onNodeWithText("Guardar").performScrollTo().performClick()
 
         assertEquals(RepeatScope.THIS_AND_FOLLOWING, savedScope)
         assertEquals(Recurrence(RepeatFrequency.MONTHLY), savedRepeat)

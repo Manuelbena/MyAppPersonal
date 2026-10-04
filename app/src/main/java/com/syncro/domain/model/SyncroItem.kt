@@ -32,7 +32,9 @@ sealed class SyncroItem {
         /** La serie de la que es una repetición (ver `RepeatSeries`); null si no se repite. */
         val seriesId: String? = null,
         /** Cómo se repite su serie, para mostrarlo; null si no se repite. */
-        val repeat: Recurrence? = null
+        val repeat: Recurrence? = null,
+        /** Aviso: cuántos minutos antes de empezar (negativo = después, p. ej. "ese día a las 9:00" en uno de todo el día); null = sin aviso. */
+        val reminderMinutes: Int? = null
     ) : SyncroItem() {
         /**
          * Los eventos de día completo se guardan como 00:00–00:00 (así llegan también desde
@@ -70,7 +72,9 @@ sealed class SyncroItem {
         /** La serie de la que es una repetición (ver `RepeatSeries`); null si no se repite. */
         val seriesId: String? = null,
         /** Cómo se repite su serie, para mostrarlo; null si no se repite. */
-        val repeat: Recurrence? = null
+        val repeat: Recurrence? = null,
+        /** Aviso: cuántos minutos antes de empezar (negativo = después, p. ej. "ese día a las 9:00" en uno de todo el día); null = sin aviso. */
+        val reminderMinutes: Int? = null
     ) : SyncroItem() {
         /**
          * Tarea sin hora concreta. Se guarda a las 00:00 (misma convención que los eventos de día

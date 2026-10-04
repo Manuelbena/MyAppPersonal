@@ -81,8 +81,11 @@ class DigestRescheduleReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action !in RESCHEDULE_ACTIONS) return
         val entryPoint = context.digestEntryPoint()
+        val reminders = context.reminderEntryPoint()
         runAsync("DailyDigest") {
             entryPoint.scheduler().scheduleAll(entryPoint.settings().settings.first().digest)
+            // También el siguiente aviso de tareas y eventos
+            reminders.reminderScheduler().scheduleNext(reminders.observeReminders()().first())
         }
     }
 

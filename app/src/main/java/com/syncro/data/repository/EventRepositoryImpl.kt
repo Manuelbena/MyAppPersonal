@@ -56,7 +56,8 @@ class EventRepositoryImpl @Inject constructor(
             location = event.location,
             isCompleted = event.isCompleted,
             pendingChanges = (existing?.pendingChanges ?: 0) + 1,
-            seriesId = event.seriesId
+            seriesId = event.seriesId,
+            reminderMinutes = event.reminderMinutes
         )
 
         // insertEventWithSubtasks siempre limpia las subtareas previas antes de reinsertar,
@@ -93,7 +94,8 @@ class EventRepositoryImpl @Inject constructor(
             isCompleted = event.isCompleted,
             location = event.location,
             seriesId = event.seriesId,
-            repeat = event.seriesId?.let { repeats[it] }
+            repeat = event.seriesId?.let { repeats[it] },
+            reminderMinutes = event.reminderMinutes
         )
     }
 
@@ -112,6 +114,9 @@ class EventRepositoryImpl @Inject constructor(
     override suspend fun restoreEvent(eventId: String): Boolean {
         return dao.restoreEvent(eventId) > 0
     }
+
+    override fun observeEventsWithReminder(from: LocalDate): Flow<List<SyncroItem.Event>> =
+        dao.observeWithReminder(from.toEpochDay()).toDomain()
 
     override suspend fun getEventIdsInSeries(seriesId: String, from: LocalDate): List<String> =
         dao.getIdsInSeries(seriesId, from.toEpochDay())

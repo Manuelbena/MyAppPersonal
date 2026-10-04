@@ -78,11 +78,20 @@ val MIGRATION_15_16 = object : Migration(15, 16) {
     }
 }
 
+/** Avisos de tareas y eventos (los publica la app): minutos antes de empezar, también en las series. */
+val MIGRATION_16_17 = object : Migration(16, 17) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE tasks ADD COLUMN reminderMinutes INTEGER")
+        db.execSQL("ALTER TABLE events ADD COLUMN reminderMinutes INTEGER")
+        db.execSQL("ALTER TABLE repeat_series ADD COLUMN reminderMinutes INTEGER")
+    }
+}
+
 /**
  * Todas las migraciones, en orden. AppModule y los tests las registran desde aquí: una migración
  * nueva se añade a esta lista y no puede olvidarse en uno de los dos sitios.
  */
 val ALL_MIGRATIONS = arrayOf(
     MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12,
-    MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16
+    MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17
 )

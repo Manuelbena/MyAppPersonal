@@ -344,6 +344,37 @@ class GoogleSyncRepositoryImplTest {
     }
 
     @Test
+    fun `un evento descargado de Google conserva su aviso, que solo existe en la app`() = runTest {
+        eventDao.insertEvent(aSyncedEventEntity(id = "e1", remoteId = "g-1").copy(reminderMinutes = 15))
+        google.addEvent(timedEvent("g-1", "Cambiado en Google", DAY, at("19:00"), at("20:00")))
+
+        repository.syncCalendar(DAY)
+
+        assertEquals(15, eventDao.getEventById("e1")!!.reminderMinutes)
+    }
+
+    @Test
+    fun `un evento con aviso de la app se sube sin los avisos de Google, para no recibir dos`() = runTest {
+        eventDao.insertEvent(aSyncedEventEntity(id = "e1", remoteId = null, pendingChanges = 1).copy(reminderMinutes = 15))
+
+        val result = repository.pushEvent("e1")
+        assertTrue(result.exceptionOrNull().toString(), result.isSuccess)
+
+        val reminders = google.events.values.single().reminders
+        assertEquals(false, reminders.useDefault)
+        assertTrue(reminders.overrides.isEmpty())
+    }
+
+    @Test
+    fun `un evento sin aviso de la app no toca los avisos de Google`() = runTest {
+        eventDao.insertEvent(aSyncedEventEntity(id = "e1", remoteId = null, pendingChanges = 1))
+
+        repository.pushEvent("e1")
+
+        assertNull(google.events.values.single().reminders)
+    }
+
+    @Test
     fun `una tarea repetida descargada de Google sigue en su serie`() = runTest {
         taskDao.insertTask(aSyncedTaskEntity(id = "t1", remoteId = "g-t1").copy(seriesId = "serie-1"))
         google.addTask(googleTask("g-t1", "Regar las plantas", due = DAY))

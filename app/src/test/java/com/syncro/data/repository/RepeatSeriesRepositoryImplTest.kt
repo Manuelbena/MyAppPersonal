@@ -80,7 +80,7 @@ class RepeatSeriesRepositoryImplTest {
             priority = Priority.HIGH,
             subtasks = listOf(Subtask("Llevar cena", isCompleted = false)),
             location = "Hospital"
-        ).copy(seriesId = "s2", repeat = weekly)
+        ).copy(seriesId = "s2", repeat = weekly, reminderMinutes = 30)
         val series = RepeatSeries("s2", weekly, DAY, null, DAY, template)
 
         repository.saveSeries(series)
@@ -96,7 +96,7 @@ class RepeatSeriesRepositoryImplTest {
                 id = "rara", kind = "TASK", frequency = "HOURLY", weekdays = "", startDate = DAY.toEpochDay(),
                 untilDate = null, generatedUntil = DAY.toEpochDay(), title = "?", description = null, location = null,
                 startTime = "00:00", endTime = "00:00", spanDays = 0, categoryText = null, categoryColor = null,
-                priority = null, subtasks = ""
+                priority = null, subtasks = "", reminderMinutes = null
             )
         )
 

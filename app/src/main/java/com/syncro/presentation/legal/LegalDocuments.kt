@@ -19,7 +19,7 @@ object LegalInfo {
     const val OWNER_ADDRESS = "[Domicilio]"
     const val CONTACT_EMAIL = "[Correo de contacto]"
     /** Fecha de la última revisión de los textos; cambiarla al modificarlos. */
-    const val LAST_UPDATED = "2 de octubre de 2026"
+    const val LAST_UPDATED = "4 de octubre de 2026"
 
     val isComplete: Boolean
         get() = listOf(OWNER_NAME, OWNER_ADDRESS, CONTACT_EMAIL).none { it.startsWith("[") }
@@ -78,7 +78,7 @@ private val privacyPolicy = LegalDocument(
                 "• Tus datos se guardan en tu móvil y en tu propia cuenta de Google. ${LegalInfo.APP_NAME} no tiene servidores propios: el titular de la app no recibe ni puede ver tus tareas, eventos, notas, ingresos y gastos ni datos de tu cuenta.",
                 "• La app solo se comunica con Google, para iniciar sesión y para sincronizar Google Calendar y Google Tasks.",
                 "• No hay publicidad, no se venden ni se ceden datos, y no se usan herramientas de analítica ni de seguimiento.",
-                "• Los avisos diarios y el asistente funcionan dentro del móvil, sin enviar tus datos a ningún sitio."
+                "• Los avisos diarios, los avisos de tus tareas y eventos y el asistente funcionan dentro del móvil, sin enviar tus datos a ningún sitio."
             )
         ),
         LegalSection(
@@ -89,7 +89,7 @@ private val privacyPolicy = LegalDocument(
             "Qué datos se usan",
             listOf(
                 "• Datos de tu cuenta de Google: nombre, correo electrónico, foto de perfil y los identificadores de acceso que Google entrega al iniciar sesión.",
-                "• Eventos de Google Calendar: título, fechas y horas, descripción, ubicación, subtareas y la información de categoría y color que añades en la app.",
+                "• Eventos de Google Calendar: título, fechas y horas, descripción, ubicación, subtareas y la información de categoría y color que añades en la app. Si le pones un aviso en la app, a Google se le indica que no avise de ese evento (para que no te lleguen dos); el aviso en sí no se envía.",
                 "• Tareas de Google Tasks: título, notas, fecha, hora (solo en la app) y si están hechas.",
                 "• Notas: solo se guardan en tu móvil; no se sincronizan con Google ni con ningún otro servicio.",
                 "• Ingresos, gastos y presupuestos (sección Ahorros): importe, tipo, categoría, fecha, nota, si se repite cada mes y el límite mensual que pongas a cada categoría. Los apuntas tú; solo se guardan en tu móvil, no se sincronizan con Google ni con ningún otro servicio y la app no se conecta a tu banco.",
@@ -101,6 +101,7 @@ private val privacyPolicy = LegalDocument(
             listOf(
                 "• Mostrar en un solo sitio tus tareas, eventos y notas, llevar la cuenta de tus ingresos y gastos (totales del mes y tasa de ahorro, calculados en el móvil), y mantener tus tareas y eventos sincronizados con tu cuenta de Google en los dos sentidos (los cambios que haces en la app se guardan en Google, y al revés).",
                 "• Enviarte, si lo activas, los avisos diarios de la mañana y de la noche, que se generan en el móvil a partir de los datos guardados en él.",
+                "• Avisarte de una tarea o un evento a la hora que elijas, con una notificación que se programa en el móvil.",
                 "• Que el asistente te proponga qué hacer con las tareas pendientes y te pregunte por tus prioridades, también calculado en el móvil.",
                 "No se crean perfiles, no se toman decisiones automatizadas con efectos jurídicos sobre ti y no se usan tus datos con fines publicitarios."
             )

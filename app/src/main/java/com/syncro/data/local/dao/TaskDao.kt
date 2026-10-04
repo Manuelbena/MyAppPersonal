@@ -43,6 +43,10 @@ interface TaskDao {
     @Query("SELECT * FROM tasks WHERE isCompleted = 0 AND isDeleted = 0 AND date <= :untilEpoch ORDER BY date ASC, time ASC")
     fun getUnfinishedTasksUntil(untilEpoch: Long): Flow<List<TaskEntity>>
 
+    /** Las que tienen aviso y aún pueden sonar: sin hacer, sin borrar y desde [fromEpoch]. */
+    @Query("SELECT * FROM tasks WHERE reminderMinutes IS NOT NULL AND isCompleted = 0 AND isDeleted = 0 AND date >= :fromEpoch")
+    fun observeWithReminder(fromEpoch: Long): Flow<List<TaskEntity>>
+
     @Query("SELECT id FROM tasks WHERE seriesId = :seriesId AND date >= :fromEpoch AND isDeleted = 0")
     suspend fun getIdsInSeries(seriesId: String, fromEpoch: Long): List<String>
 

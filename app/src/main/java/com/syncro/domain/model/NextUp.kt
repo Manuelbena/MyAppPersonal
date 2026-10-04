@@ -13,7 +13,6 @@ data class NextUp(
     val tasksTotal: Int
 )
 
-private val SyncroItem.Event.startDateTime: LocalDateTime get() = date.atTime(startTime)
 private val SyncroItem.Event.endDateTime: LocalDateTime get() = endDate.atTime(endTime)
 
 /**

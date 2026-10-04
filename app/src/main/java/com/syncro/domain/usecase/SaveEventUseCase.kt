@@ -54,7 +54,8 @@ class SaveEventUseCase @Inject constructor(
         priority: Priority?,
         subtasks: List<String>,
         repeat: Recurrence? = null,
-        scope: RepeatScope = RepeatScope.THIS
+        scope: RepeatScope = RepeatScope.THIS,
+        reminderMinutes: Int? = null
     ): Result<Unit> {
         if (title.isBlank()) return Result.failure(BlankTitleException())
         if (!isValidEventRange(date.atTime(startTime), endDate.atTime(endTime))) {
@@ -84,7 +85,8 @@ class SaveEventUseCase @Inject constructor(
                 .map { Subtask(it, it.lowercase() in completedSubtasks) },
             isCompleted = existing?.isCompleted ?: false,
             location = location?.toSentenceCase(),
-            seriesId = existing?.seriesId
+            seriesId = existing?.seriesId,
+            reminderMinutes = reminderMinutes
         )
 
         val oldSeriesId = existing?.seriesId

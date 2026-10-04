@@ -9,6 +9,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Notes
 import androidx.compose.material.icons.rounded.Event
+import androidx.compose.material.icons.rounded.NotificationsActive
 import androidx.compose.material.icons.rounded.Repeat
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -25,6 +26,7 @@ import com.syncro.presentation.components.SheetDragHandle
 import com.syncro.presentation.components.GradientSheetInsets
 import com.syncro.domain.model.Recurrence
 import com.syncro.presentation.components.DetailCard
+import com.syncro.presentation.components.ReminderPicker
 import com.syncro.presentation.components.RepeatPicker
 import com.syncro.presentation.components.SectionTitle
 import com.syncro.presentation.event.FieldRow
@@ -46,7 +48,7 @@ import java.util.Locale
 @Composable
 fun QuickTaskSheet(
     onDismiss: () -> Unit,
-    onSave: (title: String, description: String, date: LocalDate, repeat: Recurrence?) -> Unit,
+    onSave: (title: String, description: String, date: LocalDate, repeat: Recurrence?, reminderMinutes: Int?) -> Unit,
     initialDate: LocalDate = LocalDate.now(),
     // Inicio pasa su "hoy" (del reloj inyectado) para que no se quede en ayer tras la medianoche
     today: LocalDate = LocalDate.now()
@@ -69,13 +71,14 @@ fun QuickTaskSheet(
 @Composable
 fun QuickTaskContent(
     initialDate: LocalDate,
-    onSave: (title: String, description: String, date: LocalDate, repeat: Recurrence?) -> Unit,
+    onSave: (title: String, description: String, date: LocalDate, repeat: Recurrence?, reminderMinutes: Int?) -> Unit,
     today: LocalDate = LocalDate.now()
 ) {
     var title by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
     var date by remember { mutableStateOf(initialDate) }
     var repeat by remember { mutableStateOf<Recurrence?>(null) }
+    var reminderMinutes by remember { mutableStateOf<Int?>(null) }
     var showDatePicker by remember { mutableStateOf(false) }
 
     // Las tareas no tienen categoría: siempre el verde de la tarjeta "Tareas" de Inicio
@@ -110,7 +113,7 @@ fun QuickTaskContent(
                     modifier = Modifier.weight(1f)
                 )
                 Button(
-                    onClick = { onSave(title, description, date, repeat) },
+                    onClick = { onSave(title, description, date, repeat, reminderMinutes) },
                     colors = ButtonDefaults.buttonColors(containerColor = accent, contentColor = Color.White),
                     shape = RoundedCornerShape(12.dp),
                     enabled = canSave,
@@ -176,12 +179,6 @@ fun QuickTaskContent(
                 }
             }
 
-            // Repetir: cada día, semana (con sus días), mes o año
-            Column {
-                SectionTitle(Icons.Rounded.Repeat, "Repetir")
-                DetailCard { RepeatPicker(repeat = repeat, startDate = date, accent = accent, onChange = { repeat = it }) }
-            }
-
             // Notas
             DetailCard {
                 FieldRow(
@@ -192,6 +189,26 @@ fun QuickTaskContent(
                     placeholder = "Añadir detalles...",
                     singleLine = false
                 )
+            }
+
+            // Repetir: cada día, semana (con sus días), mes o año
+            Column {
+                SectionTitle(Icons.Rounded.Repeat, "Repetir")
+                DetailCard { RepeatPicker(repeat = repeat, startDate = date, accent = accent, onChange = { repeat = it }) }
+            }
+
+            // Aviso: las tareas no tienen hora, así que se elige a qué hora del día (o del anterior)
+            Column {
+                SectionTitle(Icons.Rounded.NotificationsActive, "Aviso")
+                DetailCard {
+                    ReminderPicker(
+                        reminderMinutes = reminderMinutes,
+                        start = date.atStartOfDay(),
+                        isAllDay = true,
+                        accent = accent,
+                        onChange = { reminderMinutes = it }
+                    )
+                }
             }
         }
     }

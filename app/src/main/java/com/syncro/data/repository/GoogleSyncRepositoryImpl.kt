@@ -172,7 +172,9 @@ class GoogleSyncRepositoryImpl @Inject constructor(
             location = googleEvent.location,
             isCompleted = isCompletedTitle(title),
             // Google no sabe de la serie (solo le llegan repeticiones sueltas): se conserva la local
-            seriesId = existing?.seriesId
+            seriesId = existing?.seriesId,
+            // El aviso es de la app (a Google no se le manda): se conserva el local
+            reminderMinutes = existing?.reminderMinutes
         )
         eventDao.insertEventWithSubtasks(entity, subtasks)
     }
@@ -319,11 +321,16 @@ class GoogleSyncRepositoryImpl @Inject constructor(
         val allDay = isAllDayRange(startTime, endTime)
         val start = startTime
         val end = endTime
+        val hasAppReminder = reminderMinutes != null
         return Event().apply {
             summary = googleTitle
             description = googleDescription
             location = googleLocation
             colorId = googleColorId
+            // Con aviso de Syncro, Google Calendar no avisa (si no, llegarían dos). Sin él no se toca:
+            // se respetan los avisos que el usuario tenga puestos en Google
+            // ArrayList y no emptyList(): el cliente de Google copia la lista por reflexión y EmptyList no se puede crear
+            if (hasAppReminder) reminders = Event.Reminders().setUseDefault(false).setOverrides(ArrayList())
             if (allDay) {
                 // En Google el fin de un evento de día completo es exclusivo: el día siguiente
                 setStart(EventDateTime().setDate(DateTime(eventDate.toString())))

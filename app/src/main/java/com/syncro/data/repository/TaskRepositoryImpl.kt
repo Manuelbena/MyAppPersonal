@@ -47,7 +47,8 @@ class TaskRepositoryImpl @Inject constructor(
                 categoryText = task.categoryText,
                 categoryColor = task.categoryColor?.argb,
                 pendingChanges = 1,
-                seriesId = task.seriesId
+                seriesId = task.seriesId,
+                reminderMinutes = task.reminderMinutes
             )
         )
     }
@@ -78,6 +79,9 @@ class TaskRepositoryImpl @Inject constructor(
     override fun getUnfinishedTasksUntil(date: LocalDate): Flow<List<SyncroItem.Task>> =
         dao.getUnfinishedTasksUntil(date.toEpochDay()).toDomain()
 
+    override fun observeTasksWithReminder(from: LocalDate): Flow<List<SyncroItem.Task>> =
+        dao.observeWithReminder(from.toEpochDay()).toDomain()
+
     override suspend fun getTaskIdsInSeries(seriesId: String, from: LocalDate): List<String> =
         dao.getIdsInSeries(seriesId, from.toEpochDay())
 
@@ -93,7 +97,8 @@ class TaskRepositoryImpl @Inject constructor(
             categoryText = categoryText,
             categoryColor = categoryColor?.let { ArgbColor(it) },
             seriesId = seriesId,
-            repeat = seriesId?.let { repeats[it] }
+            repeat = seriesId?.let { repeats[it] },
+            reminderMinutes = reminderMinutes
         )
     }
 }

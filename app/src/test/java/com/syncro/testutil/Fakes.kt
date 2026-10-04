@@ -104,6 +104,9 @@ class FakeTaskRepository(private val log: CallLog = CallLog()) : TaskRepository 
 
     override suspend fun getTaskIdsInSeries(seriesId: String, from: LocalDate): List<String> =
         tasks.value.values.filter { it.seriesId == seriesId && !it.date.isBefore(from) }.map { it.id }
+
+    override fun observeTasksWithReminder(from: LocalDate): Flow<List<SyncroItem.Task>> =
+        tasks.map { all -> all.values.filter { it.reminderMinutes != null && !it.isCompleted && !it.date.isBefore(from) } }
 }
 
 class FakeEventRepository(private val log: CallLog = CallLog()) : EventRepository {
@@ -161,6 +164,9 @@ class FakeEventRepository(private val log: CallLog = CallLog()) : EventRepositor
 
     override suspend fun getEventIdsInSeries(seriesId: String, from: LocalDate): List<String> =
         events.value.values.filter { it.seriesId == seriesId && !it.date.isBefore(from) }.map { it.id }
+
+    override fun observeEventsWithReminder(from: LocalDate): Flow<List<SyncroItem.Event>> =
+        events.map { all -> all.values.filter { it.reminderMinutes != null && !it.isCompleted && !it.date.isBefore(from) } }
 }
 
 class FakeRepeatSeriesRepository : RepeatSeriesRepository {

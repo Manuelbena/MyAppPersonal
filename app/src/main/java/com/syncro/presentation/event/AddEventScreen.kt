@@ -37,6 +37,9 @@ import com.syncro.domain.model.SyncroItem
 import com.syncro.domain.model.isValidEventRange
 import com.syncro.presentation.components.DetailCard
 import com.syncro.presentation.components.InfoDivider
+import com.syncro.presentation.components.ALL_DAY_DEFAULT_REMINDER
+import com.syncro.presentation.components.ReminderPicker
+import com.syncro.presentation.components.TIMED_DEFAULT_REMINDER
 import com.syncro.presentation.components.RepeatPicker
 import com.syncro.presentation.components.RepeatScopeDialog
 import com.syncro.presentation.components.SectionTitle
@@ -76,7 +79,7 @@ fun AddEventScreen(
             eventToEdit = eventToEdit,
             initialDate = initialDate,
             onDismiss = onDismiss,
-            onSave = { title, desc, loc, date, endDate, start, end, catText, catCol, priority, subs, repeat, scope ->
+            onSave = { title, desc, loc, date, endDate, start, end, catText, catCol, priority, subs, repeat, scope, reminder ->
                 viewModel.saveDetailedEvent(
                     id = eventToEdit?.id,
                     title = title,
@@ -91,7 +94,8 @@ fun AddEventScreen(
                     priority = priority,
                     subtasks = subs,
                     repeat = repeat,
-                    scope = scope
+                    scope = scope,
+                    reminderMinutes = reminder
                 )
                 onDismiss()
             }
@@ -122,7 +126,7 @@ fun AddEventContent(
     eventToEdit: SyncroItem.Event? = null,
     initialDate: LocalDate? = null,
     onDismiss: () -> Unit,
-    onSave: (String, String?, String?, LocalDate, LocalDate, LocalTime, LocalTime, String, Color, Priority?, List<String>, Recurrence?, RepeatScope) -> Unit
+    onSave: (String, String?, String?, LocalDate, LocalDate, LocalTime, LocalTime, String, Color, Priority?, List<String>, Recurrence?, RepeatScope, Int?) -> Unit
 ) {
     var title by remember { mutableStateOf(eventToEdit?.title ?: "") }
     var description by remember { mutableStateOf(eventToEdit?.description ?: "") }
@@ -163,6 +167,9 @@ fun AddEventContent(
     var repeat by remember { mutableStateOf(eventToEdit?.repeat) }
     var askScope by remember { mutableStateOf(false) }
 
+    // Aviso (lo publica Syncro, no Google): minutos antes de empezar
+    var reminderMinutes by remember { mutableStateOf(eventToEdit?.reminderMinutes) }
+
     // "Todo el día" se guarda como 00:00–00:00: así lo entienden el resto de la app y la sync con Google
     val effectiveStartTime = if (isAllDay) LocalTime.MIDNIGHT else startTime
     val effectiveEndTime = if (isAllDay) LocalTime.MIDNIGHT else endTime
@@ -193,7 +200,8 @@ fun AddEventContent(
         selectedPriority,
         subtasks.toList(),
         repeat,
-        scope
+        scope,
+        reminderMinutes
     )
 
     fun onSaveClick() {
@@ -290,7 +298,11 @@ fun AddEventContent(
                     )
                     Switch(
                         checked = isAllDay,
-                        onCheckedChange = { isAllDay = it },
+                        onCheckedChange = {
+                            isAllDay = it
+                            // Los tramos cambian (con hora: "15 min antes"; todo el día: "ese día a las 9:00"): se pasa al equivalente
+                            if (reminderMinutes != null) reminderMinutes = if (it) ALL_DAY_DEFAULT_REMINDER else TIMED_DEFAULT_REMINDER
+                        },
                         colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = accent)
                     )
                 }
@@ -320,12 +332,6 @@ fun AddEventContent(
                     fontSize = 13.sp,
                     modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 14.dp, top = 2.dp)
                 )
-            }
-
-            // Repetir: cada día, semana (con sus días), mes o año
-            Column {
-                SectionTitle(Icons.Rounded.Repeat, "Repetir")
-                DetailCard { RepeatPicker(repeat = repeat, startDate = startDate, accent = accent, onChange = { repeat = it }) }
             }
 
             // Categoría
@@ -466,6 +472,26 @@ fun AddEventContent(
                             }
                         }
                     }
+                }
+            }
+
+            // Repetir: cada día, semana (con sus días), mes o año
+            Column {
+                SectionTitle(Icons.Rounded.Repeat, "Repetir")
+                DetailCard { RepeatPicker(repeat = repeat, startDate = startDate, accent = accent, onChange = { repeat = it }) }
+            }
+
+            // Aviso: lo publica Syncro en el móvil (a Google no se le pone)
+            Column {
+                SectionTitle(Icons.Rounded.NotificationsActive, "Aviso")
+                DetailCard {
+                    ReminderPicker(
+                        reminderMinutes = reminderMinutes,
+                        start = startDate.atTime(effectiveStartTime),
+                        isAllDay = isAllDay,
+                        accent = accent,
+                        onChange = { reminderMinutes = it }
+                    )
                 }
             }
         }

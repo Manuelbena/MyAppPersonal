@@ -22,4 +22,6 @@ interface TaskRepository {
     fun getUnfinishedTasksUntil(date: LocalDate): Flow<List<SyncroItem.Task>>
     /** Ids de las repeticiones de la serie desde [from] incluido (sin las borradas). */
     suspend fun getTaskIdsInSeries(seriesId: String, from: LocalDate): List<String>
+    /** Las que tienen aviso y aún pueden sonar: sin hacer, sin borrar, desde [from]. */
+    fun observeTasksWithReminder(from: LocalDate): Flow<List<SyncroItem.Task>>
 }

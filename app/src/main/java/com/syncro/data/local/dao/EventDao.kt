@@ -71,6 +71,11 @@ interface EventDao {
         markEventChanged(eventId)
     }
 
+    /** Los que tienen aviso y aún pueden sonar: sin completar, sin borrar y desde [fromEpoch]. */
+    @Transaction
+    @Query("SELECT * FROM events WHERE reminderMinutes IS NOT NULL AND isCompleted = 0 AND isDeleted = 0 AND date >= :fromEpoch")
+    fun observeWithReminder(fromEpoch: Long): Flow<List<EventWithSubtasks>>
+
     @Query("SELECT id FROM events WHERE seriesId = :seriesId AND date >= :fromEpoch AND isDeleted = 0")
     suspend fun getIdsInSeries(seriesId: String, fromEpoch: Long): List<String>
 

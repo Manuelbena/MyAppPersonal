@@ -28,5 +28,7 @@ data class EventEntity(
     // marca, la siguiente sincronización lo volvería a traer
     @ColumnInfo(defaultValue = "0") val isDeleted: Boolean = false,
     // Serie de la que es una repetición (repeat_series.id); null si no se repite
-    val seriesId: String? = null
+    val seriesId: String? = null,
+    // Aviso que publica la app: minutos antes de empezar (negativo = después); null = sin aviso
+    val reminderMinutes: Int? = null
 )
