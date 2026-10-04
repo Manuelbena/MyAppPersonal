@@ -1,6 +1,7 @@
 package com.syncro.domain.usecase
 
 import com.syncro.domain.model.InvalidAmountException
+import com.syncro.domain.model.MAIN_ACCOUNT_ID
 import com.syncro.domain.model.MAX_AMOUNT_CENTS
 import com.syncro.domain.model.Movement
 import com.syncro.domain.model.MovementCategory
@@ -27,7 +28,8 @@ class SaveMovementUseCase @Inject constructor(
         date: LocalDate,
         note: String,
         repeatsMonthly: Boolean,
-        id: String? = null
+        id: String? = null,
+        accountId: String = MAIN_ACCOUNT_ID
     ): Result<Unit> {
         if (amountCents !in 1..MAX_AMOUNT_CENTS) return Result.failure(InvalidAmountException())
 
@@ -38,7 +40,8 @@ class SaveMovementUseCase @Inject constructor(
             category = category.takeIf { it.type == type } ?: MovementCategory.other(type),
             date = date,
             note = note.toSentenceCase().ifBlank { null },
-            repeatsMonthly = repeatsMonthly
+            repeatsMonthly = repeatsMonthly,
+            accountId = accountId
         )
         repository.insertMovement(movement)
         return Result.success(Unit)

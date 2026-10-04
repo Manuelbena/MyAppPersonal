@@ -6,6 +6,7 @@ import com.syncro.domain.model.InvalidBackupException
 import com.syncro.domain.model.MovementCategory
 import com.syncro.domain.model.RestoreSummary
 import com.syncro.testutil.FakeBudgetRepository
+import com.syncro.testutil.FakeSavingsAccountRepository
 import com.syncro.testutil.FakeMovementRepository
 import com.syncro.testutil.FakeNoteRepository
 import com.syncro.testutil.aMovement
@@ -30,10 +31,11 @@ class BackupUseCasesTest {
         val notes = FakeNoteRepository()
         val movements = FakeMovementRepository()
         val budgets = FakeBudgetRepository()
+        val accounts = FakeSavingsAccountRepository(movements, budgets)
     }
 
-    private fun backupOf(phone: Phone) = CreateBackupUseCase(phone.notes, phone.movements, phone.budgets, JsonBackupCodec())
-    private fun restoreOn(phone: Phone) = RestoreBackupUseCase(phone.notes, phone.movements, phone.budgets, codec)
+    private fun backupOf(phone: Phone) = CreateBackupUseCase(phone.notes, phone.movements, phone.budgets, phone.accounts, JsonBackupCodec())
+    private fun restoreOn(phone: Phone) = RestoreBackupUseCase(phone.notes, phone.movements, phone.budgets, phone.accounts, codec)
 
     @Test
     fun `una copia hecha en un movil se recupera entera en otro`() = runTest {
@@ -85,7 +87,7 @@ class BackupUseCasesTest {
             movements.insertMovement(aMovement(id = "m2"))
         }
 
-        val lines = ExportMovementsCsvUseCase(phone.movements)().lines().filter { it.isNotBlank() }
+        val lines = ExportMovementsCsvUseCase(phone.movements, phone.accounts)().lines().filter { it.isNotBlank() }
 
         assertEquals(3, lines.size) // Cabecera + 2
     }

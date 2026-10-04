@@ -140,7 +140,7 @@ class MigrationTest {
         val db = openCurrentVersion()
 
         assertEquals(1, db.movementDao.count())
-        assertTrue(db.budgetDao.observeBudgets().first().isEmpty())
+        assertTrue(db.budgetDao.observeBudgets(null).first().isEmpty())
     }
 
     @Test
@@ -174,6 +174,22 @@ class MigrationTest {
         assertNull(db.taskDao.getTaskById("t1")!!.reminderMinutes)
         assertNull(db.eventDao.getEventById("e1")!!.reminderMinutes)
         assertNull(db.repeatSeriesDao.getById("s1")!!.reminderMinutes)
+    }
+
+    @Test
+    fun `migrar de la version 17 deja todo el dinero y los presupuestos en la cuenta principal`() = runTest {
+        createDatabase(Schema17.CREATE_STATEMENTS, Schema17.VERSION) {
+            execSQL("INSERT INTO movements (id, type, amountCents, category, date, note, repeatsMonthly) VALUES ('m1', 'EXPENSE', 4590, 'GROCERIES', ${DAY.toEpochDay()}, 'Mercadona', 0)")
+            execSQL("INSERT INTO budgets (category, limitCents) VALUES ('GROCERIES', 30000)")
+        }
+
+        val db = openCurrentVersion()
+
+        val accounts = db.savingsAccountDao.getAll()
+        assertEquals(listOf("main"), accounts.map { it.id })
+        assertTrue(accounts.single().isActive)
+        assertEquals("main", db.movementDao.getAll().single().accountId)
+        assertEquals("main", db.budgetDao.observeBudgets(null).first().single().accountId)
     }
 
     // Sin borrado automático (solo para versiones 1–6), olvidar una migración haría fallar la

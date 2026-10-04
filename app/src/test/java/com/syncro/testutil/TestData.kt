@@ -1,6 +1,7 @@
 package com.syncro.testutil
 
 import android.content.Context
+import com.syncro.domain.model.MAIN_ACCOUNT_ID
 import com.syncro.domain.model.ArgbColor
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
@@ -103,8 +104,9 @@ fun aMovement(
     category: MovementCategory = MovementCategory.GROCERIES,
     date: LocalDate = DAY,
     note: String? = "Mercadona",
-    repeatsMonthly: Boolean = false
-) = Movement(id, type, amountCents, category, date, note, repeatsMonthly)
+    repeatsMonthly: Boolean = false,
+    accountId: String = MAIN_ACCOUNT_ID
+) = Movement(id, type, amountCents, category, date, note, repeatsMonthly, accountId)
 
 /** Tarea tal como queda tras sincronizarse con Google: con remoteId y sin cambios pendientes. */
 fun aSyncedTaskEntity(

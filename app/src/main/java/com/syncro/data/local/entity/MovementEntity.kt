@@ -1,5 +1,6 @@
 package com.syncro.data.local.entity
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
@@ -16,5 +17,7 @@ data class MovementEntity(
     val category: String,
     val date: Long,
     val note: String?,
-    val repeatsMonthly: Boolean
+    val repeatsMonthly: Boolean,
+    // Cuenta de ahorro (accounts.id); lo anterior a las cuentas está en la principal
+    @ColumnInfo(defaultValue = "main") val accountId: String = "main"
 )

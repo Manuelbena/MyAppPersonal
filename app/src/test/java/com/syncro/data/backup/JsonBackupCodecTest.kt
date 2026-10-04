@@ -1,6 +1,9 @@
 package com.syncro.data.backup
 
+import com.syncro.domain.model.ArgbColor
 import com.syncro.domain.model.BackupContent
+import com.syncro.domain.model.MAIN_ACCOUNT_ID
+import com.syncro.domain.model.SavingsAccount
 import com.syncro.domain.model.Budget
 import com.syncro.domain.model.InvalidBackupException
 import com.syncro.domain.model.MovementCategory
@@ -65,4 +68,36 @@ class JsonBackupCodecTest {
         assertEquals(listOf(Budget(MovementCategory.LEISURE, 5000)), content.budgets)
         assertEquals(emptyList<Any>(), content.notes)
     }
+
+    // region Cuentas de ahorro
+
+    @Test
+    fun `las cuentas y la cuenta de cada movimiento y presupuesto viajan en la copia`() {
+        val content = BackupContent(
+            notes = emptyList(),
+            movements = listOf(aMovement(id = "m1", accountId = "conjunta")),
+            budgets = listOf(Budget(MovementCategory.GROCERIES, 30_000, "conjunta")),
+            accounts = listOf(
+                SavingsAccount(MAIN_ACCOUNT_ID, "Principal", ArgbColor(0xFF10B981)),
+                SavingsAccount("conjunta", "Conjunta", ArgbColor(0xFF0EA5E9))
+            )
+        )
+
+        assertEquals(content, codec.decode(codec.encode(content)))
+    }
+
+    @Test
+    fun `una copia de antes de las cuentas lo deja todo en la principal`() {
+        val text = """{"app":"syncro","version":1,
+            "movements":[{"id":"m1","type":"EXPENSE","amountCents":100,"category":"GROCERIES","date":"2026-10-01","note":null,"repeatsMonthly":false}],
+            "budgets":[{"category":"LEISURE","limitCents":5000}]}"""
+
+        val content = codec.decode(text)
+
+        assertEquals(MAIN_ACCOUNT_ID, content.movements.single().accountId)
+        assertEquals(MAIN_ACCOUNT_ID, content.budgets.single().accountId)
+        assertEquals(emptyList<Any>(), content.accounts)
+    }
+
+    // endregion
 }

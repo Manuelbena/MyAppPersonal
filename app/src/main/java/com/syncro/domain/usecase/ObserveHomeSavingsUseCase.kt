@@ -16,13 +16,14 @@ import javax.inject.Inject
 
 /**
  * El resumen de Ahorros de Inicio para el mes en que cae [today] (de nómina a nómina si hay día de
- * nómina): null si está apagado en Ajustes (lo de fábrica), si no el balance del mes y los
- * presupuestos que van justos o pasados.
+ * nómina), de la cuenta que se está viendo en Ahorros: null si está apagado en Ajustes (lo de
+ * fábrica), si no el balance del mes y los presupuestos que van justos o pasados.
  */
 class ObserveHomeSavingsUseCase @Inject constructor(
     private val settings: SettingsRepository,
     private val getMonthMovements: GetMonthMovementsUseCase,
-    private val getBudgets: GetBudgetsUseCase
+    private val getBudgets: GetBudgetsUseCase,
+    private val observeAccounts: ObserveSavingsAccountsUseCase
 ) {
     @OptIn(ExperimentalCoroutinesApi::class)
     operator fun invoke(today: LocalDate): Flow<HomeSavings?> =
@@ -33,14 +34,18 @@ class ObserveHomeSavingsUseCase @Inject constructor(
                 if (!enabled) {
                     flowOf(null)
                 } else {
-                    combine(getMonthMovements(today), getBudgets()) { movements, budgets ->
-                        HomeSavings(
-                            period = movements.period,
-                            incomeCents = movements.incomeCents,
-                            expenseCents = movements.expenseCents,
-                            hasMovements = movements.occurrences.isNotEmpty(),
-                            tightBudgets = movements.budgetStatuses(budgets).filter { it.level != BudgetLevel.OK }
-                        )
+                    observeAccounts().flatMapLatest { accounts ->
+                        val accountId = accounts.active.id
+                        combine(getMonthMovements(today, accountId), getBudgets(accountId)) { movements, budgets ->
+                            HomeSavings(
+                                period = movements.period,
+                                incomeCents = movements.incomeCents,
+                                expenseCents = movements.expenseCents,
+                                hasMovements = movements.occurrences.isNotEmpty(),
+                                tightBudgets = movements.budgetStatuses(budgets).filter { it.level != BudgetLevel.OK },
+                                accountName = accounts.active.name.takeIf { accounts.hasSeveral }
+                            )
+                        }
                     }
                 }
             }

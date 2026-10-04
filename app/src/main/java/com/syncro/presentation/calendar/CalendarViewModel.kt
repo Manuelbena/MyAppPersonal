@@ -3,7 +3,6 @@ package com.syncro.presentation.calendar
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.syncro.domain.model.ArgbColor
-import com.syncro.domain.model.Recurrence
 import com.syncro.domain.model.RepeatScope
 import com.syncro.domain.usecase.GenerateRepeatsUseCase
 import com.syncro.domain.model.SyncroItem
@@ -113,9 +112,9 @@ class CalendarViewModel @Inject constructor(
         viewModelScope.launch { saveNoteUseCase(title = title, content = content, color = color) }
     }
 
-    fun saveTask(title: String, description: String, date: LocalDate, repeat: Recurrence? = null, reminderMinutes: Int? = null) {
+    fun saveTask(title: String, description: String, date: LocalDate) {
         viewModelScope.launch {
-            saveTaskUseCase(title, description, date, LocalTime.MIDNIGHT, repeat = repeat, reminderMinutes = reminderMinutes)
+            saveTaskUseCase(title, description, date, LocalTime.MIDNIGHT)
         }
     }
 

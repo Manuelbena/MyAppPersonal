@@ -345,21 +345,17 @@ class HomeViewModel @Inject constructor(
     fun saveQuickTask(
         title: String,
         description: String,
-        date: LocalDate,
-        repeat: Recurrence? = null,
-        reminderMinutes: Int? = null
+        date: LocalDate
     ) {
         viewModelScope.launch {
             val result = saveTaskUseCase(
                 title = title,
                 description = description,
                 date = date,
-                time = LocalTime.MIDNIGHT,
-                repeat = repeat,
-                reminderMinutes = reminderMinutes
+                time = LocalTime.MIDNIGHT
             )
             val msg = result.fold(
-                onSuccess = { if (repeat == null) "Tarea creada correctamente" else "Tarea creada: se repetirá" },
+                onSuccess = { "Tarea creada correctamente" },
                 onFailure = { it.message ?: "No se pudo guardar la tarea" }
             )
             _effect.send(HomeEffect.ShowSnackbar(msg))

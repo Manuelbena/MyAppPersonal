@@ -24,6 +24,7 @@ import com.syncro.domain.usecase.ChooseDailyFocusUseCase
 import com.syncro.domain.usecase.GetFocusCandidatesUseCase
 import com.syncro.domain.usecase.GetFocusHistoryUseCase
 import com.syncro.domain.usecase.GetBudgetsUseCase
+import com.syncro.domain.usecase.ObserveSavingsAccountsUseCase
 import com.syncro.domain.usecase.GetLeftoverTasksUseCase
 import com.syncro.domain.usecase.GetMonthMovementsUseCase
 import com.syncro.domain.usecase.GetSettingsUseCase
@@ -63,6 +64,7 @@ class AssistantViewModel @Inject constructor(
     private val chooseDailyFocus: ChooseDailyFocusUseCase,
     private val getMonthMovements: GetMonthMovementsUseCase,
     getBudgets: GetBudgetsUseCase,
+    observeAccounts: ObserveSavingsAccountsUseCase,
     getSettings: GetSettingsUseCase,
     private val clock: Clock
 ) : ViewModel() {
@@ -103,15 +105,20 @@ class AssistantViewModel @Inject constructor(
     }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     // Avisos de presupuesto de esta semana: el mes actual y, a principios de mes, también el anterior
-    private val budgetAlerts = combine(refreshTick, getSettings(), getBudgets()) { _, settings, budgets ->
-        budgets.takeIf { settings.assistant.budgetAlertsEnabled }.orEmpty()
-    }.flatMapLatest { budgets ->
+    // De todas las cuentas de ahorro: cada presupuesto con los gastos de su cuenta
+    private val budgetAlerts = combine(refreshTick, getSettings(), getBudgets(), observeAccounts()) { _, settings, budgets, accounts ->
+        budgets.takeIf { settings.assistant.budgetAlertsEnabled }.orEmpty() to accounts
+    }.flatMapLatest { (budgets, accounts) ->
         if (budgets.isEmpty()) return@flatMapLatest flowOf(emptyList())
         val today = LocalDate.now(clock)
         val since = historySince
         // Los meses (o periodos de nómina) en que caen hace una semana y hoy; si son el mismo, una vez
         combine(listOf(since, today).map { getMonthMovements(it) }) { monthly ->
-            monthly.distinctBy { it.period }.flatMap { it.budgetAlerts(budgets, today) }.filter { !it.date.isBefore(since) }
+            monthly.distinctBy { it.period }
+                .flatMap { it.budgetAlerts(budgets, today) }
+                .filter { !it.date.isBefore(since) }
+                // Con varias cuentas el mensaje dice de cuál es el presupuesto
+                .map { alert -> if (accounts.hasSeveral) alert.copy(accountName = accounts.nameOf(alert.budget.accountId)) else alert }
         }
     }
 

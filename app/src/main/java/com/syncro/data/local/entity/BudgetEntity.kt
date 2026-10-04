@@ -1,11 +1,14 @@
 package com.syncro.data.local.entity
 
 import androidx.room.Entity
-import androidx.room.PrimaryKey
 
-/** Presupuesto mensual de una categoría; [category] es el nombre del enum del dominio (uno por categoría). */
-@Entity(tableName = "budgets")
+/**
+ * Presupuesto mensual de una categoría en una cuenta; [category] es el nombre del enum del dominio
+ * (uno por categoría y cuenta).
+ */
+@Entity(tableName = "budgets", primaryKeys = ["accountId", "category"])
 data class BudgetEntity(
-    @PrimaryKey val category: String,
+    val accountId: String,
+    val category: String,
     val limitCents: Long
 )

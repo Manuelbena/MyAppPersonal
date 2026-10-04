@@ -7,6 +7,7 @@ import com.syncro.data.local.dao.EventDao
 import com.syncro.data.local.dao.MovementDao
 import com.syncro.data.local.dao.NoteDao
 import com.syncro.data.local.dao.RepeatSeriesDao
+import com.syncro.data.local.dao.SavingsAccountDao
 import com.syncro.data.local.dao.TaskDao
 import com.syncro.data.local.dao.UserDao
 import com.syncro.data.local.entity.BudgetEntity
@@ -14,6 +15,7 @@ import com.syncro.data.local.entity.EventEntity
 import com.syncro.data.local.entity.MovementEntity
 import com.syncro.data.local.entity.NoteEntity
 import com.syncro.data.local.entity.RepeatSeriesEntity
+import com.syncro.data.local.entity.SavingsAccountEntity
 import com.syncro.data.local.entity.SubtaskEntity
 import com.syncro.data.local.entity.TaskEntity
 import com.syncro.data.local.entity.UserEntity
@@ -21,9 +23,9 @@ import com.syncro.data.local.entity.UserEntity
 @Database(
     entities = [
         TaskEntity::class, UserEntity::class, EventEntity::class, SubtaskEntity::class, NoteEntity::class,
-        MovementEntity::class, BudgetEntity::class, RepeatSeriesEntity::class
+        MovementEntity::class, BudgetEntity::class, RepeatSeriesEntity::class, SavingsAccountEntity::class
     ],
-    version = 17,
+    version = 18,
     exportSchema = false
 )
 abstract class SyncroDatabase : RoomDatabase() {
@@ -34,4 +36,5 @@ abstract class SyncroDatabase : RoomDatabase() {
     abstract val movementDao: MovementDao
     abstract val budgetDao: BudgetDao
     abstract val repeatSeriesDao: RepeatSeriesDao
+    abstract val savingsAccountDao: SavingsAccountDao
 }

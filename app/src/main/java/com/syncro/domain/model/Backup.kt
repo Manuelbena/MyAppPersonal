@@ -9,7 +9,9 @@ package com.syncro.domain.model
 data class BackupContent(
     val notes: List<SyncroItem.Note>,
     val movements: List<Movement>,
-    val budgets: List<Budget>
+    val budgets: List<Budget>,
+    /** Las cuentas de ahorro; vacío en las copias de antes de las cuentas (todo va a la principal). */
+    val accounts: List<SavingsAccount> = emptyList()
 )
 
 /** Cuántas cosas se recuperaron al restaurar una copia. */
@@ -24,21 +26,24 @@ class InvalidBackupException : IllegalArgumentException("Este archivo no es una 
  * ";" y coma decimal, y una marca (BOM) para que Excel lea bien las tildes. Un movimiento mensual
  * sale una vez, con su primera fecha y "Sí" en la columna de repetición.
  */
-fun movementsCsv(movements: List<Movement>): String = buildString {
+fun movementsCsv(movements: List<Movement>, accountNames: Map<String, String> = emptyMap()): String = buildString {
+    // Con varias cuentas, la primera columna dice de cuál es cada movimiento
+    val withAccount = accountNames.size > 1
     append(UTF8_BOM)
-    appendLine("Fecha;Tipo;Categoría;Concepto;Importe;Se repite cada mes")
+    appendLine((if (withAccount) "Cuenta;" else "") + "Fecha;Tipo;Categoría;Concepto;Importe;Se repite cada mes")
     movements.sortedWith(compareBy({ it.date }, { it.id })).forEach { movement ->
         val sign = if (movement.type == MovementType.EXPENSE) "-" else ""
         val amount = "$sign${movement.amountCents / 100},${"%02d".format(movement.amountCents % 100)}"
+        val account = listOfNotNull(accountNames[movement.accountId].orEmpty().takeIf { withAccount })
         appendLine(
-            listOf(
+            (account + listOf(
                 movement.date.toString(),
                 if (movement.type == MovementType.INCOME) "Ingreso" else "Gasto",
                 movement.category.label,
                 movement.note.orEmpty(),
                 amount,
                 if (movement.repeatsMonthly) "Sí" else "No"
-            ).joinToString(";") { it.csvField() }
+            )).joinToString(";") { it.csvField() }
         )
     }
 }

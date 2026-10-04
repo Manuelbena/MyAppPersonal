@@ -10,7 +10,9 @@ data class HomeSavings(
     val expenseCents: Long,
     /** Si hay algo apuntado este mes; sin nada, la tarjeta invita a empezar. */
     val hasMovements: Boolean,
-    val tightBudgets: List<BudgetStatus>
+    val tightBudgets: List<BudgetStatus>,
+    /** La cuenta que se ve, para decirla; null si solo hay una. */
+    val accountName: String? = null
 ) {
     val balanceCents: Long get() = incomeCents - expenseCents
 }

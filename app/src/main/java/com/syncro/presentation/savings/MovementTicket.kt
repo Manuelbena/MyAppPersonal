@@ -100,12 +100,12 @@ suspend fun Context.shareMovementTicket(occurrence: MovementOccurrence, issuedAt
  * por categoría (gastos e ingresos, con su %) y todos los movimientos. Los que aún no han llegado
  * a fecha de [issuedAt] se marcan con "*" (previstos).
  */
-fun monthStatement(month: MonthMovements, issuedAt: LocalDateTime, budgets: List<Budget> = emptyList()): TicketContent {
+fun monthStatement(month: MonthMovements, issuedAt: LocalDateTime, budgets: List<Budget> = emptyList(), accountName: String? = null): TicketContent {
     val today = issuedAt.toLocalDate()
     val hasUpcoming = month.occurrences.any { it.date.isAfter(today) }
     return TicketContent(
         title = "SYNCRO",
-        subtitle = "Resumen de ${month.monthName()}",
+        subtitle = "Resumen de ${month.monthName()}" + (accountName?.let { " · $it" } ?: ""),
         blocks = buildList {
             add(TicketBlock.Rule)
             add(TicketBlock.Row("Ingresos", formatSignedEuros(month.incomeCents, MovementType.INCOME)))
@@ -176,8 +176,9 @@ fun monthStatement(month: MonthMovements, issuedAt: LocalDateTime, budgets: List
  * 🏆 Mayor gasto: 🏠 Vivienda (75 %)
  * ✨ _Enviado con Syncro_
  */
-fun monthShareText(month: MonthMovements, budgets: List<Budget> = emptyList()): String = buildString {
+fun monthShareText(month: MonthMovements, budgets: List<Budget> = emptyList(), accountName: String? = null): String = buildString {
     appendLine("/// 📊 *RESUMEN DE ${month.monthName().uppercase(SPANISH)}* ///")
+    accountName?.let { appendLine("🏦 Cuenta: *$it*") }
     appendLine("💰 Ingresos: *${formatSignedEuros(month.incomeCents, MovementType.INCOME)}*")
     appendLine("💸 Gastos: *${formatSignedEuros(month.expenseCents, MovementType.EXPENSE)}*")
     appendLine("⚖️ Balance: *${month.balanceCents.signedEuros()}*")
@@ -202,10 +203,10 @@ fun monthShareText(month: MonthMovements, budgets: List<Budget> = emptyList()): 
     append(SIGNATURE)
 }
 
-suspend fun Context.shareMonthStatement(month: MonthMovements, budgets: List<Budget>, issuedAt: LocalDateTime) =
+suspend fun Context.shareMonthStatement(month: MonthMovements, budgets: List<Budget>, issuedAt: LocalDateTime, accountName: String? = null) =
     shareTicket(
-        ticket = monthStatement(month, issuedAt, budgets),
-        caption = monthShareText(month, budgets),
+        ticket = monthStatement(month, issuedAt, budgets, accountName),
+        caption = monthShareText(month, budgets, accountName),
         fileName = "resumen-" + if (month.period.isCalendarMonth) "${month.month}" else "${month.period.start}",
         chooserTitle = "Compartir resumen del mes"
     )

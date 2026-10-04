@@ -5,6 +5,9 @@ import androidx.compose.ui.graphics.Color
 import com.google.android.gms.auth.UserRecoverableAuthException
 import com.google.api.client.googleapis.extensions.android.gms.auth.UserRecoverableAuthIOException
 import com.syncro.domain.model.AppSettings
+import com.syncro.domain.model.MAIN_ACCOUNT_ID
+import com.syncro.domain.usecase.ObserveSavingsAccountsUseCase
+import com.syncro.testutil.FakeSavingsAccountRepository
 import com.syncro.domain.model.AssistantSettings
 import com.syncro.domain.model.User
 import com.syncro.domain.usecase.DeleteEventUseCase
@@ -101,6 +104,7 @@ class HomeViewModelTest {
     private val connectivity = FakeConnectivityRepository()
     private val movements = FakeMovementRepository()
     private val budgets = FakeBudgetRepository()
+    private val accounts = FakeSavingsAccountRepository()
     private val settings = FakeSettingsRepository()
     private val quotes = FakeDailyQuoteRepository()
 
@@ -149,7 +153,7 @@ class HomeViewModelTest {
         undoDeleteTaskUseCase = UndoDeleteTaskUseCase(tasks, google),
         undoDeleteEventUseCase = UndoDeleteEventUseCase(events, google),
         undoDeleteNoteUseCase = UndoDeleteNoteUseCase(notes),
-        observeHomeSavingsUseCase = ObserveHomeSavingsUseCase(settings, GetMonthMovementsUseCase(movements, settings), GetBudgetsUseCase(budgets)),
+        observeHomeSavingsUseCase = ObserveHomeSavingsUseCase(settings, GetMonthMovementsUseCase(movements, settings), GetBudgetsUseCase(budgets), ObserveSavingsAccountsUseCase(accounts)),
         generateRepeatsUseCase = GenerateRepeatsUseCase(series, tasks, events, google, clock)
     )
 
@@ -576,8 +580,8 @@ class HomeViewModelTest {
             "mes-pasado" to aMovement(id = "mes-pasado", amountCents = 99_000, date = DAY.minusMonths(1))
         )
         budgets.budgets.value = mapOf(
-            MovementCategory.GROCERIES to Budget(MovementCategory.GROCERIES, 30_000),
-            MovementCategory.LEISURE to Budget(MovementCategory.LEISURE, 10_000)
+            (MAIN_ACCOUNT_ID to MovementCategory.GROCERIES) to Budget(MovementCategory.GROCERIES, 30_000),
+            (MAIN_ACCOUNT_ID to MovementCategory.LEISURE) to Budget(MovementCategory.LEISURE, 10_000)
         )
 
         val savings = createViewModel().uiState.value.savings!!

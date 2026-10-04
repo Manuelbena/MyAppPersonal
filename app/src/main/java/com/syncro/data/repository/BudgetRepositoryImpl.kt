@@ -15,16 +15,16 @@ class BudgetRepositoryImpl @Inject constructor(
 ) : BudgetRepository {
 
     /** Una categoría que ya no existe (o de ingresos) se ignora en vez de romper la lista. */
-    override fun observeBudgets(): Flow<List<Budget>> = dao.observeBudgets().map { entities ->
+    override fun observeBudgets(accountId: String?): Flow<List<Budget>> = dao.observeBudgets(accountId).map { entities ->
         entities.mapNotNull { entity ->
             MovementCategory.entries
                 .firstOrNull { it.name == entity.category && it.type == MovementType.EXPENSE }
-                ?.let { Budget(it, entity.limitCents) }
+                ?.let { Budget(it, entity.limitCents, entity.accountId) }
         }
     }
 
     override suspend fun saveBudget(budget: Budget) =
-        dao.saveBudget(BudgetEntity(budget.category.name, budget.limitCents))
+        dao.saveBudget(BudgetEntity(budget.accountId, budget.category.name, budget.limitCents))
 
-    override suspend fun deleteBudget(category: MovementCategory) = dao.deleteBudget(category.name)
+    override suspend fun deleteBudget(accountId: String, category: MovementCategory) = dao.deleteBudget(accountId, category.name)
 }

@@ -2,7 +2,10 @@ package com.syncro.presentation.savings
 
 import com.syncro.domain.model.AppSettings
 import com.syncro.domain.model.AssistantSettings
+import com.syncro.domain.model.ArgbColor
+import com.syncro.domain.model.Budget
 import com.syncro.domain.model.MovementCategory
+import com.syncro.domain.model.SavingsAccount
 import com.syncro.domain.model.MovementType
 import com.syncro.domain.model.SavingsPeriod
 import com.syncro.domain.usecase.DeleteBudgetUseCase
@@ -14,6 +17,11 @@ import com.syncro.domain.usecase.SaveMovementUseCase
 import com.syncro.testutil.FakeBudgetRepository
 import com.syncro.testutil.FakeMovementRepository
 import com.syncro.testutil.FakeSettingsRepository
+import com.syncro.testutil.FakeSavingsAccountRepository
+import com.syncro.domain.usecase.ObserveSavingsAccountsUseCase
+import com.syncro.domain.usecase.SelectSavingsAccountUseCase
+import com.syncro.domain.usecase.SaveSavingsAccountUseCase
+import com.syncro.domain.usecase.DeleteSavingsAccountUseCase
 import com.syncro.testutil.MainDispatcherRule
 import com.syncro.testutil.aMovement
 import kotlinx.coroutines.flow.toList
@@ -44,6 +52,7 @@ class SavingsViewModelTest {
     private val repository = FakeMovementRepository()
     private val budgets = FakeBudgetRepository()
     private val settings = FakeSettingsRepository()
+    private val accounts = FakeSavingsAccountRepository(repository, budgets)
 
     private fun createViewModel() = SavingsViewModel(
         getMonthMovementsUseCase = GetMonthMovementsUseCase(repository, settings),
@@ -52,6 +61,10 @@ class SavingsViewModelTest {
         getBudgetsUseCase = GetBudgetsUseCase(budgets),
         saveBudgetUseCase = SaveBudgetUseCase(budgets),
         deleteBudgetUseCase = DeleteBudgetUseCase(budgets),
+        observeAccountsUseCase = ObserveSavingsAccountsUseCase(accounts),
+        selectAccountUseCase = SelectSavingsAccountUseCase(accounts),
+        saveAccountUseCase = SaveSavingsAccountUseCase(accounts),
+        deleteAccountUseCase = DeleteSavingsAccountUseCase(accounts),
         clock = clock
     )
 
@@ -187,4 +200,52 @@ class SavingsViewModelTest {
         assertEquals(period(LocalDate.of(2026, 9, 27), LocalDate.of(2026, 10, 26)), viewModel.currentPeriod.value)
         assertEquals(period(LocalDate.of(2026, 9, 27), LocalDate.of(2026, 10, 26)), viewModel.state.value!!.period)
     }
+
+    // region Cuentas de ahorro
+
+    @Test
+    fun `al cambiar de cuenta cambian los movimientos y los presupuestos`() = runTest {
+        accounts.saveAccount(SavingsAccount("conjunta", "Conjunta", ArgbColor(0xFF0EA5E9)))
+        repository.insertMovement(aMovement(id = "mio", date = today))
+        repository.insertMovement(aMovement(id = "conjunto", date = today, accountId = "conjunta"))
+        budgets.saveBudget(Budget(MovementCategory.GROCERIES, 30_000, "conjunta"))
+        val viewModel = createViewModel()
+        observeState(viewModel)
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.budgets.collect {} }
+
+        assertEquals(listOf("mio"), viewModel.state.value!!.occurrences.map { it.movement.id })
+        assertTrue(viewModel.budgets.value.isEmpty())
+
+        viewModel.selectAccount("conjunta")
+
+        assertEquals(listOf("conjunto"), viewModel.state.value!!.occurrences.map { it.movement.id })
+        assertEquals(listOf(MovementCategory.GROCERIES), viewModel.budgets.value.map { it.category })
+    }
+
+    @Test
+    fun `lo que se apunta va a la cuenta que se ve`() = runTest {
+        accounts.saveAccount(SavingsAccount("conjunta", "Conjunta", ArgbColor(0xFF0EA5E9)))
+        val viewModel = createViewModel()
+        observeState(viewModel)
+        viewModel.selectAccount("conjunta")
+
+        viewModel.save(MovementType.EXPENSE, 4_590, MovementCategory.GROCERIES, today, "", false)
+        viewModel.saveBudget(MovementCategory.LEISURE, 10_000)
+
+        assertEquals("conjunta", repository.movements.value.values.single().accountId)
+        assertEquals("conjunta", budgets.budgets.value.values.single().accountId)
+    }
+
+    @Test
+    fun `crear una cuenta la deja elegida y lo confirma`() = runTest {
+        val viewModel = createViewModel()
+        val messages = collectMessages(viewModel)
+
+        viewModel.saveAccount("vacaciones", ArgbColor(0xFF0EA5E9))
+
+        assertEquals(listOf("Cuenta \"Vacaciones\" creada"), messages)
+        assertEquals("Vacaciones", viewModel.accounts.value!!.active.name)
+    }
+
+    // endregion
 }

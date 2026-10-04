@@ -88,10 +88,27 @@ val MIGRATION_16_17 = object : Migration(16, 17) {
 }
 
 /**
+ * Cuentas de ahorro: la tabla de cuentas con la principal (elegida), donde pasa todo lo que ya
+ * había, y la cuenta de cada movimiento y presupuesto. SQLite no deja cambiar la clave de una
+ * tabla: la de presupuestos (antes, una por categoría; ahora por cuenta y categoría) se rehace.
+ */
+val MIGRATION_17_18 = object : Migration(17, 18) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("CREATE TABLE IF NOT EXISTS `accounts` (`id` TEXT NOT NULL, `name` TEXT NOT NULL, `color` INTEGER NOT NULL, `position` INTEGER NOT NULL, `isActive` INTEGER NOT NULL, PRIMARY KEY(`id`))")
+        db.execSQL("INSERT INTO accounts (id, name, color, position, isActive) VALUES ('main', 'Principal', ${0xFF10B981.toInt()}, 0, 1)")
+        db.execSQL("ALTER TABLE movements ADD COLUMN accountId TEXT NOT NULL DEFAULT 'main'")
+        db.execSQL("CREATE TABLE IF NOT EXISTS `budgets_new` (`accountId` TEXT NOT NULL, `category` TEXT NOT NULL, `limitCents` INTEGER NOT NULL, PRIMARY KEY(`accountId`, `category`))")
+        db.execSQL("INSERT INTO budgets_new (accountId, category, limitCents) SELECT 'main', category, limitCents FROM budgets")
+        db.execSQL("DROP TABLE budgets")
+        db.execSQL("ALTER TABLE budgets_new RENAME TO budgets")
+    }
+}
+
+/**
  * Todas las migraciones, en orden. AppModule y los tests las registran desde aquí: una migración
  * nueva se añade a esta lista y no puede olvidarse en uno de los dos sitios.
  */
 val ALL_MIGRATIONS = arrayOf(
     MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12,
-    MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17
+    MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18
 )

@@ -15,7 +15,8 @@ import java.time.LocalDate
 import javax.inject.Inject
 
 /**
- * Los movimientos del mes en que cae una fecha (con los mensuales que caen en él) y sus totales.
+ * Los movimientos del mes en que cae una fecha (con los mensuales que caen en él) y sus totales,
+ * de una cuenta de ahorro o, con [accountId] null, de todas (el asistente mira todas).
  * El "mes" va de nómina a nómina si hay día de nómina en Ajustes (cobrando el 27: del 27 al 26);
  * si no, es el mes natural. Si se cambia el día de nómina, se recalcula.
  */
@@ -24,9 +25,9 @@ class GetMonthMovementsUseCase @Inject constructor(
     private val settings: SettingsRepository
 ) {
     @OptIn(ExperimentalCoroutinesApi::class)
-    operator fun invoke(date: LocalDate): Flow<MonthMovements> =
+    operator fun invoke(date: LocalDate, accountId: String? = null): Flow<MonthMovements> =
         period(date).flatMapLatest { period ->
-            repository.observeForPeriod(period).map { monthMovements(period, it) }
+            repository.observeForPeriod(period, accountId).map { monthMovements(period, it) }
         }
 
     /** Solo el periodo en que cae [date], para saber qué mes se ve antes de cargar los movimientos. */

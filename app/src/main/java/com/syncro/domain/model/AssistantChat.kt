@@ -303,7 +303,8 @@ private fun paydayId(date: LocalDate) = "payday-$date"
  */
 private fun budgetAlertMessage(alert: BudgetAlert): ChatMessage {
     val budget = alert.budget
-    val name = "${budget.category.emoji} ${budget.category.label}"
+    // Con varias cuentas se dice de cuál: "Supermercado (Conjunta)"
+    val name = "${budget.category.emoji} ${budget.category.label}" + (alert.accountName?.let { " ($it)" } ?: "")
     val text = when (alert.level) {
         BudgetLevel.EXCEEDED ->
             "🚨 Te has pasado del presupuesto de $name: llevas ${euros(alert.spentCents)} de ${euros(budget.limitCents)}. " +
@@ -315,7 +316,9 @@ private fun budgetAlertMessage(alert: BudgetAlert): ChatMessage {
         }
     }
     val level = if (alert.level == BudgetLevel.EXCEEDED) "exceeded" else "warning"
-    return assistant("budget-${alert.month}-${budget.category.name}-$level", text)
+    // La cuenta principal no lleva su id: así los avisos de antes de las cuentas no salen otra vez como nuevos
+    val account = budget.accountId.takeIf { it != MAIN_ACCOUNT_ID }?.let { "$it-" } ?: ""
+    return assistant("budget-${alert.month}-$account${budget.category.name}-$level", text)
 }
 
 // endregion

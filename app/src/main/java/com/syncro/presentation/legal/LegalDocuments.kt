@@ -99,7 +99,7 @@ private val privacyPolicy = LegalDocument(
         LegalSection(
             "Para qué se usan",
             listOf(
-                "• Mostrar en un solo sitio tus tareas, eventos y notas, llevar la cuenta de tus ingresos y gastos (totales del mes y tasa de ahorro, calculados en el móvil), y mantener tus tareas y eventos sincronizados con tu cuenta de Google en los dos sentidos (los cambios que haces en la app se guardan en Google, y al revés).",
+                "• Mostrar en un solo sitio tus tareas, eventos y notas, llevar la cuenta de tus ingresos y gastos, separados en las cuentas de ahorro que crees (totales del mes y tasa de ahorro, calculados en el móvil), y mantener tus tareas y eventos sincronizados con tu cuenta de Google en los dos sentidos (los cambios que haces en la app se guardan en Google, y al revés).",
                 "• Enviarte, si lo activas, los avisos diarios de la mañana y de la noche, que se generan en el móvil a partir de los datos guardados en él.",
                 "• Avisarte de una tarea o un evento a la hora que elijas, con una notificación que se programa en el móvil.",
                 "• Que el asistente te proponga qué hacer con las tareas pendientes y te pregunte por tus prioridades, también calculado en el móvil.",
@@ -144,7 +144,7 @@ private val privacyPolicy = LegalDocument(
             listOf(
                 "Puedes ejercer tus derechos de acceso, rectificación, supresión, oposición, limitación del tratamiento y portabilidad. Como tus datos están en tu móvil y en tu cuenta de Google, la mayoría los controlas directamente:",
                 "• Ver, corregir o borrar tus tareas, eventos, notas, ingresos y gastos desde la propia app, o tus eventos y tareas desde Google Calendar y Google Tasks.",
-                "• Llevarte tus datos (portabilidad): en Ajustes > Tus datos puedes exportar tus ingresos y gastos (CSV) y hacer una copia de tus notas, ingresos, gastos y presupuestos.",
+                "• Llevarte tus datos (portabilidad): en Ajustes > Tus datos puedes exportar tus ingresos y gastos (CSV) y hacer una copia de tus notas, cuentas de ahorro, ingresos, gastos y presupuestos.",
                 "• Borrar los datos del móvil cerrando sesión (Ajustes > Cuenta) o desinstalando la app.",
                 "• Retirar el acceso de ${LegalInfo.APP_NAME} a tu cuenta de Google en myaccount.google.com/permissions.",
                 "• Retirar el permiso de notificaciones en Ajustes > Notificaciones o en los ajustes del móvil.",

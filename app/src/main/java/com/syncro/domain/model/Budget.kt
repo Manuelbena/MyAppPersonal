@@ -8,8 +8,12 @@ import java.time.YearMonth
  * los meses; cada mes se compara con lo gastado en esa categoría.
  */
 
-/** Límite mensual de gasto de una categoría (solo de gastos). */
-data class Budget(val category: MovementCategory, val limitCents: Long)
+/** Límite mensual de gasto de una categoría (solo de gastos) en una cuenta de ahorro. */
+data class Budget(val category: MovementCategory, val limitCents: Long, val accountId: String = MAIN_ACCOUNT_ID)
+
+/** Si este movimiento gasta del presupuesto: un gasto de su categoría y de su misma cuenta. */
+private fun MovementOccurrence.counts(budget: Budget): Boolean =
+    movement.type == MovementType.EXPENSE && movement.category == budget.category && movement.accountId == budget.accountId
 
 /** A partir de qué parte del límite se avisa: con un 20 % de margen aún se puede frenar. */
 const val BUDGET_WARNING_PERCENT = 80
@@ -46,7 +50,7 @@ fun MonthMovements.budgetStatuses(budgets: List<Budget>): List<BudgetStatus> = b
         BudgetStatus(
             budget,
             occurrences
-                .filter { it.movement.type == MovementType.EXPENSE && it.movement.category == budget.category }
+                .filter { it.counts(budget) }
                 .sumOf { it.movement.amountCents }
         )
     }
@@ -58,13 +62,15 @@ fun MonthMovements.budgetStatuses(budgets: List<Budget>): List<BudgetStatus> = b
  *
  * @param month el mes del aviso (el de inicio del periodo si va de nómina a nómina): un periodo del
  * 27 al 26 tiene avisos en dos meses naturales, y el id del mensaje no puede repetirse
+ * @param accountName la cuenta del presupuesto, para decirla en el mensaje; null con una sola cuenta
  */
 data class BudgetAlert(
     val budget: Budget,
     val level: BudgetLevel,
     val date: LocalDate,
     val spentCents: Long,
-    val month: YearMonth = YearMonth.from(date)
+    val month: YearMonth = YearMonth.from(date),
+    val accountName: String? = null
 )
 
 /**
@@ -74,7 +80,7 @@ data class BudgetAlert(
  */
 fun MonthMovements.budgetAlerts(budgets: List<Budget>, today: LocalDate): List<BudgetAlert> = budgets.flatMap { budget ->
     val expenses = occurrences
-        .filter { it.movement.type == MovementType.EXPENSE && it.movement.category == budget.category && !it.date.isAfter(today) }
+        .filter { it.counts(budget) && !it.date.isAfter(today) }
         .sortedBy { it.date }
     var spent = 0L
     var warned = false

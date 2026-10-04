@@ -58,7 +58,9 @@ data class Movement(
     val category: MovementCategory,
     val date: LocalDate,
     val note: String?,
-    val repeatsMonthly: Boolean
+    val repeatsMonthly: Boolean,
+    /** La cuenta de ahorro en la que está (ver [SavingsAccount]). */
+    val accountId: String = MAIN_ACCOUNT_ID
 )
 
 /**

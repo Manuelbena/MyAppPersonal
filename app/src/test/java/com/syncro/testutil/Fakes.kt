@@ -6,6 +6,11 @@ import com.syncro.domain.model.DailyFocus
 import com.syncro.domain.model.DataLossSummary
 import com.syncro.domain.model.Movement
 import com.syncro.domain.model.RepeatSeries
+import com.syncro.domain.model.ArgbColor
+import com.syncro.domain.model.MAIN_ACCOUNT_ID
+import com.syncro.domain.model.MAIN_ACCOUNT_NAME
+import com.syncro.domain.model.SavingsAccount
+import com.syncro.domain.model.SavingsAccounts
 import com.syncro.domain.model.SavingsPeriod
 import com.syncro.domain.model.MovementCategory
 import com.syncro.domain.model.SyncroItem
@@ -20,11 +25,13 @@ import com.syncro.domain.repository.GoogleSyncRepository
 import com.syncro.domain.repository.MovementRepository
 import com.syncro.domain.repository.NoteRepository
 import com.syncro.domain.repository.RepeatSeriesRepository
+import com.syncro.domain.repository.SavingsAccountRepository
 import com.syncro.domain.repository.TaskRepository
 import com.syncro.domain.repository.UserRepository
 import com.syncro.domain.model.User
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import java.io.IOException
@@ -279,8 +286,8 @@ class FakeNoteRepository : NoteRepository {
 class FakeMovementRepository : MovementRepository {
     val movements = MutableStateFlow<Map<String, Movement>>(emptyMap())
 
-    override fun observeForPeriod(period: SavingsPeriod): Flow<List<Movement>> = movements.map { all ->
-        all.values.filter { it.date in period || (it.repeatsMonthly && !it.date.isAfter(period.end)) }
+    override fun observeForPeriod(period: SavingsPeriod, accountId: String?): Flow<List<Movement>> = movements.map { all ->
+        all.values.filter { (it.date in period || (it.repeatsMonthly && !it.date.isAfter(period.end))) && (accountId == null || it.accountId == accountId) }
     }
 
     override suspend fun getAllMovements(): List<Movement> = movements.value.values.sortedBy { it.date }
@@ -302,17 +309,44 @@ class FakeDailyQuoteRepository : DailyQuoteRepository {
     }
 }
 
+/** Como la tabla: uno por cuenta y categoría. */
 class FakeBudgetRepository : BudgetRepository {
-    val budgets = MutableStateFlow<Map<MovementCategory, Budget>>(emptyMap())
+    val budgets = MutableStateFlow<Map<Pair<String, MovementCategory>, Budget>>(emptyMap())
 
-    override fun observeBudgets(): Flow<List<Budget>> = budgets.map { it.values.toList() }
+    override fun observeBudgets(accountId: String?): Flow<List<Budget>> =
+        budgets.map { all -> all.values.filter { accountId == null || it.accountId == accountId } }
 
     override suspend fun saveBudget(budget: Budget) {
-        budgets.update { it + (budget.category to budget) }
+        budgets.update { it + ((budget.accountId to budget.category) to budget) }
     }
 
-    override suspend fun deleteBudget(category: MovementCategory) {
-        budgets.update { it - category }
+    override suspend fun deleteBudget(accountId: String, category: MovementCategory) {
+        budgets.update { it - (accountId to category) }
+    }
+}
+
+/** Como el real: siempre hay al menos la principal, y una sola es la que se ve. */
+class FakeSavingsAccountRepository(private val movements: FakeMovementRepository? = null, private val budgets: FakeBudgetRepository? = null) :
+    SavingsAccountRepository {
+    val accounts = MutableStateFlow(listOf(SavingsAccount(MAIN_ACCOUNT_ID, MAIN_ACCOUNT_NAME, ArgbColor(0xFF10B981))))
+    val activeId = MutableStateFlow(MAIN_ACCOUNT_ID)
+
+    override fun observeAccounts(): Flow<SavingsAccounts> = combine(accounts, activeId) { all, active ->
+        SavingsAccounts(all, all.firstOrNull { it.id == active } ?: all.first())
+    }
+
+    override suspend fun saveAccount(account: SavingsAccount) {
+        accounts.update { all -> if (all.any { it.id == account.id }) all.map { if (it.id == account.id) account else it } else all + account }
+    }
+
+    override suspend fun selectAccount(id: String) {
+        activeId.value = id
+    }
+
+    override suspend fun deleteAccount(id: String) {
+        accounts.update { all -> all.filter { it.id != id } }
+        movements?.movements?.update { all -> all.filterValues { it.accountId != id } }
+        budgets?.budgets?.update { all -> all.filterValues { it.accountId != id } }
     }
 }
 

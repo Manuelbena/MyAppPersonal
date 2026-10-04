@@ -17,6 +17,7 @@ import com.syncro.data.repository.BudgetRepositoryImpl
 import com.syncro.data.repository.DailyFocusRepositoryImpl
 import com.syncro.data.repository.DailyQuoteRepositoryImpl
 import com.syncro.data.repository.SettingsRepositoryImpl
+import com.syncro.data.repository.SavingsAccountRepositoryImpl
 import com.syncro.data.repository.EventRepositoryImpl
 import com.syncro.data.repository.GoogleSyncRepositoryImpl
 import com.syncro.data.repository.MovementRepositoryImpl
@@ -36,6 +37,7 @@ import com.syncro.domain.repository.ConnectivityRepository
 import com.syncro.domain.repository.DailyFocusRepository
 import com.syncro.domain.repository.DailyQuoteRepository
 import com.syncro.domain.repository.SettingsRepository
+import com.syncro.domain.repository.SavingsAccountRepository
 import com.syncro.domain.repository.EventRepository
 import com.syncro.domain.repository.GoogleSyncRepository
 import com.syncro.domain.repository.MovementRepository
@@ -134,6 +136,12 @@ object AppModule {
     @Provides
     fun provideBudgetDao(db: SyncroDatabase): BudgetDao {
         return db.budgetDao
+    }
+
+    @Provides
+    @Singleton
+    fun provideSavingsAccountRepository(db: SyncroDatabase): SavingsAccountRepository {
+        return SavingsAccountRepositoryImpl(db.savingsAccountDao)
     }
 
     @Provides

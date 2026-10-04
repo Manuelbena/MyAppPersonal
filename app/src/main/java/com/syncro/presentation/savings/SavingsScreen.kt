@@ -32,6 +32,9 @@ import com.syncro.domain.model.label
 import com.syncro.domain.model.Budget
 import com.syncro.domain.model.MonthMovements
 import com.syncro.domain.model.SavingsPeriod
+import com.syncro.domain.model.SavingsAccount
+import com.syncro.domain.model.SavingsAccounts
+import com.syncro.domain.model.ArgbColor
 import com.syncro.domain.model.budgetStatuses
 import com.syncro.domain.model.Movement
 import com.syncro.domain.model.MovementCategory
@@ -63,6 +66,7 @@ fun SavingsScreen(
     val state by viewModel.state.collectAsState()
     val period by viewModel.currentPeriod.collectAsState()
     val budgets by viewModel.budgets.collectAsState()
+    val accounts by viewModel.accounts.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -86,7 +90,12 @@ fun SavingsScreen(
         onSaveBudget = viewModel::saveBudget,
         onDeleteBudget = viewModel::deleteBudget,
         onShare = { scope.launch { context.shareMovementTicket(it, LocalDateTime.now()) } },
-        onShareMonth = { scope.launch { context.shareMonthStatement(it, budgets, LocalDateTime.now()) } }
+        // Con varias cuentas, el resumen dice de cuál es
+        onShareMonth = { scope.launch { context.shareMonthStatement(it, budgets, LocalDateTime.now(), accounts?.takeIf { a -> a.hasSeveral }?.active?.name) } },
+        accounts = accounts,
+        onSelectAccount = viewModel::selectAccount,
+        onSaveAccount = viewModel::saveAccount,
+        onDeleteAccount = viewModel::deleteAccount
     )
 }
 
@@ -118,9 +127,15 @@ fun SavingsContent(
     onDeleteBudget: (MovementCategory) -> Unit = {},
     openSalaryForm: Boolean = false,
     onSalaryFormOpened: () -> Unit = {},
-    snackbarHostState: SnackbarHostState = remember { SnackbarHostState() }
+    snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
+    // Cuentas de ahorro: la que se ve (en la cabecera) y las demás; null mientras se cargan
+    accounts: SavingsAccounts? = null,
+    onSelectAccount: (String) -> Unit = {},
+    onSaveAccount: (name: String, color: ArgbColor, id: String?) -> Unit = { _, _, _ -> },
+    onDeleteAccount: (String) -> Unit = {}
 ) {
     var showAddSheet by remember { mutableStateOf(false) }
+    var showAccounts by remember { mutableStateOf(false) }
     var formType by remember { mutableStateOf<MovementType?>(null) }
     // Categoría ya elegida al abrir el formulario (la nómina que se apunta desde el asistente)
     var presetCategory by remember { mutableStateOf<MovementCategory?>(null) }
@@ -149,7 +164,7 @@ fun SavingsContent(
                 .padding(padding)
         ) {
             // Fija: el título y el mes; lo de debajo hace scroll
-            SavingsHeader(period, onPreviousMonth, onNextMonth)
+            SavingsHeader(period, onPreviousMonth, onNextMonth, accounts?.active) { showAccounts = true }
 
             // Igual que en Inicio: el contenido se desvanece bajo la cabecera y sobre la barra
             Box(modifier = Modifier.fillMaxSize()) {
@@ -189,6 +204,16 @@ fun SavingsContent(
                 EdgeFades()
             }
         }
+    }
+
+    if (showAccounts && accounts != null) {
+        AccountsSheet(
+            accounts = accounts,
+            onSelect = onSelectAccount,
+            onSave = onSaveAccount,
+            onDelete = onDeleteAccount,
+            onDismiss = { showAccounts = false }
+        )
     }
 
     if (showAddSheet) {
@@ -296,7 +321,13 @@ fun AddMovementSheet(onDismiss: () -> Unit, onSelect: (MovementType) -> Unit) {
  * salía doble y la cabecera no quedaba a la altura de las demás).
  */
 @Composable
-private fun SavingsHeader(period: SavingsPeriod?, onPrevious: () -> Unit, onNext: () -> Unit) {
+private fun SavingsHeader(
+    period: SavingsPeriod?,
+    onPrevious: () -> Unit,
+    onNext: () -> Unit,
+    account: SavingsAccount?,
+    onAccountClick: () -> Unit
+) {
     // Misma cabecera que Asistente: título y subtítulo a la izquierda, botones redondos a la derecha
     Row(
         modifier = Modifier
@@ -317,6 +348,8 @@ private fun SavingsHeader(period: SavingsPeriod?, onPrevious: () -> Unit, onNext
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.primary
             )
+            // La cuenta que se ve: tocarla deja cambiar de cuenta o crear otra
+            account?.let { AccountSwitcher(it, onClick = onAccountClick, modifier = Modifier.padding(top = 8.dp)) }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             SyncroIconButton(

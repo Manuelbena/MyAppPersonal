@@ -69,7 +69,7 @@ fun HomeSavingsCard(
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    "💶 Ahorros $title",
+                    "💶 Ahorros $title" + (savings.accountName?.let { " · $it" } ?: ""),
                     modifier = Modifier.weight(1f),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,

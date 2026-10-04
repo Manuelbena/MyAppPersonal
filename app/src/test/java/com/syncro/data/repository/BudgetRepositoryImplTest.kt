@@ -3,6 +3,7 @@ package com.syncro.data.repository
 import com.syncro.data.local.SyncroDatabase
 import com.syncro.data.local.entity.BudgetEntity
 import com.syncro.domain.model.Budget
+import com.syncro.domain.model.MAIN_ACCOUNT_ID
 import com.syncro.domain.model.MovementCategory
 import com.syncro.testutil.createInMemoryDatabase
 import kotlinx.coroutines.flow.first
@@ -55,15 +56,15 @@ class BudgetRepositoryImplTest {
         repository.saveBudget(Budget(MovementCategory.GROCERIES, 30_000))
         repository.saveBudget(Budget(MovementCategory.LEISURE, 10_000))
 
-        repository.deleteBudget(MovementCategory.GROCERIES)
+        repository.deleteBudget(MAIN_ACCOUNT_ID, MovementCategory.GROCERIES)
 
         assertEquals(listOf(Budget(MovementCategory.LEISURE, 10_000)), repository.observeBudgets().first())
     }
 
     @Test
     fun `una categoria desconocida o de ingresos se ignora`() = runTest {
-        db.budgetDao.saveBudget(BudgetEntity("CATEGORIA_RENOMBRADA", 1_000))
-        db.budgetDao.saveBudget(BudgetEntity("SALARY", 1_000))
+        db.budgetDao.saveBudget(BudgetEntity(MAIN_ACCOUNT_ID, "CATEGORIA_RENOMBRADA", 1_000))
+        db.budgetDao.saveBudget(BudgetEntity(MAIN_ACCOUNT_ID, "SALARY", 1_000))
         repository.saveBudget(Budget(MovementCategory.HOUSING, 70_000))
 
         assertEquals(listOf(Budget(MovementCategory.HOUSING, 70_000)), repository.observeBudgets().first())

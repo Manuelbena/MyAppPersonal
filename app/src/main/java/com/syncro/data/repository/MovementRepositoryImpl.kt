@@ -16,8 +16,8 @@ class MovementRepositoryImpl @Inject constructor(
     private val dao: MovementDao
 ) : MovementRepository {
 
-    override fun observeForPeriod(period: SavingsPeriod): Flow<List<Movement>> =
-        dao.observeForRange(period.start.toEpochDay(), period.end.toEpochDay())
+    override fun observeForPeriod(period: SavingsPeriod, accountId: String?): Flow<List<Movement>> =
+        dao.observeForRange(period.start.toEpochDay(), period.end.toEpochDay(), accountId)
             .map { entities -> entities.mapNotNull { it.toDomain() } }
 
     override suspend fun getAllMovements(): List<Movement> = dao.getAll().mapNotNull { it.toDomain() }
@@ -32,7 +32,8 @@ class MovementRepositoryImpl @Inject constructor(
                 category = movement.category.name,
                 date = movement.date.toEpochDay(),
                 note = movement.note,
-                repeatsMonthly = movement.repeatsMonthly
+                repeatsMonthly = movement.repeatsMonthly,
+                accountId = movement.accountId
             )
         )
     }
@@ -54,7 +55,8 @@ class MovementRepositoryImpl @Inject constructor(
             category = category,
             date = LocalDate.ofEpochDay(date),
             note = note,
-            repeatsMonthly = repeatsMonthly
+            repeatsMonthly = repeatsMonthly,
+            accountId = accountId
         )
     }
 }

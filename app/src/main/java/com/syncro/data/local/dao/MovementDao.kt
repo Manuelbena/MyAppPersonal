@@ -9,9 +9,15 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface MovementDao {
-    /** Los del rango [start, end] más los mensuales que empezaron antes de [end] (días desde 1970). */
-    @Query("SELECT * FROM movements WHERE (date BETWEEN :start AND :end) OR (repeatsMonthly = 1 AND date <= :end)")
-    fun observeForRange(start: Long, end: Long): Flow<List<MovementEntity>>
+    /**
+     * Los del rango [start, end] más los mensuales que empezaron antes de [end] (días desde 1970),
+     * de la cuenta [accountId] o de todas si es null.
+     */
+    @Query(
+        "SELECT * FROM movements WHERE ((date BETWEEN :start AND :end) OR (repeatsMonthly = 1 AND date <= :end)) " +
+            "AND (:accountId IS NULL OR accountId = :accountId)"
+    )
+    fun observeForRange(start: Long, end: Long, accountId: String?): Flow<List<MovementEntity>>
 
     @Query("SELECT * FROM movements ORDER BY date")
     suspend fun getAll(): List<MovementEntity>
