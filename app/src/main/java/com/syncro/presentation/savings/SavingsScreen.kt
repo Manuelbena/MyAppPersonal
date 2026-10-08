@@ -35,7 +35,7 @@ import com.syncro.domain.model.SavingsPeriod
 import com.syncro.domain.model.SavingsAccount
 import com.syncro.domain.model.SavingsAccounts
 import com.syncro.domain.model.ArgbColor
-import com.syncro.domain.model.budgetStatuses
+import com.syncro.domain.model.budgetPlan
 import com.syncro.domain.model.Movement
 import com.syncro.domain.model.MovementCategory
 import com.syncro.domain.model.MovementOccurrence
@@ -178,7 +178,7 @@ fun SavingsContent(
                         item(key = "summary") { MonthSummaryCard(movements, onShare = { onShareMonth(movements) }) }
                         item(key = "budgets") {
                             BudgetsCard(
-                                statuses = movements.budgetStatuses(budgets),
+                                plan = movements.budgetPlan(budgets),
                                 canAddMore = categoriesWithoutBudget(budgets).isNotEmpty(),
                                 onAdd = { budgetSheet = BudgetSheetTarget(null) },
                                 onOpen = { budgetSheet = BudgetSheetTarget(it) }

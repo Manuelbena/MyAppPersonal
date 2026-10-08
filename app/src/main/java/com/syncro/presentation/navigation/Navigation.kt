@@ -20,6 +20,8 @@ sealed class AppScreen(val route: String, val title: String, val icon: ImageVect
     object Login : AppScreen("login", "Login", Icons.Outlined.Person)
     object NotesList : AppScreen("notes_list", "Mis Notas", Icons.Outlined.Home)
     object Settings : AppScreen("settings", "Ajustes", Icons.Outlined.Settings)
+    /** La guía de inicio: tras el primer inicio de sesión (o desde Ajustes). */
+    object Onboarding : AppScreen("onboarding", "Bienvenida", Icons.Outlined.AutoAwesome)
     /** Un documento legal; se abre con [legalRoute]. */
     object Legal : AppScreen("legal/{doc}", "Legal", Icons.Outlined.Settings)
 }

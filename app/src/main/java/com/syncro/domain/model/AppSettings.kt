@@ -46,7 +46,9 @@ data class AssistantSettings(
 /** Ajustes de la app que afectan a la lógica (el tema es solo de la interfaz y va aparte). */
 data class AppSettings(
     val digest: DigestSettings = DigestSettings(),
-    val assistant: AssistantSettings = AssistantSettings()
+    val assistant: AssistantSettings = AssistantSettings(),
+    /** Si ya pasó (o se saltó) la guía de inicio; se puede repetir desde Ajustes. */
+    val onboardingCompleted: Boolean = false
 )
 
 class InvalidPaydayException :

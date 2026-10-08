@@ -4,6 +4,7 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -213,6 +214,9 @@ class SavingsScreenTest {
             budgets = listOf(Budget(MovementCategory.GROCERIES, 30_000))
         )
 
+        // Va bien (50 %), así que su grupo sale cerrado: se abre como lo haría el usuario
+        compose.onNode(hasScrollAction()).performScrollToNode(hasContentDescription("Ver presupuestos"))
+        compose.onNodeWithContentDescription("Ver presupuestos").performClick()
         compose.onNode(hasScrollAction()).performScrollToNode(hasText("150,00 € de 300,00 €"))
         compose.onNodeWithText("Te quedan 150,00 €").assertIsDisplayed()
         compose.onNodeWithText("50 %").assertIsDisplayed()
@@ -262,4 +266,52 @@ class SavingsScreenTest {
         id = "netflix", amountCents = 1_299, category = MovementCategory.SUBSCRIPTIONS,
         date = LocalDate.of(2026, 10, 1), note = "Netflix", repeatsMonthly = true
     )
+
+    // region Presupuestos agrupados (50/30/20)
+
+    @Test
+    fun `los presupuestos se agrupan en necesidades, caprichos y ahorro segun la nomina`() {
+        show(
+            monthMovements(
+                october,
+                listOf(
+                    aMovement(id = "nomina", type = MovementType.INCOME, amountCents = 200_000, category = MovementCategory.SALARY, date = LocalDate.of(2026, 10, 1)),
+                    aMovement(id = "alquiler", amountCents = 80_000, category = MovementCategory.HOUSING, date = LocalDate.of(2026, 10, 1))
+                )
+            ),
+            budgets = listOf(Budget(MovementCategory.HOUSING, 120_000))
+        )
+
+        compose.onNode(hasScrollAction()).performScrollToNode(hasText("Reparto 50/30/20 de tu nómina (2.000,00 €)"))
+        compose.onNode(hasScrollAction()).performScrollToNode(hasText("🏠 Necesidades · 50 %"))
+        compose.onNode(hasScrollAction()).performScrollToNode(hasText("800,00 € de 1.000,00 €"))
+        compose.onNode(hasScrollAction()).performScrollToNode(hasText("🐷 Ahorro · 20 %"))
+        compose.onNode(hasScrollAction()).performScrollToNode(hasText("¡Objetivo cumplido! 💪"))
+        // Va bien: el presupuesto de Vivienda queda dentro del grupo cerrado
+        compose.onAllNodesWithText("800,00 € de 1.200,00 €").assertCountEquals(0)
+    }
+
+    @Test
+    fun `un grupo con un presupuesto pasado sale abierto`() {
+        show(
+            monthMovements(october, listOf(aMovement(id = "m", amountCents = 32_000, category = MovementCategory.GROCERIES, date = LocalDate.of(2026, 10, 1)))),
+            budgets = listOf(Budget(MovementCategory.GROCERIES, 30_000))
+        )
+
+        compose.onNode(hasScrollAction()).performScrollToNode(hasText("320,00 € de 300,00 €"))
+        compose.onNodeWithText("Te has pasado 20,00 €").assertIsDisplayed()
+    }
+
+    @Test
+    fun `al crear un presupuesto las categorias salen por grupos`() {
+        show()
+
+        compose.onNode(hasScrollAction()).performScrollToNode(hasText("Crear presupuesto"))
+        compose.onNodeWithText("Crear presupuesto").performClick()
+
+        compose.onNodeWithText("🏠 Necesidades · 50 %").assertIsDisplayed()
+        compose.onNodeWithText("🎉 Caprichos · 30 %").performScrollTo().assertIsDisplayed()
+    }
+
+    // endregion
 }

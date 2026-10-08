@@ -49,6 +49,8 @@ import com.syncro.presentation.login.LoginScreen
 import com.syncro.presentation.notes.NotesListScreen
 import com.syncro.presentation.savings.SavingsScreen
 import com.syncro.presentation.settings.SettingsScreen
+import com.syncro.presentation.onboarding.OnboardingScreen
+import com.syncro.presentation.onboarding.OnboardingViewModel
 import com.syncro.presentation.legal.LegalDocumentId
 import com.syncro.presentation.legal.LegalDocumentScreen
 import com.syncro.data.preferences.ThemeMode
@@ -76,7 +78,9 @@ fun MainScaffold(
     themeViewModel: ThemeViewModel = hiltViewModel(),
     authViewModel: AuthViewModel = hiltViewModel(),
     // Uno solo para el chat y el número de la barra, así nunca se desincronizan
-    assistantViewModel: AssistantViewModel = hiltViewModel()
+    assistantViewModel: AssistantViewModel = hiltViewModel(),
+    // Decide si se abre la guía de inicio y la comparte con su pantalla
+    onboardingViewModel: OnboardingViewModel = hiltViewModel()
 ) {
     val themeMode by themeViewModel.themeMode.collectAsState()
     val isDarkTheme = when (themeMode) {
@@ -85,6 +89,7 @@ fun MainScaffold(
         ThemeMode.DARK -> true
     }
     val session by authViewModel.session.collectAsState()
+    val needsOnboarding by onboardingViewModel.needsOnboarding.collectAsState()
     TrackAssistantOnResume(assistantViewModel)
     val assistantUnread = assistantViewModel.uiState.collectAsState().value?.unreadCount ?: 0
     val navController = rememberNavController()
@@ -95,7 +100,8 @@ fun MainScaffold(
     val showBottomBar = currentRoute != AppScreen.Login.route &&
                        currentRoute != AppScreen.NotesList.route &&
                        currentRoute != AppScreen.Settings.route &&
-                       currentRoute != AppScreen.Legal.route
+                       currentRoute != AppScreen.Legal.route &&
+                       currentRoute != AppScreen.Onboarding.route
     // Mientras la barra se oculta con animación, sigue marcando la sección de la que se viene
     var lastBottomRoute by remember { mutableStateOf(currentRoute) }
     // "Apuntar nómina" en el chat: Ahorros abre el formulario de ingreso con la categoría Nómina
@@ -111,9 +117,15 @@ fun MainScaffold(
             ) {
                 // Mientras se lee la sesión no se muestra nada: evita el parpadeo del login
                 if (session == SessionState.Loading) return@Box
+                // Con sesión, también hay que saber si toca la guía antes de elegir la primera pantalla
+                if (session is SessionState.LoggedIn && needsOnboarding == null) return@Box
                 // Se decide una sola vez; después, login -> inicio lo gestiona la propia navegación
                 val startDestination = remember {
-                    if (session is SessionState.LoggedIn) AppScreen.Home.route else AppScreen.Login.route
+                    when {
+                        session !is SessionState.LoggedIn -> AppScreen.Login.route
+                        needsOnboarding == true -> AppScreen.Onboarding.route
+                        else -> AppScreen.Home.route
+                    }
                 }
                 val navigateToTab: (AppScreen) -> Unit = { screen ->
                     navController.navigate(screen.route) {
@@ -233,8 +245,25 @@ fun MainScaffold(
                             LoginScreen(
                                 onOpenLegal = { navController.navigate(legalRoute(it)) },
                                 onLoginSuccess = {
-                                    navController.navigate(AppScreen.Home.route) {
+                                    // La primera vez, la guía de inicio; después, directamente a Inicio
+                                    val next = if (needsOnboarding == true) AppScreen.Onboarding.route else AppScreen.Home.route
+                                    navController.navigate(next) {
                                         popUpTo(AppScreen.Login.route) { inclusive = true }
+                                    }
+                                }
+                            )
+                        }
+                    }
+                    // La guía de inicio: al acabar o saltarla se va a Inicio (si se abrió desde Ajustes, se vuelve a él)
+                    composable(AppScreen.Onboarding.route) {
+                        ReadableWidth {
+                            OnboardingScreen(
+                                viewModel = onboardingViewModel,
+                                onFinished = {
+                                    if (!navController.popBackStack(AppScreen.Home.route, inclusive = false)) {
+                                        navController.navigate(AppScreen.Home.route) {
+                                            popUpTo(AppScreen.Onboarding.route) { inclusive = true }
+                                        }
                                     }
                                 }
                             )
@@ -268,7 +297,11 @@ fun MainScaffold(
                         ReadableWidth {
                             SettingsScreen(
                                 onBack = { navController.popBackStack() },
-                                onOpenLegal = { navController.navigate(legalRoute(it)) }
+                                onOpenLegal = { navController.navigate(legalRoute(it)) },
+                                onOpenOnboarding = {
+                                    onboardingViewModel.restart()
+                                    navController.navigate(AppScreen.Onboarding.route)
+                                }
                             )
                         }
                     }

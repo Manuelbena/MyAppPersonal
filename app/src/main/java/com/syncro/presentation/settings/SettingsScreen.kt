@@ -74,6 +74,8 @@ import java.time.LocalTime
 fun SettingsScreen(
     onBack: () -> Unit,
     onOpenLegal: (LegalDocumentId) -> Unit,
+    // "Ver la guía de inicio" (Acerca de)
+    onOpenOnboarding: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val context = LocalContext.current
@@ -137,6 +139,7 @@ fun SettingsScreen(
             onLogoutConfirm = viewModel::confirmLogout,
             onLogoutDismiss = viewModel::dismissLogout,
             onOpenLegal = onOpenLegal,
+            onOpenOnboarding = onOpenOnboarding,
             onExportCsv = { csvLauncher.launch("syncro-movimientos-$today.csv") },
             onBackup = { backupLauncher.launch("syncro-copia-$today.json") },
             // Algunos gestores de archivos no reconocen .json y lo marcan como binario o texto
@@ -192,6 +195,7 @@ fun SettingsContent(
     onLogoutConfirm: () -> Unit,
     onLogoutDismiss: () -> Unit,
     onOpenLegal: (LegalDocumentId) -> Unit,
+    onOpenOnboarding: () -> Unit = {},
     onExportCsv: () -> Unit = {},
     onBackup: () -> Unit = {},
     onRestore: () -> Unit = {},
@@ -440,6 +444,12 @@ fun SettingsContent(
                         SettingsRow(title = "Versión", trailing = {
                             Text(appVersion, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         })
+                        SettingsDivider()
+                        SettingsRow(
+                            title = "Ver la guía de inicio",
+                            subtitle = "Vuelve a configurar avisos, nómina, asistente y tema en un minuto",
+                            onClick = onOpenOnboarding
+                        )
                     }
                 }
             }

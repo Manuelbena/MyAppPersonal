@@ -15,11 +15,11 @@ package com.syncro.presentation.legal
  */
 object LegalInfo {
     const val APP_NAME = "Syncro"
-    const val OWNER_NAME = "[Nombre y apellidos o razón social del titular]"
-    const val OWNER_ADDRESS = "[Domicilio]"
-    const val CONTACT_EMAIL = "[Correo de contacto]"
+    const val OWNER_NAME = "Manuel Galindo Ramírez"
+    const val OWNER_ADDRESS = "14900 Lucena (Córdoba), España"
+    const val CONTACT_EMAIL = "appsyncro2026@gmail.com"
     /** Fecha de la última revisión de los textos; cambiarla al modificarlos. */
-    const val LAST_UPDATED = "4 de octubre de 2026"
+    const val LAST_UPDATED = "8 de octubre de 2026"
 
     val isComplete: Boolean
         get() = listOf(OWNER_NAME, OWNER_ADDRESS, CONTACT_EMAIL).none { it.startsWith("[") }
@@ -92,8 +92,9 @@ private val privacyPolicy = LegalDocument(
                 "• Eventos de Google Calendar: título, fechas y horas, descripción, ubicación, subtareas y la información de categoría y color que añades en la app. Si le pones un aviso en la app, a Google se le indica que no avise de ese evento (para que no te lleguen dos); el aviso en sí no se envía.",
                 "• Tareas de Google Tasks: título, notas, fecha, hora (solo en la app) y si están hechas.",
                 "• Notas: solo se guardan en tu móvil; no se sincronizan con Google ni con ningún otro servicio.",
-                "• Ingresos, gastos y presupuestos (sección Ahorros): importe, tipo, categoría, fecha, nota, si se repite cada mes y el límite mensual que pongas a cada categoría. Los apuntas tú; solo se guardan en tu móvil, no se sincronizan con Google ni con ningún otro servicio y la app no se conecta a tu banco.",
-                "• Uso de la app en el móvil: tus respuestas al asistente, las prioridades que eliges cada día, tus ajustes (horarios de los avisos, día de cobro de la nómina si lo indicas, tema) y si has dado permiso de notificaciones."
+                "• Ingresos, gastos y presupuestos (sección Ahorros): importe, tipo, categoría, fecha, nota, si se repite cada mes, el límite mensual que pongas a cada categoría y las cuentas de ahorro que crees (nombre y color). Los apuntas tú; solo se guardan en tu móvil, no se sincronizan con Google ni con ningún otro servicio y la app no se conecta a tu banco.",
+                "• Repeticiones y avisos: la regla de las tareas y eventos que se repiten (cada día, semana, mes o año) y la hora a la que quieres que te avise la app. Se guardan solo en tu móvil; a Google le llega cada repetición como un evento o tarea normal.",
+                "• Uso de la app en el móvil: tus respuestas al asistente, las prioridades que eliges cada día, tus ajustes (horarios de los avisos, día de cobro de la nómina si lo indicas, tema, lo que eliges en la guía de inicio) y si has dado permiso de notificaciones."
             )
         ),
         LegalSection(
@@ -102,7 +103,8 @@ private val privacyPolicy = LegalDocument(
                 "• Mostrar en un solo sitio tus tareas, eventos y notas, llevar la cuenta de tus ingresos y gastos, separados en las cuentas de ahorro que crees (totales del mes y tasa de ahorro, calculados en el móvil), y mantener tus tareas y eventos sincronizados con tu cuenta de Google en los dos sentidos (los cambios que haces en la app se guardan en Google, y al revés).",
                 "• Enviarte, si lo activas, los avisos diarios de la mañana y de la noche, que se generan en el móvil a partir de los datos guardados en él.",
                 "• Avisarte de una tarea o un evento a la hora que elijas, con una notificación que se programa en el móvil.",
-                "• Que el asistente te proponga qué hacer con las tareas pendientes y te pregunte por tus prioridades, también calculado en el móvil.",
+                "• Que el asistente te proponga qué hacer con las tareas pendientes, te pregunte por tus prioridades, te avise si un presupuesto va justo y te sugiera cómo repartir la nómina (regla 50/30/20), también calculado en el móvil.",
+                "• Mostrar lo que te queda del día en el widget de la pantalla de inicio, si lo añades. Ten en cuenta que el widget se ve sin desbloquear la app.",
                 "No se crean perfiles, no se toman decisiones automatizadas con efectos jurídicos sobre ti y no se usan tus datos con fines publicitarios."
             )
         ),
@@ -120,7 +122,7 @@ private val privacyPolicy = LegalDocument(
                 "Google puede tratar datos fuera del Espacio Económico Europeo, con las garantías que recoge su política, como el Marco de Privacidad de Datos UE-EE. UU. y las cláusulas contractuales tipo de la Comisión Europea.",
                 "Tickets y resúmenes: si compartes el ticket de un ingreso o gasto o el resumen de un mes, se crea una imagen con sus datos en el almacenamiento temporal de la app y se envía solo a la app que elijas en el menú de compartir de Android (por ejemplo WhatsApp o el correo), que la tratará según su propia política. La app no la envía a ningún otro sitio.",
                 "Exportaciones y copias: si exportas tus ingresos y gastos o haces una copia de seguridad, el archivo se guarda solo donde tú elijas (tu móvil, Google Drive u otro servicio que tengas instalado), que lo tratará según su propia política. Restaurar una copia solo lee el archivo que elijas.",
-                "Copias de seguridad: si tienes activada la copia de seguridad de Android, el sistema puede incluir los datos de la app (entre ellos las notas, los ingresos y gastos y la sesión) en la copia de tu cuenta de Google. Puedes desactivarla en los ajustes del móvil."
+                "Copias de seguridad: si tienes activada la copia de seguridad de Android, el sistema puede incluir los datos de la app (entre ellos las notas, los ingresos y gastos y la sesión) en la copia de tu cuenta de Google; los ajustes de la app no se copian. Puedes desactivarla en los ajustes del móvil."
             )
         ),
         LegalSection(
@@ -133,9 +135,20 @@ private val privacyPolicy = LegalDocument(
             )
         ),
         LegalSection(
+            "Permisos del móvil",
+            listOf(
+                "La app solo pide los permisos que necesita para funcionar:",
+                "• Internet y estado de la red: para sincronizar con Google y saber si estás sin conexión (lo que hagas sin conexión se sube al volver).",
+                "• Notificaciones: para los resúmenes diarios y los avisos de tus tareas y eventos. Lo concedes tú y puedes quitarlo cuando quieras.",
+                "• Alarmas exactas: para que los avisos lleguen a la hora que elegiste aunque el móvil esté en reposo, como en cualquier app de calendario.",
+                "• Ejecutar al iniciar el móvil: para volver a programar los avisos después de reiniciarlo.",
+                "La app no pide acceso a tu ubicación, contactos, fotos, micrófono ni cámara."
+            )
+        ),
+        LegalSection(
             "Cuánto tiempo se guardan",
             listOf(
-                "• En tu móvil, mientras uses la app. Al cerrar sesión se borran del móvil tus tareas, eventos, notas, ingresos y gastos, el chat del asistente y las prioridades (la app te avisa antes de lo que no se podrá recuperar, como las notas o los ingresos y gastos). Al desinstalar la app, Android borra todos sus datos.",
+                "• En tu móvil, mientras uses la app. Al cerrar sesión se borran del móvil tus tareas, eventos, notas, ingresos y gastos, cuentas de ahorro, repeticiones, el chat del asistente y las prioridades (la app te avisa antes de lo que no se podrá recuperar, como las notas o los ingresos y gastos). Al desinstalar la app, Android borra todos sus datos.",
                 "• En tu cuenta de Google, tus eventos y tareas siguen allí hasta que los borres, según las condiciones de Google."
             )
         ),
@@ -149,6 +162,16 @@ private val privacyPolicy = LegalDocument(
                 "• Retirar el acceso de ${LegalInfo.APP_NAME} a tu cuenta de Google en myaccount.google.com/permissions.",
                 "• Retirar el permiso de notificaciones en Ajustes > Notificaciones o en los ajustes del móvil.",
                 "Para cualquier duda o solicitud, escribe a ${LegalInfo.CONTACT_EMAIL}. Si crees que no se han respetado tus derechos, puedes reclamar ante la Agencia Española de Protección de Datos (www.aepd.es)."
+            )
+        ),
+        LegalSection(
+            "Cómo borrar tus datos",
+            listOf(
+                "${LegalInfo.APP_NAME} no crea una cuenta propia ni guarda tus datos en servidores del titular, así que no hay nada que borrar fuera de tu móvil y de tu cuenta de Google:",
+                "• Datos del móvil: cierra sesión en Ajustes > Cuenta o desinstala la app. Se borran al momento.",
+                "• Datos de Google: borra tus eventos y tareas en Google Calendar y Google Tasks, y quita el acceso de ${LegalInfo.APP_NAME} en myaccount.google.com/permissions.",
+                "• Copias que hayas hecho tú (archivos exportados o copias de seguridad): bórralas de donde las guardaste.",
+                "Si tienes cualquier duda, escribe a ${LegalInfo.CONTACT_EMAIL} y te ayudamos."
             )
         ),
         LegalSection(
@@ -202,14 +225,15 @@ private val termsOfUse = LegalDocument(
         LegalSection(
             "Tus datos y copias",
             listOf(
-                "Tus tareas y eventos se guardan en tu cuenta de Google. Las notas y los ingresos y gastos solo se guardan en tu móvil: se pierden si cierras sesión, desinstalas la app o pierdes el móvil, así que te recomendamos no guardar en ellos nada que no quieras perder. El tratamiento de tus datos se explica en la Política de privacidad."
+                "Tus tareas y eventos se guardan en tu cuenta de Google. Las notas, los ingresos y gastos, las cuentas de ahorro y las reglas de repetición solo se guardan en tu móvil: se pierden si cierras sesión, desinstalas la app o pierdes el móvil, salvo que hayas hecho una copia en Ajustes > Tus datos. Te recomendamos hacer copias de vez en cuando. El tratamiento de tus datos se explica en la Política de privacidad."
             )
         ),
         LegalSection(
             "Disponibilidad y responsabilidad",
             listOf(
                 "La app se ofrece tal cual y de forma gratuita. Se intenta que funcione bien, pero no se garantiza que esté libre de errores ni que esté siempre disponible; la sincronización depende además de los servicios de Google y de tu conexión.",
-                "La sección Ahorros es solo una libreta para apuntar tus ingresos y gastos: no está conectada a tu banco, no mueve dinero y sus cifras y totales no son asesoramiento financiero. Comprueba siempre tus saldos reales con tu entidad.",
+                "La sección Ahorros es solo una libreta para apuntar tus ingresos y gastos: no está conectada a tu banco, no mueve dinero y sus cifras y totales no son asesoramiento financiero. Las sugerencias del asistente (como repartir la nómina con la regla 50/30/20 o los avisos de presupuesto) son orientativas y generales; decide siempre según tu situación y comprueba tus saldos reales con tu entidad.",
+                "Los avisos y resúmenes dependen de que el móvil permita las notificaciones y las alarmas, de su modo de ahorro de batería y de que la app esté instalada; no los uses para nada en lo que un aviso perdido pueda causarte un perjuicio grave (por ejemplo, tomar una medicación).",
                 "En la medida en que lo permita la ley, el titular no responde de daños derivados de errores, interrupciones o pérdidas de datos. Nada de lo anterior limita los derechos que te reconoce la normativa de consumidores ni la responsabilidad que no puede excluirse legalmente."
             )
         ),
@@ -260,7 +284,7 @@ private val legalNotice = LegalDocument(
         LegalSection(
             "Objeto",
             listOf(
-                "${LegalInfo.APP_NAME} es una aplicación gratuita para organizar tareas, eventos y notas. Su uso se rige por los Términos de uso y el tratamiento de datos por la Política de privacidad."
+                "${LegalInfo.APP_NAME} es una aplicación gratuita para organizar tareas, eventos y notas, apuntar ingresos y gastos, y recibir avisos y la ayuda de un asistente. Su uso se rige por los Términos de uso y el tratamiento de datos por la Política de privacidad."
             )
         ),
         LegalSection(

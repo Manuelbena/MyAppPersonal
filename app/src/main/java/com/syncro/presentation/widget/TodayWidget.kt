@@ -2,6 +2,7 @@ package com.syncro.presentation.widget
 
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
@@ -18,6 +19,7 @@ import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetReceiver
 import androidx.glance.appwidget.action.actionStartActivity
+import androidx.glance.appwidget.appWidgetBackground
 import androidx.glance.appwidget.cornerRadius
 import androidx.glance.appwidget.lazy.LazyColumn
 import androidx.glance.appwidget.lazy.items
@@ -76,7 +78,7 @@ class TodayWidget : GlanceAppWidget() {
             .fromApplication(context.applicationContext, TodayWidgetEntryPoint::class.java)
             .getTodayAgenda()()
         provideContent {
-            GlanceTheme(colors = SyncroWidgetColors) {
+            GlanceTheme(colors = widgetColors()) {
                 TodayWidgetContent(agenda)
             }
         }
@@ -87,8 +89,14 @@ class TodayWidgetReceiver : GlanceAppWidgetReceiver() {
     override val glanceAppWidget: GlanceAppWidget = TodayWidget()
 }
 
-/** Los colores de la app, en claro u oscuro según el sistema. */
-private val SyncroWidgetColors = ColorProviders(light = LightColorScheme, dark = DarkColorScheme)
+/**
+ * Los colores del sistema (Material You, los del fondo de pantalla) para que el widget se vea como
+ * los demás del escritorio. Antes de Android 12 no hay colores del sistema: se usan los de la app.
+ */
+@Composable
+private fun widgetColors() =
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) GlanceTheme.colors
+    else ColorProviders(light = LightColorScheme, dark = DarkColorScheme)
 
 private const val MAX_ITEMS = 8
 private val DAY_FORMAT = DateTimeFormatter.ofPattern("EEEE d 'de' MMMM", Locale.forLanguageTag("es-ES"))
@@ -99,8 +107,10 @@ fun TodayWidgetContent(agenda: TodayAgenda) {
     Column(
         modifier = GlanceModifier
             .fillMaxSize()
+            // Fondo y esquinas del propio lanzador, como el resto de widgets
+            .appWidgetBackground()
             .background(GlanceTheme.colors.widgetBackground)
-            .cornerRadius(24.dp)
+            .widgetCorners()
             .padding(16.dp)
             .clickable(openApp)
     ) {
@@ -144,6 +154,11 @@ fun TodayWidgetContent(agenda: TodayAgenda) {
         }
     }
 }
+
+/** Desde Android 12, el radio de esquina que usa el lanzador para todos los widgets. */
+private fun GlanceModifier.widgetCorners(): GlanceModifier =
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) cornerRadius(android.R.dimen.system_app_widget_background_radius)
+    else cornerRadius(24.dp)
 
 /** "+": abre la app directamente en la hoja de nueva tarea. */
 @Composable

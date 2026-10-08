@@ -61,6 +61,62 @@ fun HomeScreen(
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    
+    HomeScreenContent(
+        uiState = uiState,
+        effectFlow = viewModel.effect,
+        onOpenSettings = onOpenSettings,
+        openQuickTask = openQuickTask,
+        onQuickTaskOpened = onQuickTaskOpened,
+        onNavigateToNotes = onNavigateToNotes,
+        onNavigateToSavings = onNavigateToSavings,
+        onRefreshToday = viewModel::refreshToday,
+        onSyncFromGoogle = { viewModel.syncFromGoogle() },
+        onUndo = viewModel::undo,
+        onUndoExpired = viewModel::undoExpired,
+        onGoToToday = viewModel::goToToday,
+        onDaySelected = viewModel::onDaySelected,
+        onHideDailyQuote = viewModel::hideDailyQuote,
+        onToggleTaskCompletion = viewModel::toggleTaskCompletion,
+        onToggleSubtaskCompletion = viewModel::toggleSubtaskCompletion,
+        onToggleEventCompletion = viewModel::toggleEventCompletion,
+        onSaveNote = viewModel::saveNote,
+        onDeleteNote = viewModel::deleteNote,
+        onSaveQuickTask = viewModel::saveQuickTask,
+        onDeleteEvent = viewModel::deleteEvent,
+        onDeleteEventAndFollowing = viewModel::deleteEventAndFollowing,
+        onDeleteTask = viewModel::deleteTask,
+        onDeleteTaskAndFollowing = viewModel::deleteTaskAndFollowing
+    )
+}
+
+@Composable
+fun HomeScreenContent(
+    uiState: HomeUiState,
+    effectFlow: kotlinx.coroutines.flow.Flow<HomeEffect>,
+    onOpenSettings: () -> Unit,
+    openQuickTask: Boolean = false,
+    onQuickTaskOpened: () -> Unit = {},
+    onNavigateToNotes: () -> Unit = {},
+    onNavigateToSavings: () -> Unit = {},
+    onRefreshToday: () -> Unit,
+    onSyncFromGoogle: () -> Unit,
+    onUndo: (HomeUndo) -> Unit,
+    onUndoExpired: (HomeUndo) -> Unit,
+    onGoToToday: () -> Unit,
+    onDaySelected: (LocalDate) -> Unit,
+    onHideDailyQuote: () -> Unit,
+    onToggleTaskCompletion: (String) -> Unit,
+    onToggleSubtaskCompletion: (String, String) -> Unit,
+    onToggleEventCompletion: (String) -> Unit,
+    onSaveNote: (String?, String, String, Color) -> Unit,
+    onDeleteNote: (SyncroItem.Note) -> Unit,
+    onSaveQuickTask: (String, String, LocalDate) -> Unit,
+    onDeleteEvent: (String) -> Unit,
+    onDeleteEventAndFollowing: (String) -> Unit,
+    onDeleteTask: (String) -> Unit,
+    onDeleteTaskAndFollowing: (String) -> Unit
+) {
     // La última frase mostrada: así la tarjeta no se queda vacía mientras se recoge al cerrarla
     var shownQuote by remember { mutableStateOf(uiState.quote) }
     uiState.quote?.let { shownQuote = it }
@@ -70,9 +126,9 @@ fun HomeScreen(
     // Hora actual al minuto: mueve la línea "Ahora" y el progreso de los eventos en curso
     val now = rememberCurrentMinute()
     // Si la app sigue abierta al pasar la medianoche (o vuelve a primer plano otro día), "hoy" avanza
-    LaunchedEffect(now.toLocalDate()) { viewModel.refreshToday() }
+    LaunchedEffect(now.toLocalDate()) { onRefreshToday() }
     LifecycleResumeEffect(Unit) {
-        viewModel.refreshToday()
+        onRefreshToday()
         onPauseOrDispose { }
     }
     val context = LocalContext.current
@@ -102,12 +158,12 @@ fun HomeScreen(
     ) { result ->
         if (result.resultCode == Activity.RESULT_OK) {
             // Reintentar sincronización si el usuario autorizó
-            viewModel.syncFromGoogle()
+            onSyncFromGoogle()
         }
     }
 
-    LaunchedEffect(viewModel.effect) {
-        viewModel.effect.collect { effect ->
+    LaunchedEffect(effectFlow) {
+        effectFlow.collect { effect ->
             when (effect) {
                 is HomeEffect.LaunchAuthRecovery -> {
                     authLauncher.launch(effect.intent)
@@ -129,11 +185,11 @@ fun HomeScreen(
                         )
                         if (result == SnackbarResult.ActionPerformed) {
                             undone = true
-                            viewModel.undo(effect.undo)
+                            onUndo(effect.undo)
                         }
                     } finally {
                         // También si se sale de Inicio con el aviso en pantalla: el borrado se sube
-                        if (!undone) viewModel.undoExpired(effect.undo)
+                        if (!undone) onUndoExpired(effect.undo)
                     }
                 }
             }
@@ -164,7 +220,7 @@ fun HomeScreen(
                 currentDate = formattedDate,
                 userPhotoUrl = uiState.userPhotoUrl,
                 onOpenSettings = onOpenSettings,
-                onTodayClick = viewModel::goToToday,
+                onTodayClick = onGoToToday,
                 // Mirando hoy, el botón no haría nada: solo sale al ver otro día
                 showTodayButton = uiState.selectedDate != today
             )
@@ -174,21 +230,21 @@ fun HomeScreen(
                 enter = expandVertically() + fadeIn(),
                 exit = shrinkVertically() + fadeOut()
             ) {
-                shownSyncNotice?.let { SyncNoticeBar(notice = it, onRetry = { viewModel.syncFromGoogle() }) }
+                shownSyncNotice?.let { SyncNoticeBar(notice = it, onRetry = onSyncFromGoogle) }
             }
         }
         val weekStrip: @Composable () -> Unit = {
             WeekCalendarStrip(
                 today = uiState.today,
                 selectedDate = uiState.selectedDate,
-                onDateSelected = { viewModel.onDaySelected(it) },
+                onDateSelected = onDaySelected,
                 dayMarks = uiState.dayMarks
             )
         }
         // Deslizar el contenido a los lados cambia de día
         val daySwipe = Modifier.swipeBetweenDays(
-            onPreviousDay = { viewModel.onDaySelected(uiState.selectedDate.minusDays(1)) },
-            onNextDay = { viewModel.onDaySelected(uiState.selectedDate.plusDays(1)) }
+            onPreviousDay = { onDaySelected(uiState.selectedDate.minusDays(1)) },
+            onNextDay = { onDaySelected(uiState.selectedDate.plusDays(1)) }
         )
         val summaryCards: @Composable () -> Unit = {
             // Lo próximo de hoy (evento en curso, el siguiente y las tareas); solo mirando hoy
@@ -208,7 +264,7 @@ fun HomeScreen(
                 enter = expandVertically() + fadeIn(),
                 exit = shrinkVertically() + fadeOut()
             ) {
-                shownQuote?.let { DailyQuoteCard(quote = it.text, author = it.author, onClose = viewModel::hideDailyQuote) }
+                shownQuote?.let { DailyQuoteCard(quote = it.text, author = it.author, onClose = onHideDailyQuote) }
             }
 
             // Ahorros del mes, si se activó en Ajustes > Asistente (es del mes: solo mirando hoy)
@@ -221,7 +277,7 @@ fun HomeScreen(
                 FocusCard(
                     tasks = uiState.focusTasks,
                     isToday = uiState.selectedDate == uiState.today,
-                    onToggle = { viewModel.toggleTaskCompletion(it.id) },
+                    onToggle = { onToggleTaskCompletion(it.id) },
                     onClick = { selectedTaskIdForDetail = it.id }
                 )
             }
@@ -252,7 +308,7 @@ fun HomeScreen(
             if (dayTasks.isNotEmpty()) {
                 TasksCard(
                     tasks = dayTasks,
-                    onToggle = { viewModel.toggleTaskCompletion(it.id) },
+                    onToggle = { onToggleTaskCompletion(it.id) },
                     onClick = { selectedTaskIdForDetail = it.id }
                 )
             }
@@ -266,10 +322,10 @@ fun HomeScreen(
                     EventCard(
                         event = event,
                         onSubtaskToggle = { subtaskTitle ->
-                            viewModel.toggleSubtaskCompletion(event.id, subtaskTitle)
+                            onToggleSubtaskCompletion(event.id, subtaskTitle)
                         },
                         onToggleEvent = {
-                            viewModel.toggleEventCompletion(event.id)
+                            onToggleEventCompletion(event.id)
                         },
                         onClick = { selectedEventIdForDetail = event.id },
                         now = now
@@ -301,7 +357,7 @@ fun HomeScreen(
                 header()
                 PullToRefreshBox(
                     isRefreshing = uiState.isLoading,
-                    onRefresh = { viewModel.syncFromGoogle() },
+                    onRefresh = onSyncFromGoogle,
                     modifier = Modifier.fillMaxSize()
                 ) {
                     Row(modifier = Modifier.fillMaxSize()) {
@@ -373,7 +429,7 @@ fun HomeScreen(
                     // CONTENEDOR CON DEGRADADOS (Arriba y Abajo)
                     PullToRefreshBox(
                         isRefreshing = uiState.isLoading,
-                        onRefresh = { viewModel.syncFromGoogle() },
+                        onRefresh = onSyncFromGoogle,
                         modifier = Modifier.fillMaxSize()
                     ) {
                         Box(modifier = Modifier.fillMaxSize()) {
@@ -428,7 +484,7 @@ fun HomeScreen(
                 noteToEdit = null
             },
             onSave = { id, title, content, color ->
-                viewModel.saveNote(id, title, content, color)
+                onSaveNote(id, title, content, color)
                 showAddNoteSheet = false
                 noteToEdit = null
             }
@@ -448,7 +504,7 @@ fun HomeScreen(
                 },
                 onDelete = {
                     selectedNoteIdForDetail = null
-                    viewModel.deleteNote(note)
+                    onDeleteNote(note)
                 }
             )
         }
@@ -469,7 +525,7 @@ fun HomeScreen(
         QuickTaskSheet(
             onDismiss = { showQuickTaskSheet = false },
             onSave = { title, description, date ->
-                viewModel.saveQuickTask(title, description, date)
+                onSaveQuickTask(title, description, date)
                 showQuickTaskSheet = false
             },
             // Se crea en el día que se está mirando (hoy, si se mira un día pasado)
@@ -484,8 +540,8 @@ fun HomeScreen(
             EventDetailSheet(
                 event = event,
                 onDismiss = { selectedEventIdForDetail = null },
-                onToggleCompleted = { viewModel.toggleEventCompletion(event.id) },
-                onSubtaskToggle = { viewModel.toggleSubtaskCompletion(event.id, it) },
+                onToggleCompleted = { onToggleEventCompletion(event.id) },
+                onSubtaskToggle = { onToggleSubtaskCompletion(event.id, it) },
                 onEdit = {
                     selectedEventIdForDetail = null
                     selectedEventForEdit = event
@@ -493,11 +549,11 @@ fun HomeScreen(
                 onShare = { context.shareEvent(event) },
                 onDelete = {
                     selectedEventIdForDetail = null
-                    viewModel.deleteEvent(event.id)
+                    onDeleteEvent(event.id)
                 },
                 onDeleteFollowing = {
                     selectedEventIdForDetail = null
-                    viewModel.deleteEventAndFollowing(event.id)
+                    onDeleteEventAndFollowing(event.id)
                 }
             )
         }
@@ -508,15 +564,62 @@ fun HomeScreen(
             TaskDetailSheet(
                 task = task,
                 onDismiss = { selectedTaskIdForDetail = null },
-                onToggleCompleted = { viewModel.toggleTaskCompletion(task.id) },
+                onToggleCompleted = { onToggleTaskCompletion(task.id) },
                 onDelete = {
                     selectedTaskIdForDetail = null
-                    viewModel.deleteTask(task.id)
+                    onDeleteTask(task.id)
                 },
                 onDeleteFollowing = {
                     selectedTaskIdForDetail = null
-                    viewModel.deleteTaskAndFollowing(task.id)
+                    onDeleteTaskAndFollowing(task.id)
                 }
             )
         }
+}
+
+@androidx.compose.ui.tooling.preview.Preview
+@Composable
+fun HomeScreenPreview() {
+    com.syncro.presentation.theme.SyncroTheme {
+        HomeScreenContent(
+            uiState = HomeUiState(
+                userName = "Usuario",
+                today = LocalDate.now(),
+                selectedDate = LocalDate.now(),
+                timelineItems = listOf(
+                    com.syncro.domain.model.SyncroItem.Task(
+                        id = "1",
+                        title = "Tarea de prueba",
+                        description = "Esta es una tarea",
+                        date = LocalDate.now(),
+                        time = java.time.LocalTime.MIDNIGHT,
+                        isCompleted = false
+                    )
+                )
+            ),
+            effectFlow = kotlinx.coroutines.flow.emptyFlow(),
+            onOpenSettings = {},
+            openQuickTask = false,
+            onQuickTaskOpened = {},
+            onNavigateToNotes = {},
+            onNavigateToSavings = {},
+            onRefreshToday = {},
+            onSyncFromGoogle = {},
+            onUndo = {},
+            onUndoExpired = {},
+            onGoToToday = {},
+            onDaySelected = {},
+            onHideDailyQuote = {},
+            onToggleTaskCompletion = {},
+            onToggleSubtaskCompletion = { _, _ -> },
+            onToggleEventCompletion = {},
+            onSaveNote = { _, _, _, _ -> },
+            onDeleteNote = {},
+            onSaveQuickTask = { _, _, _ -> },
+            onDeleteEvent = {},
+            onDeleteEventAndFollowing = {},
+            onDeleteTask = {},
+            onDeleteTaskAndFollowing = {}
+        )
+    }
 }

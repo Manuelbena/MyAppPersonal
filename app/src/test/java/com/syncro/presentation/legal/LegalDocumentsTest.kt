@@ -64,6 +64,11 @@ class LegalDocumentsTest {
     }
 
     @Test
+    fun `los datos del titular estan rellenos`() {
+        assertTrue("Quedan datos del titular por rellenar en LegalInfo", LegalInfo.isComplete)
+    }
+
+    @Test
     fun `toda licencia citada va incluida en la app`() {
         openSourceComponents.map { it.licenseFile }.distinct().forEach { path ->
             val file = File("src/main/assets/$path")
