@@ -12,7 +12,7 @@ android {
     compileSdk = 37
 
     defaultConfig {
-        applicationId = "com.syncro"
+        applicationId = "com.manuelgalindo.syncro"
         minSdk = 26
         targetSdk = 37
         versionCode = 1
