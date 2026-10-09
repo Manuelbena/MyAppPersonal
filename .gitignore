@@ -19,3 +19,6 @@ local.properties
 keystore.properties
 *.jks
 *.keystore
+
+# Salida de "Generate Signed Bundle" (el .aab firmado que se sube a Play)
+/app/release/
