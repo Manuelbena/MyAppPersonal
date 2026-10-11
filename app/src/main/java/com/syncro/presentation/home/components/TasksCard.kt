@@ -81,31 +81,32 @@ fun TasksCard(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clickable { onClick(task) }
-                        .padding(start = 12.dp, end = 20.dp, top = 2.dp, bottom = 2.dp),
+                        .padding(start = 12.dp, end = 20.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     IconButton(onClick = { onToggle(task) }) {
                         Icon(
                             if (task.isCompleted) Icons.Rounded.CheckCircle else Icons.Rounded.RadioButtonUnchecked,
                             contentDescription = if (task.isCompleted) "Marcar como pendiente" else "Marcar como hecha",
-                            tint = if (task.isCompleted) accent else MaterialTheme.colorScheme.outline
+                            tint = if (task.isCompleted) accent else MaterialTheme.colorScheme.outline,
+                            modifier = Modifier.size(22.dp)
                         )
                     }
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             task.title,
-                            style = MaterialTheme.typography.bodyLarge,
-                            fontWeight = FontWeight.SemiBold,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium,
                             color = if (task.isCompleted) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
                             textDecoration = if (task.isCompleted) TextDecoration.LineThrough else null,
-                            maxLines = 2,
+                            maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
                         if (!task.description.isNullOrBlank()) {
                             Text(
                                 task.description,
                                 style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )

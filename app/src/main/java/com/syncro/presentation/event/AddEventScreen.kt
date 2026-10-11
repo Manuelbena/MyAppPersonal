@@ -33,6 +33,7 @@ import com.syncro.presentation.components.GradientSheetInsets
 import com.syncro.domain.model.Priority
 import com.syncro.domain.model.Recurrence
 import com.syncro.domain.model.RepeatScope
+import com.syncro.domain.model.suggestEventCategory
 import com.syncro.domain.model.SyncroItem
 import com.syncro.domain.model.isValidEventRange
 import com.syncro.presentation.components.DetailCard
@@ -115,6 +116,9 @@ private val EVENT_CATEGORIES = listOf(
     "Otro" to Slate500
 ).map { (name, color) -> CategoryItem(name, categoryIcon(name), color) }
 
+/** La de un evento nuevo cuyo título no sugiere ninguna. */
+private const val DEFAULT_CATEGORY = "Personal"
+
 /** De menor a mayor, como se lee de izquierda a derecha. */
 private val PRIORITIES_IN_ORDER = listOf(Priority.LOW, Priority.MEDIUM, Priority.HIGH)
 
@@ -131,7 +135,27 @@ fun AddEventContent(
     var title by remember { mutableStateOf(eventToEdit?.title ?: "") }
     var description by remember { mutableStateOf(eventToEdit?.description ?: "") }
     var location by remember { mutableStateOf(eventToEdit?.location ?: "") }
-    var selectedCategory by remember { mutableStateOf(eventToEdit?.categoryText ?: "Personal") }
+    var selectedCategory by remember { mutableStateOf(eventToEdit?.categoryText ?: DEFAULT_CATEGORY) }
+    // En uno nuevo la categoría sigue al título ("Dentista" → Salud) hasta que se elige a mano;
+    // al editar se respeta la que tiene
+    var categoryChosenByHand by remember { mutableStateOf(eventToEdit != null) }
+    var categoryFromTitle by remember { mutableStateOf(false) }
+    fun onTitleChange(newTitle: String) {
+        title = newTitle
+        if (categoryChosenByHand) return
+        val suggested = suggestEventCategory(newTitle)
+        when {
+            suggested != null -> {
+                selectedCategory = suggested
+                categoryFromTitle = true
+            }
+            // Se borró la palabra que la eligió: vuelve a la de siempre
+            categoryFromTitle -> {
+                selectedCategory = DEFAULT_CATEGORY
+                categoryFromTitle = false
+            }
+        }
+    }
     var selectedPriority by remember { mutableStateOf(eventToEdit?.priority ?: Priority.MEDIUM) }
     var isAllDay by remember { mutableStateOf(eventToEdit?.isAllDay == true) }
 
@@ -256,7 +280,7 @@ fun AddEventContent(
 
             TextField(
                 value = title,
-                onValueChange = { title = it },
+                onValueChange = { onTitleChange(it) },
                 placeholder = {
                     Text(
                         "Añade un título",
@@ -337,7 +361,19 @@ fun AddEventContent(
             // Categoría
             Column {
                 SectionTitle(Icons.Rounded.LocalOffer, "Categoría")
-                CategoryChips(categories, selectedCategory, onSelect = { selectedCategory = it })
+                CategoryChips(categories, selectedCategory, onSelect = {
+                    selectedCategory = it
+                    categoryChosenByHand = true
+                    categoryFromTitle = false
+                })
+                if (categoryFromTitle) {
+                    Text(
+                        "✨ Elegida por el título",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+                }
             }
 
             // Prioridad

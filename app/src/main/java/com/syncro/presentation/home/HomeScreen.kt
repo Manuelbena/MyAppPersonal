@@ -1,6 +1,5 @@
 package com.syncro.presentation.home
 
-import com.syncro.presentation.theme.NotebookFontFamily
 import androidx.compose.ui.platform.LocalContext
 import com.syncro.presentation.components.rememberCurrentMinute
 import com.syncro.presentation.components.shareEvent
@@ -32,7 +31,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -43,6 +41,10 @@ import com.syncro.presentation.event.EventDetailSheet
 import com.syncro.presentation.notes.NoteDetailSheet
 import com.syncro.presentation.task.TaskDetailSheet
 import com.syncro.presentation.home.components.*
+import com.syncro.domain.model.ExpenseDraft
+import com.syncro.domain.model.MovementCategory
+import com.syncro.domain.model.MovementType
+import com.syncro.presentation.savings.MovementSheet
 import com.syncro.domain.model.SyncroItem
 import com.syncro.domain.model.nextUp
 import kotlinx.coroutines.launch
@@ -86,7 +88,8 @@ fun HomeScreen(
         onDeleteEvent = viewModel::deleteEvent,
         onDeleteEventAndFollowing = viewModel::deleteEventAndFollowing,
         onDeleteTask = viewModel::deleteTask,
-        onDeleteTaskAndFollowing = viewModel::deleteTaskAndFollowing
+        onDeleteTaskAndFollowing = viewModel::deleteTaskAndFollowing,
+        onSaveEventExpense = viewModel::saveEventExpense
     )
 }
 
@@ -115,7 +118,8 @@ fun HomeScreenContent(
     onDeleteEvent: (String) -> Unit,
     onDeleteEventAndFollowing: (String) -> Unit,
     onDeleteTask: (String) -> Unit,
-    onDeleteTaskAndFollowing: (String) -> Unit
+    onDeleteTaskAndFollowing: (String) -> Unit,
+    onSaveEventExpense: (amountCents: Long, category: MovementCategory, date: LocalDate, note: String, repeatsMonthly: Boolean) -> Unit = { _, _, _, _, _ -> }
 ) {
     // La última frase mostrada: así la tarjeta no se queda vacía mientras se recoge al cerrarla
     var shownQuote by remember { mutableStateOf(uiState.quote) }
@@ -152,6 +156,8 @@ fun HomeScreenContent(
     var selectedEventIdForDetail by remember { mutableStateOf<String?>(null) }
     var selectedNoteIdForDetail by remember { mutableStateOf<String?>(null) }
     var noteToEdit by remember { mutableStateOf<SyncroItem.Note?>(null) }
+    // El gasto que se está apuntando tras completar un evento (compra, cena, médico…)
+    var expenseDraft by remember { mutableStateOf<ExpenseDraft?>(null) }
 
     val authLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
@@ -191,6 +197,15 @@ fun HomeScreenContent(
                         // También si se sale de Inicio con el aviso en pantalla: el borrado se sube
                         if (!undone) onUndoExpired(effect.undo)
                     }
+                }
+                // Aparte, como el de "Deshacer": se queda unos segundos sin frenar los demás avisos
+                is HomeEffect.OfferExpense -> launch {
+                    val result = snackbarHostState.showSnackbar(
+                        message = "¿Gastaste algo en «${effect.draft.note}»?",
+                        actionLabel = "Apuntar",
+                        duration = SnackbarDuration.Long
+                    )
+                    if (result == SnackbarResult.ActionPerformed) expenseDraft = effect.draft
                 }
             }
         }
@@ -285,11 +300,7 @@ fun HomeScreenContent(
         val dayHeading: @Composable () -> Unit = {
             Text(
                 text = dayTitle,
-                style = MaterialTheme.typography.titleLarge.copy(
-                    fontFamily = NotebookFontFamily,
-                    fontStyle = FontStyle.Italic,
-                    fontWeight = FontWeight.Medium
-                ),
+                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
                 color = MaterialTheme.colorScheme.onBackground,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp)
             )
@@ -557,6 +568,20 @@ fun HomeScreenContent(
                 }
             )
         }
+
+    expenseDraft?.let { draft ->
+        MovementSheet(
+            type = MovementType.EXPENSE,
+            today = uiState.today,
+            presetCategory = draft.category,
+            presetNote = draft.note,
+            onDismiss = { expenseDraft = null },
+            onSave = { amountCents, category, date, note, repeatsMonthly ->
+                expenseDraft = null
+                onSaveEventExpense(amountCents, category, date, note, repeatsMonthly)
+            }
+        )
+    }
 
     selectedTaskIdForDetail
         ?.let { id -> uiState.timelineItems.firstOrNull { it is SyncroItem.Task && it.id == id } as SyncroItem.Task? }

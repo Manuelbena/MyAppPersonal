@@ -353,6 +353,26 @@ class GoogleSyncRepositoryImplTest {
         assertEquals(15, eventDao.getEventById("e1")!!.reminderMinutes)
     }
 
+    // Regresión: cada descarga reescribía la prioridad como "MEDIUM" y se perdía la elegida
+    @Test
+    fun `un evento descargado de Google conserva su prioridad, que solo existe en la app`() = runTest {
+        eventDao.insertEvent(aSyncedEventEntity(id = "e1", remoteId = "g-1").copy(priority = "HIGH"))
+        google.addEvent(timedEvent("g-1", "Cambiado en Google", DAY, at("19:00"), at("20:00")))
+
+        repository.syncCalendar(DAY)
+
+        assertEquals("HIGH", eventDao.getEventById("e1")!!.priority)
+    }
+
+    @Test
+    fun `un evento nuevo de Google llega sin prioridad`() = runTest {
+        google.addEvent(timedEvent("g-1", "Cita", DAY, at("19:00"), at("20:00")))
+
+        repository.syncCalendar(DAY)
+
+        assertEquals(null, eventDao.getEventByRemoteId("g-1")!!.priority)
+    }
+
     @Test
     fun `un evento con aviso de la app se sube sin los avisos de Google, para no recibir dos`() = runTest {
         eventDao.insertEvent(aSyncedEventEntity(id = "e1", remoteId = null, pendingChanges = 1).copy(reminderMinutes = 15))

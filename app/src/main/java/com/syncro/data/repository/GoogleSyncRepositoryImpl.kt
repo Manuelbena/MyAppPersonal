@@ -15,6 +15,7 @@ import com.syncro.data.local.entity.TaskEntity
 import com.syncro.data.remote.GoogleRemoteDataSource
 import com.syncro.data.sync.SyncScheduler
 import com.syncro.domain.model.isValidEventRange
+import com.syncro.domain.model.suggestEventCategory
 import com.syncro.domain.repository.GoogleSyncRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -167,7 +168,8 @@ class GoogleSyncRepositoryImpl @Inject constructor(
             endTime = formatTime(googleEvent.end.dateTime),
             categoryText = categoryName,
             categoryColor = categoryColor,
-            priority = "MEDIUM",
+            // La prioridad es de la app (Google no la tiene): se conserva la local; uno nuevo llega sin ella
+            priority = existing?.priority,
             isAllDay = isAllDay,
             location = googleEvent.location,
             isCompleted = isCompletedTitle(title),
@@ -382,24 +384,16 @@ class GoogleSyncRepositoryImpl @Inject constructor(
             title.startsWith("Cancelado", ignoreCase = true) ||
             title.startsWith("Done", ignoreCase = true)
 
-    /** Categoría y color de la app a partir del título o del colorId de Google Calendar. */
+    /**
+     * Categoría y color de la app: primero por el colorId de Google Calendar (el que pone Syncro al
+     * subir) y, si no dice nada, por el título con las mismas palabras que el formulario
+     * ([suggestEventCategory]). "Otro" solo llega por color: no se adivina por el título.
+     */
     private fun resolveCategory(title: String, colorId: String?): Pair<String, Int> {
-        fun matches(category: String, vararg keywords: String) =
-            colorId == CATEGORY_TO_GOOGLE_COLOR[category] ||
-                keywords.any { title.contains(it, ignoreCase = true) }
-
-        return when {
-            matches("Trabajo", "Trabajo") -> "Trabajo" to 0xFF6366F1.toInt() // Indigo500
-            matches("Salud", "Salud") -> "Salud" to 0xFFFF5252.toInt()
-            matches("Ocio", "Ocio") -> "Ocio" to 0xFFF59E0B.toInt() // Amber500
-            matches("Personal", "Personal", "Cita", "Médico") -> "Personal" to 0xFF10B981.toInt() // Emerald500
-            matches("Deporte", "Deporte", "Gimnasio") -> "Deporte" to 0xFFEC4899.toInt() // Pink500
-            matches("Compras", "Compras") -> "Compras" to 0xFF8B5CF6.toInt() // Violet500
-            matches("Recados", "Recados") -> "Recados" to 0xFF0EA5E9.toInt() // Sky500
-            // "Otro" solo por color: la palabra es demasiado común para buscarla en el título
-            colorId == CATEGORY_TO_GOOGLE_COLOR["Otro"] -> "Otro" to 0xFF64748B.toInt() // Slate500
-            else -> CATEGORY_GENERAL to (GOOGLE_COLORS[colorId] ?: GOOGLE_DEFAULT_COLOR)
-        }
+        val category = CATEGORY_TO_GOOGLE_COLOR.entries.firstOrNull { it.value == colorId }?.key
+            ?: suggestEventCategory(title)
+        return category?.let { it to CATEGORY_COLORS.getValue(it) }
+            ?: (CATEGORY_GENERAL to (GOOGLE_COLORS[colorId] ?: GOOGLE_DEFAULT_COLOR))
     }
 
     /**
@@ -498,6 +492,18 @@ class GoogleSyncRepositoryImpl @Inject constructor(
             "Compras" to "3",   // Uva
             "Recados" to "7",   // Pavo real
             "Otro" to "8"       // Grafito
+        )
+
+        /** Color local de cada categoría (el mismo que en el formulario de evento). */
+        val CATEGORY_COLORS = mapOf(
+            "Trabajo" to 0xFF6366F1.toInt(),  // Indigo500
+            "Personal" to 0xFF10B981.toInt(), // Emerald500
+            "Salud" to 0xFFFF5252.toInt(),
+            "Ocio" to 0xFFF59E0B.toInt(),     // Amber500
+            "Deporte" to 0xFFEC4899.toInt(),  // Pink500
+            "Compras" to 0xFF8B5CF6.toInt(),  // Violet500
+            "Recados" to 0xFF0EA5E9.toInt(),  // Sky500
+            "Otro" to 0xFF64748B.toInt()      // Slate500
         )
 
         val GOOGLE_COLORS = mapOf(

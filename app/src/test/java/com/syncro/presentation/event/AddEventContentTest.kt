@@ -80,6 +80,37 @@ class AddEventContentTest {
     }
 
     @Test
+    fun `en un evento nuevo la categoria se elige sola por el titulo`() {
+        showForm()
+
+        compose.onNodeWithText("Añade un título").performTextInput("Dentista")
+        compose.onNodeWithText("✨ Elegida por el título").assertExists()
+        compose.onNodeWithText("Guardar").performClick()
+
+        assertEquals("Salud", saved?.category)
+    }
+
+    @Test
+    fun `la categoria elegida a mano no la cambia el titulo`() {
+        showForm()
+
+        compose.onNodeWithText("Compras").performScrollTo().performClick()
+        compose.onNodeWithText("Añade un título").performTextInput("Dentista")
+        compose.onNodeWithText("Guardar").performScrollTo().performClick()
+
+        assertEquals("Compras", saved?.category)
+    }
+
+    @Test
+    fun `al editar se respeta la categoria del evento aunque el titulo sugiera otra`() {
+        showForm(anEvent(title = "Reunión", categoryText = "Personal"))
+
+        compose.onNodeWithText("Guardar").performClick()
+
+        assertEquals("Personal", saved?.category)
+    }
+
+    @Test
     fun `al editar se muestran los datos del evento`() {
         showForm(anEvent(title = "Cena con Ana", location = "Casa de Ana"))
 

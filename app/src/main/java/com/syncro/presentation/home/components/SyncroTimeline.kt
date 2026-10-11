@@ -23,9 +23,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.syncro.domain.model.Subtask
 import com.syncro.domain.model.SyncroItem
-import com.syncro.presentation.components.Pill
 import com.syncro.presentation.components.SubtaskProgress
-import com.syncro.presentation.components.categoryIcon
 import com.syncro.presentation.components.toDisplayTime
 import com.syncro.presentation.theme.Emerald500
 import com.syncro.presentation.theme.color
@@ -52,7 +50,6 @@ import java.time.temporal.ChronoUnit
  * Tarjeta de un evento en el timeline. Muestra lo esencial (título, lugar, descripción corta,
  * categoría y progreso de subtareas); tocarla abre el detalle completo, con editar y compartir.
  */
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun EventCard(
     event: SyncroItem.Event,
@@ -84,20 +81,21 @@ fun EventCard(
         Surface(
             onClick = onClick,
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(22.dp),
+            shape = RoundedCornerShape(20.dp),
             color = MaterialTheme.colorScheme.surface,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f))
+            // Mismo acabado que TasksCard: borde y degradado vertical del color del evento
+            border = BorderStroke(1.dp, accent.copy(alpha = 0.3f))
         ) {
             Row(
                 modifier = Modifier
-                    .background(Brush.horizontalGradient(listOf(accent.copy(alpha = 0.10f), Color.Transparent)))
+                    .background(Brush.verticalGradient(listOf(accent.copy(alpha = 0.12f), Color.Transparent)))
                     .height(IntrinsicSize.Min)
                     .padding(14.dp)
             ) {
                 // Barra de color redondeada
                 Box(
                     modifier = Modifier
-                        .width(4.dp)
+                        .width(3.dp)
                         .fillMaxHeight()
                         .clip(RoundedCornerShape(50))
                         .background(accent)
@@ -108,8 +106,8 @@ fun EventCard(
                     Text(
                         text = event.title,
                         fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp,
-                        lineHeight = 21.sp,
+                        fontSize = 17.sp,
+                        lineHeight = 22.sp,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (event.isCompleted) 0.6f else 1f),
@@ -120,7 +118,7 @@ fun EventCard(
                         Text(
                             text = "En curso · quedan ${formatDuration(minutesLeft)}",
                             fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
+                            fontWeight = FontWeight.SemiBold,
                             color = accent,
                             maxLines = 1,
                             modifier = Modifier.padding(top = 2.dp)
@@ -135,13 +133,13 @@ fun EventCard(
                             Icon(
                                 Icons.Rounded.Place,
                                 contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(14.dp)
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                modifier = Modifier.size(13.dp)
                             )
                             Spacer(Modifier.width(4.dp))
                             Text(
                                 text = event.location,
-                                fontSize = 13.sp,
+                                fontSize = 12.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
@@ -152,24 +150,17 @@ fun EventCard(
                     if (!event.description.isNullOrBlank()) {
                         Text(
                             text = event.description,
-                            fontSize = 13.sp,
-                            lineHeight = 18.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 2,
+                            fontSize = 12.sp,
+                            lineHeight = 17.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f),
+                            maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.padding(top = 4.dp)
                         )
                     }
 
-                    Spacer(Modifier.height(10.dp))
-                    // FlowRow: en tarjetas estrechas (diálogo del Calendario) la prioridad baja de línea
-                    FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Pill(categoryIcon(event.categoryText), event.categoryText, event.categoryColor.toColor(), compact = true)
-                        event.priority?.let { Pill(Icons.Rounded.Flag, it.label, it.color, compact = true) }
-                    }
+                    Spacer(Modifier.height(8.dp))
+                    EventMeta(event)
 
                     if (event.subtasks.isNotEmpty()) {
                         val done = event.subtasks.count { it.isCompleted }
@@ -224,6 +215,58 @@ fun EventCard(
             }
         }
     }
+}
+
+/**
+ * Categoría y prioridad del evento en una línea discreta (punto de color + texto pequeño) en vez de
+ * píldoras, para que no compitan con el título. Las píldoras quedan para el detalle.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun EventMeta(event: SyncroItem.Event) {
+    val muted = MaterialTheme.colorScheme.onSurfaceVariant
+    // FlowRow: en tarjetas estrechas (diálogo del Calendario) la prioridad baja de línea
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+        itemVerticalAlignment = Alignment.CenterVertically
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                Modifier
+                    .size(6.dp)
+                    .clip(RoundedCornerShape(50))
+                    .background(event.categoryColor.toColor())
+            )
+            Spacer(Modifier.width(6.dp))
+            MetaText(event.categoryText, muted)
+        }
+        event.priority?.let { priority ->
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.Rounded.Flag,
+                    contentDescription = null,
+                    tint = priority.color,
+                    modifier = Modifier.size(11.dp)
+                )
+                Spacer(Modifier.width(4.dp))
+                MetaText(priority.label, muted)
+            }
+        }
+    }
+}
+
+@Composable
+private fun MetaText(text: String, color: Color) {
+    Text(
+        text = text,
+        fontSize = 11.sp,
+        fontWeight = FontWeight.Medium,
+        color = color,
+        maxLines = 1,
+        softWrap = false,
+        overflow = TextOverflow.Ellipsis
+    )
 }
 
 @Composable

@@ -7,6 +7,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.api.client.googleapis.extensions.android.gms.auth.UserRecoverableAuthIOException
 import androidx.compose.ui.graphics.Color
+import com.syncro.domain.model.ExpenseDraft
+import com.syncro.domain.model.MovementCategory
+import com.syncro.domain.model.expenseDraft
 import com.syncro.domain.model.Priority
 import com.syncro.domain.model.Recurrence
 import com.syncro.domain.model.RepeatScope
@@ -14,6 +17,7 @@ import com.syncro.domain.model.Quote
 import com.syncro.domain.model.SyncroItem
 import com.syncro.domain.usecase.GetTimelineUseCase
 import com.syncro.domain.usecase.GenerateRepeatsUseCase
+import com.syncro.domain.usecase.SaveEventExpenseUseCase
 import com.syncro.domain.usecase.SaveEventUseCase
 import com.syncro.domain.usecase.SaveTaskUseCase
 import com.syncro.domain.usecase.SyncGoogleCalendarUseCase
@@ -112,6 +116,9 @@ sealed class HomeEffect {
      * [HomeViewModel.undoExpired] si no (también si se cierra la pantalla antes).
      */
     data class OfferUndo(val message: String, val undo: HomeUndo) : HomeEffect()
+
+    /** Se completó un evento en el que suele gastarse dinero: se ofrece apuntar el gasto en Ahorros. */
+    data class OfferExpense(val draft: ExpenseDraft) : HomeEffect()
 }
 
 /** Lo que se puede deshacer desde el aviso. */
@@ -151,7 +158,8 @@ class HomeViewModel @Inject constructor(
     private val undoDeleteEventUseCase: UndoDeleteEventUseCase,
     private val undoDeleteNoteUseCase: UndoDeleteNoteUseCase,
     observeHomeSavingsUseCase: ObserveHomeSavingsUseCase,
-    private val generateRepeatsUseCase: GenerateRepeatsUseCase
+    private val generateRepeatsUseCase: GenerateRepeatsUseCase,
+    private val saveEventExpenseUseCase: SaveEventExpenseUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HomeUiState(today = LocalDate.now(clock)))
@@ -417,8 +425,19 @@ class HomeViewModel @Inject constructor(
     }
 
     fun toggleEventCompletion(eventId: String) {
+        val event = _uiState.value.timelineItems.filterIsInstance<SyncroItem.Event>().firstOrNull { it.id == eventId }
         viewModelScope.launch {
             toggleEventCompletionUseCase(eventId)
+            // Al completar una compra, una cena o el médico se ofrece apuntar lo que costó
+            if (event?.isCompleted == false) event.expenseDraft()?.let { _effect.send(HomeEffect.OfferExpense(it)) }
+        }
+    }
+
+    /** El gasto apuntado desde el aviso de un evento completado (ver [HomeEffect.OfferExpense]). */
+    fun saveEventExpense(amountCents: Long, category: MovementCategory, date: LocalDate, note: String, repeatsMonthly: Boolean) {
+        viewModelScope.launch {
+            val result = saveEventExpenseUseCase(amountCents, category, date, note, repeatsMonthly)
+            _effect.send(HomeEffect.ShowSnackbar(result.fold(onSuccess = { "Gasto apuntado en Ahorros" }, onFailure = { it.message ?: "No se pudo guardar el gasto" })))
         }
     }
 

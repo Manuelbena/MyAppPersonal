@@ -36,6 +36,11 @@ import com.syncro.domain.usecase.GetLocalUserUseCase
 import com.syncro.domain.usecase.GetNotesUseCase
 import com.syncro.domain.usecase.GetTimelineUseCase
 import com.syncro.domain.usecase.PushPendingChangesUseCase
+import com.syncro.domain.usecase.SaveEventExpenseUseCase
+import com.syncro.domain.usecase.SaveMovementUseCase
+import com.syncro.domain.model.ExpenseDraft
+import com.syncro.domain.model.SavingsAccount
+import com.syncro.domain.model.ArgbColor
 import com.syncro.domain.usecase.SaveEventUseCase
 import com.syncro.domain.usecase.SaveNoteUseCase
 import com.syncro.domain.usecase.SaveTaskUseCase
@@ -154,7 +159,8 @@ class HomeViewModelTest {
         undoDeleteEventUseCase = UndoDeleteEventUseCase(events, google),
         undoDeleteNoteUseCase = UndoDeleteNoteUseCase(notes),
         observeHomeSavingsUseCase = ObserveHomeSavingsUseCase(settings, GetMonthMovementsUseCase(movements, settings), GetBudgetsUseCase(budgets), ObserveSavingsAccountsUseCase(accounts)),
-        generateRepeatsUseCase = GenerateRepeatsUseCase(series, tasks, events, google, clock)
+        generateRepeatsUseCase = GenerateRepeatsUseCase(series, tasks, events, google, clock),
+        saveEventExpenseUseCase = SaveEventExpenseUseCase(SaveMovementUseCase(movements), accounts)
     )
 
     /** Recoge los efectos de un solo uso (snackbars, petición de permisos) que emite el ViewModel. */
@@ -588,6 +594,49 @@ class HomeViewModelTest {
 
         assertEquals(123_000, savings.balanceCents)
         assertEquals(listOf(MovementCategory.GROCERIES), savings.tightBudgets.map { it.budget.category })
+    }
+
+    // endregion
+
+    // region Gasto de un evento completado
+
+    @Test
+    fun `al completar una compra se ofrece apuntar el gasto con la categoria ya elegida`() = runTest {
+        events.insertEvent(anEvent(id = "e1", title = "Mercadona", categoryText = "Compras"))
+        val viewModel = createViewModel()
+        val effects = collectEffects(viewModel)
+
+        viewModel.toggleEventCompletion("e1")
+
+        assertEquals(listOf(HomeEffect.OfferExpense(ExpenseDraft(MovementCategory.GROCERIES, "Mercadona"))), effects)
+    }
+
+    @Test
+    fun `no se ofrece gasto al descompletar ni en eventos que no suelen costar dinero`() = runTest {
+        events.insertEvent(anEvent(id = "hecho", title = "Cine", categoryText = "Ocio", isCompleted = true))
+        events.insertEvent(anEvent(id = "trabajo", title = "Reunión", categoryText = "Trabajo"))
+        val viewModel = createViewModel()
+        val effects = collectEffects(viewModel)
+
+        viewModel.toggleEventCompletion("hecho")
+        viewModel.toggleEventCompletion("trabajo")
+
+        assertEquals(emptyList<HomeEffect>(), effects)
+    }
+
+    @Test
+    fun `el gasto apuntado desde Inicio va a la cuenta que se ve en Ahorros`() = runTest {
+        accounts.activeId.value = "viajes"
+        accounts.accounts.value = accounts.accounts.value + SavingsAccount("viajes", "Viajes", ArgbColor(0xFF0EA5E9))
+        val viewModel = createViewModel()
+        val effects = collectEffects(viewModel)
+
+        viewModel.saveEventExpense(2_350, MovementCategory.RESTAURANTS, DAY, "Cena con Ana", repeatsMonthly = false)
+
+        val saved = movements.movements.value.values.single()
+        assertEquals("viajes", saved.accountId)
+        assertEquals(MovementType.EXPENSE, saved.type)
+        assertEquals(listOf(HomeEffect.ShowSnackbar("Gasto apuntado en Ahorros")), effects)
     }
 
     // endregion

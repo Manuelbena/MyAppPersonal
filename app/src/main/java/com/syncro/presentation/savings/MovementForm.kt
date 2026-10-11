@@ -59,6 +59,8 @@ fun MovementSheet(
     initial: Movement? = null,
     // Para uno nuevo, la categoría ya elegida (p. ej. "Nómina" desde el asistente)
     presetCategory: MovementCategory? = null,
+    // Para uno nuevo, la nota ya escrita (p. ej. el título del evento del que sale el gasto)
+    presetNote: String? = null,
     onDismiss: () -> Unit,
     onSave: (amountCents: Long, category: MovementCategory, date: LocalDate, note: String, repeatsMonthly: Boolean) -> Unit
 ) {
@@ -72,7 +74,7 @@ fun MovementSheet(
         containerColor = MaterialTheme.colorScheme.surface,
         shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
     ) {
-        MovementContent(type = type, today = today, initial = initial, presetCategory = presetCategory, onSave = onSave)
+        MovementContent(type = type, today = today, initial = initial, presetCategory = presetCategory, presetNote = presetNote, onSave = onSave)
     }
 }
 
@@ -87,12 +89,13 @@ fun MovementContent(
     today: LocalDate,
     initial: Movement? = null,
     presetCategory: MovementCategory? = null,
+    presetNote: String? = null,
     onSave: (amountCents: Long, category: MovementCategory, date: LocalDate, note: String, repeatsMonthly: Boolean) -> Unit
 ) {
     var amountText by remember { mutableStateOf(initial?.amountCents?.toAmountInput().orEmpty()) }
     var category by remember { mutableStateOf(initial?.category ?: presetCategory?.takeIf { it.type == type }) }
     var date by remember { mutableStateOf(initial?.date ?: today) }
-    var note by remember { mutableStateOf(initial?.note.orEmpty()) }
+    var note by remember { mutableStateOf(initial?.note ?: presetNote.orEmpty()) }
     var repeatsMonthly by remember { mutableStateOf(initial?.repeatsMonthly ?: false) }
     var showDatePicker by remember { mutableStateOf(false) }
 
