@@ -14,6 +14,7 @@ import com.syncro.domain.model.SavingsAccounts
 import com.syncro.domain.model.SavingsPeriod
 import com.syncro.domain.model.MovementCategory
 import com.syncro.domain.model.SyncroItem
+import com.syncro.domain.repository.CalendarFilterRepository
 import com.syncro.domain.repository.AccountDataRepository
 import com.syncro.domain.repository.BudgetRepository
 import com.syncro.domain.repository.ConnectivityRepository
@@ -379,5 +380,13 @@ class FakeAccountDataRepository(private val log: CallLog = CallLog()) : AccountD
 
     override suspend fun clearAccountData() {
         log.calls += "clearAccountData"
+    }
+}
+
+class FakeCalendarFilterRepository : CalendarFilterRepository {
+    override val hiddenCategories = MutableStateFlow<Set<String>>(emptySet())
+
+    override suspend fun setHiddenCategories(categories: Set<String>) {
+        hiddenCategories.value = categories
     }
 }

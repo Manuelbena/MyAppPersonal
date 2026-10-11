@@ -28,6 +28,9 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
+import com.syncro.domain.usecase.ObserveHiddenCategoriesUseCase
+import com.syncro.domain.usecase.SetCategoryHiddenUseCase
+import com.syncro.testutil.FakeCalendarFilterRepository
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -54,6 +57,7 @@ class CalendarViewModelTest {
     private val series = FakeRepeatSeriesRepository()
     private val notes = FakeNoteRepository()
     private val clock = Clock.systemDefaultZone()
+    private val filter = FakeCalendarFilterRepository()
 
     @Before
     fun setUp() {
@@ -75,7 +79,9 @@ class CalendarViewModelTest {
         deleteTaskUseCase = DeleteTaskUseCase(tasks, google, series),
         saveTaskUseCase = SaveTaskUseCase(tasks, google, series, GenerateRepeatsUseCase(series, tasks, events, google, clock)),
         saveNoteUseCase = SaveNoteUseCase(notes, clock),
-        generateRepeatsUseCase = GenerateRepeatsUseCase(series, tasks, events, google, clock)
+        generateRepeatsUseCase = GenerateRepeatsUseCase(series, tasks, events, google, clock),
+        observeHiddenCategoriesUseCase = ObserveHiddenCategoriesUseCase(filter),
+        setCategoryHiddenUseCase = SetCategoryHiddenUseCase(filter)
     )
 
     @Test
@@ -111,6 +117,37 @@ class CalendarViewModelTest {
             }
         }
         assertEquals(listOf("Festivo", "Gimnasio"), titles)
+    }
+
+    @Test
+    fun `ocultar una categoria quita sus eventos pero no las tareas, y se puede volver a mostrar`() = runTest {
+        events.insertEvent(anEvent(title = "Reunión", date = day, categoryText = "Trabajo"))
+        events.insertEvent(anEvent(title = "Cine", date = day, categoryText = "Ocio"))
+        tasks.insertTask(aTask(title = "Llamar", date = day))
+        val viewModel = createViewModel()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect() }
+
+        viewModel.setCategoryHidden("Trabajo", hidden = true)
+
+        val state = viewModel.uiState.value
+        assertEquals(2, state.events.getValue(day).size)
+        assertTrue(state.events.getValue(day).none { it is com.syncro.domain.model.SyncroItem.Event && it.title == "Reunión" })
+        // Sigue en el filtro para poder volver a mostrarla
+        assertEquals(listOf("Ocio", "Trabajo"), state.monthCategories.map { it.name })
+        assertEquals(setOf("Trabajo"), state.hiddenCategories)
+
+        viewModel.showAllCategories()
+
+        assertEquals(3, viewModel.uiState.value.events.getValue(day).size)
+    }
+
+    @Test
+    fun `una categoria oculta sin eventos este mes sigue en el filtro`() = runTest {
+        filter.hiddenCategories.value = setOf("Deporte")
+        val viewModel = createViewModel()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect() }
+
+        assertEquals(listOf("Deporte"), viewModel.uiState.value.monthCategories.map { it.name })
     }
 
     @Test

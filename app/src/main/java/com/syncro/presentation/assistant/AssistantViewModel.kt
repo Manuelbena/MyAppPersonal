@@ -18,6 +18,12 @@ import com.syncro.domain.model.PaydayAnswer
 import com.syncro.domain.model.TaskAction
 import com.syncro.domain.model.assistantConversation
 import com.syncro.domain.model.budgetAlerts
+import com.syncro.domain.model.WeeklyBalance
+import com.syncro.domain.model.ErrandsDay
+import com.syncro.domain.model.errandsOf
+import com.syncro.domain.model.lastWeekEnd
+import com.syncro.domain.model.weeklyBalance
+import com.syncro.domain.usecase.GetEventsInRangeUseCase
 import com.syncro.domain.model.lastPayday
 import com.syncro.domain.model.salaryCents
 import com.syncro.domain.usecase.ChooseDailyFocusUseCase
@@ -66,6 +72,7 @@ class AssistantViewModel @Inject constructor(
     getBudgets: GetBudgetsUseCase,
     observeAccounts: ObserveSavingsAccountsUseCase,
     getSettings: GetSettingsUseCase,
+    getEventsInRange: GetEventsInRangeUseCase,
     private val clock: Clock
 ) : ViewModel() {
 
@@ -122,9 +129,23 @@ class AssistantViewModel @Inject constructor(
         }
     }
 
-    // Lo de dinero, junto: nómina y presupuestos
-    private data class Money(val payday: Payday?, val budgetAlerts: List<BudgetAlert>)
-    private val money = combine(payday.filterNotNull(), budgetAlerts) { payday, alerts -> Money(payday.payday, alerts) }
+    // Las horas por categoría de la semana pasada (de lunes a domingo); se cuentan el lunes
+    private val weekly = refreshTick.flatMapLatest {
+        val weekEnd = lastWeekEnd(LocalDate.now(clock))
+        getEventsInRange(weekEnd.minusDays(6), weekEnd).map { weeklyBalance(it, weekEnd) }
+    }
+
+    // Las salidas de hoy (Recados, Compras), por si se pueden juntar
+    private val errands = refreshTick.flatMapLatest {
+        val today = LocalDate.now(clock)
+        getEventsInRange(today, today).map { errandsOf(it, today) }
+    }
+
+    // Los resúmenes, juntos: nómina, presupuestos, la semana y las salidas de hoy
+    private data class Money(val payday: Payday?, val budgetAlerts: List<BudgetAlert>, val week: WeeklyBalance?, val errands: ErrandsDay?)
+    private val money = combine(payday.filterNotNull(), budgetAlerts, weekly, errands) { payday, alerts, week, errands ->
+        Money(payday.payday, alerts, week, errands)
+    }
 
     private data class Tasks(val leftovers: LeftoverTasks, val focus: Focus, val focusHistory: List<DailyFocus>, val money: Money)
     private val tasks = combine(
@@ -155,6 +176,8 @@ class AssistantViewModel @Inject constructor(
             focusHistory = tasks.focusHistory,
             payday = tasks.money.payday,
             budgetAlerts = tasks.money.budgetAlerts,
+            weeklyBalance = tasks.money.week,
+            errands = tasks.money.errands,
             clearedIds = clearedIds
         )
     }

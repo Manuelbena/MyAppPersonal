@@ -13,6 +13,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Notes
 import androidx.compose.material.icons.rounded.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -34,6 +35,8 @@ import com.syncro.domain.model.Priority
 import com.syncro.domain.model.Recurrence
 import com.syncro.domain.model.RepeatScope
 import com.syncro.domain.model.suggestEventCategory
+import com.syncro.domain.model.defaultReminderFor
+import com.syncro.domain.model.suggestedSubtasksFor
 import com.syncro.domain.model.SyncroItem
 import com.syncro.domain.model.isValidEventRange
 import com.syncro.presentation.components.DetailCard
@@ -191,8 +194,11 @@ fun AddEventContent(
     var repeat by remember { mutableStateOf(eventToEdit?.repeat) }
     var askScope by remember { mutableStateOf(false) }
 
-    // Aviso (lo publica Syncro, no Google): minutos antes de empezar
-    var reminderMinutes by remember { mutableStateOf(eventToEdit?.reminderMinutes) }
+    // Aviso (lo publica Syncro, no Google): minutos antes de empezar. En uno nuevo sale de la
+    // categoría (médico: el día antes) hasta que se elige a mano; al editar se respeta el que tiene
+    var reminderChosenByHand by remember { mutableStateOf(eventToEdit != null) }
+    var manualReminder by remember { mutableStateOf(eventToEdit?.reminderMinutes) }
+    val reminderMinutes = if (reminderChosenByHand) manualReminder else defaultReminderFor(selectedCategory, isAllDay)
 
     // "Todo el día" se guarda como 00:00–00:00: así lo entienden el resto de la app y la sync con Google
     val effectiveStartTime = if (isAllDay) LocalTime.MIDNIGHT else startTime
@@ -325,7 +331,8 @@ fun AddEventContent(
                         onCheckedChange = {
                             isAllDay = it
                             // Los tramos cambian (con hora: "15 min antes"; todo el día: "ese día a las 9:00"): se pasa al equivalente
-                            if (reminderMinutes != null) reminderMinutes = if (it) ALL_DAY_DEFAULT_REMINDER else TIMED_DEFAULT_REMINDER
+                            // (el que viene de la categoría ya se recalcula solo)
+                            if (manualReminder != null) manualReminder = if (it) ALL_DAY_DEFAULT_REMINDER else TIMED_DEFAULT_REMINDER
                         },
                         colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = accent)
                     )
@@ -509,6 +516,25 @@ fun AddEventContent(
                         }
                     }
                 }
+                // Las típicas de la categoría, a un toque (desaparecen al añadirlas)
+                val suggestions = suggestedSubtasksFor(selectedCategory).filter { it !in subtasks }
+                if (suggestions.isNotEmpty()) {
+                    FlowRow(
+                        modifier = Modifier.padding(top = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        suggestions.forEach { suggestion ->
+                            SuggestionChip(
+                                onClick = { subtasks.add(suggestion) },
+                                label = { Text(suggestion, style = MaterialTheme.typography.labelMedium) },
+                                icon = { Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(16.dp)) },
+                                colors = SuggestionChipDefaults.suggestionChipColors(iconContentColor = accent),
+                                border = BorderStroke(1.dp, accent.copy(alpha = 0.3f)),
+                                shape = RoundedCornerShape(50)
+                            )
+                        }
+                    }
+                }
             }
 
             // Repetir: cada día, semana (con sus días), mes o año
@@ -526,7 +552,18 @@ fun AddEventContent(
                         start = startDate.atTime(effectiveStartTime),
                         isAllDay = isAllDay,
                         accent = accent,
-                        onChange = { reminderMinutes = it }
+                        onChange = {
+                            manualReminder = it
+                            reminderChosenByHand = true
+                        }
+                    )
+                }
+                if (!reminderChosenByHand && reminderMinutes != null) {
+                    Text(
+                        "✨ Según la categoría",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 4.dp)
                     )
                 }
             }

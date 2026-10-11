@@ -18,6 +18,8 @@ import com.syncro.domain.usecase.SyncGoogleTasksUseCase
 import com.syncro.domain.usecase.ToggleEventCompletionUseCase
 import com.syncro.domain.usecase.ToggleSubtaskCompletionUseCase
 import com.syncro.domain.usecase.ToggleTaskCompletionUseCase
+import com.syncro.domain.usecase.ObserveHiddenCategoriesUseCase
+import com.syncro.domain.usecase.SetCategoryHiddenUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
@@ -34,8 +36,15 @@ data class CalendarUiState(
     val events: Map<LocalDate, List<SyncroItem>> = emptyMap(),
     val isLoading: Boolean = false,
     val selectedMonth: YearMonth = YearMonth.now(),
-    val selectedDate: LocalDate? = null
+    val selectedDate: LocalDate? = null,
+    /** Categorías de evento ocultas con el filtro (sus eventos no salen; las tareas sí). */
+    val hiddenCategories: Set<String> = emptySet(),
+    /** Las categorías de los eventos del mes, con su color, para elegir en el filtro. */
+    val monthCategories: List<CategoryOption> = emptyList()
 )
+
+/** Una categoría en el filtro del Calendario. */
+data class CategoryOption(val name: String, val color: ArgbColor)
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
@@ -51,12 +60,15 @@ class CalendarViewModel @Inject constructor(
     private val deleteTaskUseCase: DeleteTaskUseCase,
     private val saveTaskUseCase: SaveTaskUseCase,
     private val saveNoteUseCase: SaveNoteUseCase,
-    private val generateRepeatsUseCase: GenerateRepeatsUseCase
+    private val generateRepeatsUseCase: GenerateRepeatsUseCase,
+    observeHiddenCategoriesUseCase: ObserveHiddenCategoriesUseCase,
+    private val setCategoryHiddenUseCase: SetCategoryHiddenUseCase
 ) : ViewModel() {
 
     private val _selectedMonth = MutableStateFlow(YearMonth.now())
     private val _selectedDate = MutableStateFlow<LocalDate?>(null)
     private val _isLoading = MutableStateFlow(false)
+    private val hiddenCategories = observeHiddenCategoriesUseCase()
     
     val uiState: StateFlow<CalendarUiState> = combine(_selectedMonth, _selectedDate, _isLoading) { month, selectedDate, isLoading ->
         Triple(month, selectedDate, isLoading)
@@ -66,8 +78,10 @@ class CalendarViewModel @Inject constructor(
         
         combine(
             getEventsInRangeUseCase(start, end),
-            getTasksInRangeUseCase(start, end)
-        ) { events, tasks ->
+            getTasksInRangeUseCase(start, end),
+            hiddenCategories
+        ) { allEvents, tasks, hidden ->
+            val events = allEvents.filter { it.categoryText !in hidden }
             // Un evento de varios días aparece en cada uno de ellos (21:30 → 01:00 en ambos días)
             val eventsByDay = events.flatMap { event -> event.days.map { day -> day to event } }
             val tasksByDay = tasks.map { it.date to it }
@@ -78,7 +92,12 @@ class CalendarViewModel @Inject constructor(
                     .mapValues { (day, items) -> items.sortedForDay(day) },
                 selectedMonth = month,
                 selectedDate = selectedDate,
-                isLoading = isLoading
+                isLoading = isLoading,
+                hiddenCategories = hidden,
+                // Las ocultas siguen en la lista (para volver a mostrarlas) aunque no tengan eventos este mes
+                monthCategories = (allEvents.map { CategoryOption(it.categoryText, it.categoryColor) }.distinctBy { it.name } +
+                    hidden.filter { name -> allEvents.none { it.categoryText == name } }.map { CategoryOption(it, HIDDEN_WITHOUT_EVENTS_COLOR) })
+                    .sortedBy { it.name }
             )
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), CalendarUiState())
@@ -100,6 +119,15 @@ class CalendarViewModel @Inject constructor(
     /** Al mirar un mes más adelante, se crean las repeticiones que caen en él (con tope de un año). */
     private fun generateRepeatsFor(month: YearMonth) {
         viewModelScope.launch { generateRepeatsUseCase(until = month.atEndOfMonth()) }
+    }
+
+    /** Muestra u oculta los eventos de una categoría (se recuerda al cerrar la app). */
+    fun setCategoryHidden(category: String, hidden: Boolean) {
+        viewModelScope.launch { setCategoryHiddenUseCase(category, hidden) }
+    }
+
+    fun showAllCategories() {
+        viewModelScope.launch { setCategoryHiddenUseCase.showAll() }
     }
 
     fun onDateSelected(date: LocalDate?) {
@@ -176,3 +204,6 @@ class CalendarViewModel @Inject constructor(
         }
     }
 }
+
+/** Color de una categoría oculta que este mes no tiene eventos (no hay de dónde sacar el suyo). */
+private val HIDDEN_WITHOUT_EVENTS_COLOR = ArgbColor(0xFF64748B)

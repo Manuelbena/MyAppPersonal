@@ -26,6 +26,7 @@ import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.RadioButtonUnchecked
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.FilterList
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -87,6 +88,7 @@ fun CalendarScreen(
     
     // Estados para las hojas modales
     var showAddItemSheet by remember { mutableStateOf(false) }
+    var showCategoryFilter by remember { mutableStateOf(false) }
     var showDetailedEventSheet by remember { mutableStateOf(false) }
     var selectedEventForEdit by remember { mutableStateOf<com.syncro.domain.model.SyncroItem.Event?>(null) }
     var showQuickTaskSheet by remember { mutableStateOf(false) }
@@ -125,7 +127,9 @@ fun CalendarScreen(
                 },
                 onTodayClick = {
                     coroutineScope.launch { state.animateScrollToMonth(YearMonth.now()) }
-                }
+                },
+                filterActive = uiState.hiddenCategories.isNotEmpty(),
+                onFilterClick = { showCategoryFilter = true }
             )
 
             if (uiState.isLoading) {
@@ -260,6 +264,16 @@ fun CalendarScreen(
             },
             // Se crea en el día seleccionado del calendario (hoy, si no hay ninguno o ya pasó)
             initialDate = maxOf(uiState.selectedDate ?: LocalDate.now(), LocalDate.now())
+        )
+    }
+
+    if (showCategoryFilter) {
+        CategoryFilterSheet(
+            categories = uiState.monthCategories,
+            hidden = uiState.hiddenCategories,
+            onToggle = viewModel::setCategoryHidden,
+            onShowAll = viewModel::showAllCategories,
+            onDismiss = { showCategoryFilter = false }
         )
     }
 }
@@ -451,7 +465,10 @@ fun CalendarHeader(
     selectedMonth: YearMonth,
     onPreviousMonth: () -> Unit,
     onNextMonth: () -> Unit,
-    onTodayClick: () -> Unit
+    onTodayClick: () -> Unit,
+    // Con categorías ocultas el botón lleva un punto, para no olvidar que faltan eventos
+    filterActive: Boolean = false,
+    onFilterClick: (() -> Unit)? = null
 ) {
     Row(
         modifier = Modifier
@@ -476,6 +493,13 @@ fun CalendarHeader(
         }
 
         Row {
+            onFilterClick?.let {
+                IconButton(onClick = it) {
+                    BadgedBox(badge = { if (filterActive) Badge(containerColor = MaterialTheme.colorScheme.primary) }) {
+                        Icon(Icons.Rounded.FilterList, contentDescription = if (filterActive) "Filtro de categorías (activo)" else "Filtrar por categoría")
+                    }
+                }
+            }
             IconButton(onClick = onTodayClick) {
                 Icon(Icons.Rounded.CalendarMonth, contentDescription = "Ir al mes actual")
             }

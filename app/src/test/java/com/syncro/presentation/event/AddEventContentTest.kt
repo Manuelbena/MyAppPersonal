@@ -45,7 +45,8 @@ class AddEventContentTest {
         val end: LocalTime,
         val category: String = "",
         val color: Color = Color.Unspecified,
-        val subtasks: List<String> = emptyList()
+        val subtasks: List<String> = emptyList(),
+        val reminder: Int? = null
     )
 
     private var saved: Saved? = null
@@ -55,8 +56,8 @@ class AddEventContentTest {
             AddEventContent(
                 eventToEdit = eventToEdit,
                 onDismiss = {},
-                onSave = { title, _, _, date, endDate, start, end, category, color, _, subtasks, _, _, _ ->
-                    saved = Saved(title, date, endDate, start, end, category, color, subtasks)
+                onSave = { title, _, _, date, endDate, start, end, category, color, _, subtasks, _, _, reminder ->
+                    saved = Saved(title, date, endDate, start, end, category, color, subtasks, reminder)
                 }
             )
         }
@@ -88,6 +89,28 @@ class AddEventContentTest {
         compose.onNodeWithText("Guardar").performClick()
 
         assertEquals("Salud", saved?.category)
+    }
+
+    @Test
+    fun `un evento nuevo de salud lleva aviso el dia antes y sugiere sus subtareas`() {
+        showForm()
+
+        compose.onNodeWithText("Añade un título").performTextInput("Dentista")
+        compose.onNodeWithText("✨ Según la categoría").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Llevar la tarjeta sanitaria").performScrollTo().performClick()
+        compose.onNodeWithText("Guardar").performScrollTo().performClick()
+
+        assertEquals(24 * 60, saved?.reminder)
+        assertEquals(listOf("Llevar la tarjeta sanitaria"), saved?.subtasks)
+    }
+
+    @Test
+    fun `al editar no se pone aviso por la categoria`() {
+        showForm(anEvent(title = "Dentista", categoryText = "Salud"))
+
+        compose.onNodeWithText("Guardar").performClick()
+
+        assertNull(saved?.reminder)
     }
 
     @Test

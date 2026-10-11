@@ -63,6 +63,8 @@ data class AssistantConversation(val messages: List<ChatMessage>) {
  * @param focusHistory las prioridades ya elegidas (la de hoy y las recientes)
  * @param payday el último día de nómina si fue hace poco (null sin nómina en Ajustes)
  * @param budgetAlerts los presupuestos que llegaron al 80 % o se pasaron hace poco
+ * @param weeklyBalance las horas por categoría de la semana pasada (se cuenta el lunes)
+ * @param errands las salidas (Recados, Compras) pendientes de hoy, si son varias
  * @param clearedIds mensajes que el usuario borró al vaciar el chat (no vuelven a salir)
  */
 fun assistantConversation(
@@ -74,6 +76,8 @@ fun assistantConversation(
     focusHistory: List<DailyFocus> = emptyList(),
     payday: Payday? = null,
     budgetAlerts: List<BudgetAlert> = emptyList(),
+    weeklyBalance: WeeklyBalance? = null,
+    errands: ErrandsDay? = null,
     clearedIds: Set<String> = emptySet()
 ): AssistantConversation {
     val messages = digestMessages(answer, notificationsAllowed)
@@ -102,6 +106,10 @@ fun assistantConversation(
     payday?.let { blocks += Moment(it.date, PAYDAY_ORDER) to paydayMessages(it) }
     // Los avisos de presupuesto, el día en que se cruzó el umbral (detrás de lo demás de ese día)
     budgetAlerts.forEach { blocks += Moment(it.date, BUDGET_ORDER) to listOf(budgetAlertMessage(it)) }
+    // El resumen de la semana, lo primero del lunes
+    weeklyBalance?.let { blocks += Moment(it.weekEnd.plusDays(1), WEEK_ORDER) to listOf(weeklyBalanceMessage(it)) }
+    // Las salidas de hoy, detrás de lo demás de ese día
+    errands?.let { blocks += Moment(it.date, ERRANDS_ORDER) to listOf(errandsMessage(it)) }
     blocks.sortedWith(compareBy({ it.first.day }, { it.first.order })).forEach { messages += it.second }
 
     return AssistantConversation(messages.filter { it.id !in clearedIds })
@@ -109,10 +117,12 @@ fun assistantConversation(
 
 /** Posición de un bloque en el chat: el día y, dentro del día, repaso (antes) o prioridades. */
 private data class Moment(val day: LocalDate, val order: Int)
+private const val WEEK_ORDER = -2
 private const val PAYDAY_ORDER = -1
 private const val LEFTOVERS_ORDER = 0
 private const val FOCUS_ORDER = 1
 private const val BUDGET_ORDER = 2
+private const val ERRANDS_ORDER = 3
 
 // region Avisos diarios
 
@@ -319,6 +329,56 @@ private fun budgetAlertMessage(alert: BudgetAlert): ChatMessage {
     // La cuenta principal no lleva su id: así los avisos de antes de las cuentas no salen otra vez como nuevos
     val account = budget.accountId.takeIf { it != MAIN_ACCOUNT_ID }?.let { "$it-" } ?: ""
     return assistant("budget-${alert.month}-$account${budget.category.name}-$level", text)
+}
+
+// endregion
+
+// region Semana
+
+/** Las horas de cada categoría (de más a menos) y, si se nota, un consejo amable. */
+private fun weeklyBalanceMessage(balance: WeeklyBalance): ChatMessage {
+    val lines = balance.minutesByCategory.entries
+        .sortedByDescending { it.value }
+        .joinToString(" · ") { (category, minutes) -> "${categoryEmoji(category)} $category ${hoursText(minutes)}" }
+    val work = balance.minutesOf("Trabajo")
+    val unwind = balance.minutesOf("Ocio") + balance.minutesOf("Deporte")
+    val tip = when {
+        work >= BUSY_WORK_MINUTES && unwind == 0L ->
+            " Mucho trabajo y nada de Ocio ni Deporte: ¿te reservas un rato para ti esta semana? 🌿"
+        balance.minutesOf("Deporte") >= 3 * 60 -> " ¡Bien ese deporte! 💪"
+        else -> ""
+    }
+    return assistant("week-${balance.weekEnd}", "📊 Así fue tu semana: $lines.$tip")
+}
+
+/** "45 min", "3 h", "3,5 h" (redondeado a la media hora). */
+private fun hoursText(minutes: Long): String {
+    if (minutes < 60) return "$minutes min"
+    val halves = (minutes + 15) / 30
+    return if (halves % 2 == 0L) "${halves / 2} h" else "${halves / 2},5 h"
+}
+
+private fun categoryEmoji(category: String): String = when (category) {
+    "Trabajo" -> "💼"
+    "Salud" -> "🩺"
+    "Deporte" -> "🏃"
+    "Ocio" -> "🎉"
+    "Compras" -> "🛍️"
+    "Recados" -> "📋"
+    "Personal" -> "🙂"
+    else -> "🗓️"
+}
+
+// endregion
+
+// region Recados
+
+private fun errandsMessage(errands: ErrandsDay): ChatMessage {
+    val list = errands.titles.dropLast(1).joinToString(", ") + " y " + errands.titles.last()
+    return assistant(
+        "errands-${errands.date}",
+        "🧭 Hoy tienes ${errands.titles.size} salidas: $list. Si puedes, hazlas del tirón y te ahorras viajes. 🚶"
+    )
 }
 
 // endregion
