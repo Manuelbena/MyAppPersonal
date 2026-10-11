@@ -1,27 +1,27 @@
 package com.syncro.presentation.savings
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Add
-import androidx.compose.material.icons.rounded.ExpandLess
-import androidx.compose.material.icons.rounded.ExpandMore
+import androidx.compose.material.icons.automirrored.rounded.ArrowForward
+import androidx.compose.material.icons.automirrored.rounded.ReceiptLong
 import androidx.compose.material.icons.rounded.LocalOffer
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -40,6 +40,7 @@ import com.syncro.domain.model.SAVINGS_PERCENT
 import com.syncro.domain.model.SavingsGoal
 import com.syncro.domain.model.budgetGroup
 import com.syncro.domain.model.MovementCategory
+import com.syncro.domain.model.MovementOccurrence
 import com.syncro.domain.model.MovementType
 import com.syncro.domain.model.label
 import com.syncro.domain.model.parseEuroCents
@@ -52,14 +53,17 @@ import com.syncro.presentation.event.transparentTextFieldColors
 import com.syncro.presentation.theme.Amber500
 import com.syncro.presentation.theme.Emerald500
 import com.syncro.presentation.theme.Rose500
+import com.syncro.presentation.theme.Sky500
+import com.syncro.presentation.theme.Violet500
+import java.time.LocalDate
 
 /*
- * Presupuestos en Ahorros: la tarjeta con cómo va cada uno este mes y la hoja para crear, cambiar
- * o quitar uno.
+ * Presupuestos en Ahorros: la tarjeta compacta con el 50/30/20 del mes en una sola barra, las
+ * piezas del desglose (BudgetBreakdownScreen) y la hoja para crear, cambiar o quitar uno.
  */
 
 /** Verde si va bien, ámbar desde el 80 % y rojo si se ha pasado. */
-private val BudgetLevel.color: Color
+internal val BudgetLevel.color: Color
     get() = when (this) {
         BudgetLevel.OK -> Emerald500
         BudgetLevel.WARNING -> Amber500
@@ -67,35 +71,54 @@ private val BudgetLevel.color: Color
     }
 
 /** Nombre y emoji de cada grupo del 50/30/20. */
-private val BudgetGroup.title: String
+internal val BudgetGroup.title: String
     get() = when (this) {
         BudgetGroup.NEEDS -> "🏠 Necesidades"
         BudgetGroup.WANTS -> "🎉 Caprichos"
     }
 
-private val BudgetGroup.hint: String
+/** Nombre corto para la leyenda de la barra. */
+private val BudgetGroup.shortName: String
+    get() = when (this) {
+        BudgetGroup.NEEDS -> "Necesidades"
+        BudgetGroup.WANTS -> "Caprichos"
+    }
+
+internal val BudgetGroup.hint: String
     get() = when (this) {
         BudgetGroup.NEEDS -> "Casa, facturas, comida, transporte, salud y estudios"
         BudgetGroup.WANTS -> "Salir, ocio, suscripciones, compras y otros"
     }
 
+/** Color de cada trozo de la barra: el del grupo, no el de cómo va (eso lo dice la leyenda). */
+private val BudgetGroup.stackColor: Color
+    get() = when (this) {
+        BudgetGroup.NEEDS -> Sky500
+        BudgetGroup.WANTS -> Violet500
+    }
+
+/** "Reparto 50/30/20 de tu nómina (2.000,00 €)"; null si este mes no ha entrado nada. */
+internal fun BudgetPlan.baseLabel(): String? = base?.let {
+    "Reparto 50/30/20 de ${if (it.isSalary) "tu nómina" else "lo que ha entrado"} (${formatEuros(it.cents)})"
+}
+
+/** Si hay algo que pintar en la barra: ha entrado dinero o se ha gastado algo. */
+private val BudgetPlan.hasData: Boolean
+    get() = base != null || groups.any { it.spentCents > 0 }
+
 /**
- * Tarjeta "Presupuestos" del mes, con la regla 50/30/20: Necesidades (50 %) y Caprichos (30 %) con
- * lo gastado frente a lo que les toca de la nómina (o de lo que ha entrado) y el Ahorro (20 %).
- * Cada grupo se abre para ver sus presupuestos; los que tienen uno justo o pasado salen abiertos.
- * Sin presupuestos, invita a crear el primero. Tocar un presupuesto lo abre para cambiarlo o quitarlo.
+ * Tarjeta "Presupuestos" de Ahorros, en pequeño: el mes como una pila (Necesidades, Caprichos y
+ * lo que queda de Ahorro) con su leyenda, un aviso si algún presupuesto va justo o pasado, y
+ * "Ver desglose" para las categorías y los presupuestos en su propia pantalla.
  */
 @Composable
 fun BudgetsCard(
     plan: BudgetPlan,
-    canAddMore: Boolean,
-    onAdd: () -> Unit,
-    onOpen: (Budget) -> Unit,
+    onSeeBreakdown: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val accent = MaterialTheme.colorScheme.primary
-    val hasBudgets = plan.groups.any { it.statuses.isNotEmpty() }
     Surface(
+        onClick = onSeeBreakdown,
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 8.dp),
@@ -103,120 +126,182 @@ fun BudgetsCard(
         color = MaterialTheme.colorScheme.surface,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
     ) {
-        Column(modifier = Modifier.padding(vertical = 16.dp)) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 20.dp, end = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        "🎯 Presupuestos",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    plan.base?.let { base ->
-                        Text(
-                            "Reparto 50/30/20 de ${if (base.isSalary) "tu nómina" else "lo que ha entrado"} (${formatEuros(base.cents)})",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-                if (hasBudgets && canAddMore) {
-                    TextButton(onClick = onAdd) {
-                        Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(4.dp))
-                        Text("Añadir", fontWeight = FontWeight.SemiBold)
-                    }
-                }
-            }
-
-            // Sin nada que comparar (ni presupuestos ni ingresos), solo la invitación
-            if (plan.base != null || hasBudgets) {
-                Spacer(Modifier.height(4.dp))
-                plan.groups.forEach { group -> BudgetGroupSection(group, onOpen) }
-                plan.savings?.let { SavingsGoalRow(it) }
-            }
-
-            if (!hasBudgets) {
+        Column(modifier = Modifier.padding(start = 20.dp, end = 8.dp, top = 8.dp, bottom = 16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    "Pon un límite a lo que gastas cada mes por categoría y te aviso al llegar al $BUDGET_WARNING_PERCENT %.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
+                    "🎯 Presupuestos",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.weight(1f)
                 )
-                OutlinedButton(
-                    onClick = onAdd,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 20.dp),
-                    shape = RoundedCornerShape(14.dp),
-                    border = BorderStroke(1.dp, accent.copy(alpha = 0.5f)),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = accent)
-                ) {
-                    Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text("Crear presupuesto", fontWeight = FontWeight.SemiBold)
+                // Como el "Ver todas" de la libreta
+                TextButton(onClick = onSeeBreakdown) {
+                    Text("Ver desglose", fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.width(4.dp))
+                    Icon(Icons.AutoMirrored.Rounded.ArrowForward, contentDescription = null, modifier = Modifier.size(16.dp))
+                }
+            }
+            Column(modifier = Modifier.padding(end = 12.dp)) {
+                if (plan.hasData) {
+                    plan.baseLabel()?.let {
+                        Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Spacer(Modifier.height(10.dp))
+                    }
+                    BudgetStack(plan)
+                    Spacer(Modifier.height(12.dp))
+                    BudgetStackLegend(plan)
+                    attentionNote(plan)?.let { (text, color) ->
+                        Spacer(Modifier.height(12.dp))
+                        Text(text, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold, color = color)
+                    }
+                } else {
+                    Text(
+                        "Pon un límite a lo que gastas cada mes por categoría y te aviso al llegar al $BUDGET_WARNING_PERCENT %.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
         }
     }
 }
 
+/** "⚠️ 1 presupuesto pasado · 1 casi al límite", o null si todos van bien. */
+private fun attentionNote(plan: BudgetPlan): Pair<String, Color>? {
+    val statuses = plan.groups.flatMap { it.statuses }
+    val exceeded = statuses.count { it.level == BudgetLevel.EXCEEDED }
+    val warning = statuses.count { it.level == BudgetLevel.WARNING }
+    if (exceeded == 0 && warning == 0) return null
+    val parts = listOfNotNull(
+        exceeded.takeIf { it > 0 }?.let { if (it == 1) "1 presupuesto pasado" else "$it presupuestos pasados" },
+        warning.takeIf { it > 0 }?.let { if (it == 1) "1 casi al límite" else "$it casi al límite" }
+    )
+    return "⚠️ ${parts.joinToString(" · ")}" to if (exceeded > 0) Rose500 else Amber500
+}
+
+/** Un trozo de la pila: su color y lo que pesa. */
+private data class StackSegment(val color: Color, val cents: Long)
+
 /**
- * Un grupo: su nombre y %, lo gastado frente a lo que le toca y, al tocarlo, sus presupuestos.
- * Empieza abierto si alguno va justo o pasado (lo que hay que mirar); si no, cerrado.
+ * El mes como una pila: lo gastado en Necesidades, en Caprichos y lo que queda (Ahorro), cada uno
+ * del ancho que le toca. Sin ingresos solo hay gastos; gastando más de lo que entra no hay ahorro.
  */
 @Composable
-private fun BudgetGroupSection(summary: BudgetGroupSummary, onOpen: (Budget) -> Unit) {
-    var expanded by rememberSaveable(summary.group) { mutableStateOf(summary.needsAttention) }
-    val levelColor = summary.level.color
-    val canExpand = summary.statuses.isNotEmpty()
-
-    Column(
-        modifier = Modifier
+internal fun BudgetStack(plan: BudgetPlan, modifier: Modifier = Modifier) {
+    val segments = plan.groups.map { StackSegment(it.group.stackColor, it.spentCents) } +
+        listOfNotNull(plan.savings?.let { StackSegment(Emerald500, it.savedCents.coerceAtLeast(0)) })
+    val visible = segments.filter { it.cents > 0 }
+    Row(
+        modifier = modifier
             .fillMaxWidth()
-            .then(if (canExpand) Modifier.clickable { expanded = !expanded } else Modifier)
-            .padding(horizontal = 20.dp, vertical = 10.dp)
+            .height(14.dp)
+            .clip(RoundedCornerShape(7.dp))
+            .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.12f))
+            .semantics { contentDescription = "Reparto del mes" },
+        horizontalArrangement = Arrangement.spacedBy(2.dp)
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                "${summary.group.title} · ${summary.group.percent} %",
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface,
+        visible.forEach { segment ->
+            Box(
+                modifier = Modifier
+                    .weight(segment.cents.toFloat())
+                    .fillMaxHeight()
+                    .background(segment.color)
+            )
+        }
+    }
+}
+
+/** Debajo de la barra: cada trozo con su color, lo que lleva y lo que le toca. */
+@Composable
+internal fun BudgetStackLegend(plan: BudgetPlan) {
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        plan.groups.forEach { group ->
+            LegendItem(
+                color = group.group.stackColor,
+                label = group.group.shortName,
+                amount = formatEuros(group.spentCents),
+                // Solo se colorea lo que hay que mirar
+                amountColor = group.level.takeIf { it != BudgetLevel.OK }?.color,
+                detail = group.targetCents?.let { "de ${formatEuros(it)}" },
                 modifier = Modifier.weight(1f)
             )
-            if (canExpand) {
-                Text(
-                    if (summary.statuses.size == 1) "1 presupuesto" else "${summary.statuses.size} presupuestos",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Icon(
-                    if (expanded) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
-                    contentDescription = if (expanded) "Ocultar presupuestos" else "Ver presupuestos",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
         }
+        plan.savings?.let { goal ->
+            LegendItem(
+                color = Emerald500,
+                label = "Ahorro",
+                amount = (if (goal.savedCents < 0) "−" else "") + formatEuros(kotlin.math.abs(goal.savedCents)),
+                amountColor = if (goal.savedCents < 0) Rose500 else null,
+                detail = "de ${formatEuros(goal.targetCents)}",
+                modifier = Modifier.weight(1f)
+            )
+        }
+    }
+}
+
+@Composable
+private fun LegendItem(
+    color: Color,
+    label: String,
+    amount: String,
+    amountColor: Color?,
+    detail: String?,
+    modifier: Modifier = Modifier
+) {
+    Column(modifier = modifier) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier
+                    .size(8.dp)
+                    .clip(CircleShape)
+                    .background(color)
+            )
+            Spacer(Modifier.width(6.dp))
+            Text(
+                label,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+        Text(
+            amount,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.Bold,
+            color = amountColor ?: MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        detail?.let {
+            Text(
+                it,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+/** Cabecera de un grupo en el desglose: nombre y %, lo gastado frente a lo que le toca. */
+@Composable
+internal fun BudgetGroupHeader(summary: BudgetGroupSummary) {
+    val levelColor = summary.level.color
+    Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp)) {
+        Text(
+            "${summary.group.title} · ${summary.group.percent} %",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface
+        )
         Text(summary.group.hint, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Spacer(Modifier.height(6.dp))
+        Spacer(Modifier.height(8.dp))
         val target = summary.targetCents
         if (target != null) {
-            LinearProgressIndicator(
-                progress = { ((summary.percent ?: 0) / 100f).coerceIn(0f, 1f) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(8.dp)
-                    .clip(RoundedCornerShape(4.dp)),
-                color = levelColor,
-                trackColor = levelColor.copy(alpha = 0.15f),
-                drawStopIndicator = {}
-            )
+            BudgetBar(((summary.percent ?: 0) / 100f), levelColor)
             Spacer(Modifier.height(6.dp))
             Row {
                 Text(
@@ -242,36 +327,36 @@ private fun BudgetGroupSection(summary: BudgetGroupSummary, onOpen: (Budget) -> 
             )
         }
     }
-    AnimatedVisibility(visible = expanded && canExpand) {
-        Column(modifier = Modifier.padding(start = 12.dp)) {
-            summary.statuses.forEach { status -> BudgetRow(status, onClick = { onOpen(status.budget) }) }
-        }
-    }
+}
+
+@Composable
+private fun BudgetBar(progress: Float, color: Color) {
+    LinearProgressIndicator(
+        progress = { progress.coerceIn(0f, 1f) },
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(8.dp)
+            .clip(RoundedCornerShape(4.dp)),
+        color = color,
+        trackColor = color.copy(alpha = 0.15f),
+        drawStopIndicator = {}
+    )
 }
 
 /** El 20 % que debería quedar: lo ahorrado (ingresos − gastos) frente a la meta. */
 @Composable
-private fun SavingsGoalRow(goal: SavingsGoal) {
+internal fun SavingsGoalRow(goal: SavingsGoal) {
     val color = if (goal.savedCents < 0) Rose500 else Emerald500
     Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp)) {
         Text(
             "🐷 Ahorro · $SAVINGS_PERCENT %",
-            style = MaterialTheme.typography.bodyLarge,
+            style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurface
         )
         Text("Lo que te queda de lo que ha entrado", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Spacer(Modifier.height(6.dp))
-        LinearProgressIndicator(
-            progress = { (goal.percent / 100f).coerceIn(0f, 1f) },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(8.dp)
-                .clip(RoundedCornerShape(4.dp)),
-            color = color,
-            trackColor = color.copy(alpha = 0.15f),
-            drawStopIndicator = {}
-        )
+        Spacer(Modifier.height(8.dp))
+        BudgetBar(goal.percent / 100f, color)
         Spacer(Modifier.height(6.dp))
         Row {
             Text(
@@ -294,10 +379,9 @@ private fun SavingsGoalRow(goal: SavingsGoal) {
     }
 }
 
-
-/** Una categoría: icono, nombre, "120,00 € de 300,00 €", la barra y lo que queda (o lo pasado). */
+/** Una categoría con presupuesto: icono, nombre, "120,00 € de 300,00 €", la barra y lo que queda (o lo pasado). */
 @Composable
-private fun BudgetRow(status: BudgetStatus, onClick: () -> Unit) {
+internal fun BudgetRow(status: BudgetStatus, onClick: () -> Unit) {
     val category = status.budget.category
     val levelColor = status.level.color
     Row(
@@ -328,16 +412,7 @@ private fun BudgetRow(status: BudgetStatus, onClick: () -> Unit) {
                 )
             }
             Spacer(Modifier.height(6.dp))
-            LinearProgressIndicator(
-                progress = { (status.percent / 100f).coerceIn(0f, 1f) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(8.dp)
-                    .clip(RoundedCornerShape(4.dp)),
-                color = levelColor,
-                trackColor = levelColor.copy(alpha = 0.15f),
-                drawStopIndicator = {}
-            )
+            BudgetBar(status.percent / 100f, levelColor)
             Spacer(Modifier.height(6.dp))
             Row {
                 Text(
@@ -359,6 +434,46 @@ private fun BudgetRow(status: BudgetStatus, onClick: () -> Unit) {
 }
 
 /**
+ * Una categoría con gastos y sin presupuesto: lo gastado y, si se toca, la hoja para ponerle un
+ * límite ya con la categoría elegida.
+ */
+@Composable
+internal fun UnbudgetedRow(category: MovementCategory, spentCents: Long, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 20.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        IconBadge(category.icon, category.color)
+        Spacer(Modifier.width(14.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                category.label,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                "Sin límite · Toca para poner uno",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Spacer(Modifier.width(12.dp))
+        Text(
+            formatEuros(spentCents),
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+    }
+}
+
+/**
  * Crear (sin [existing]) o cambiar un presupuesto. Al crear se elige la categoría entre las de
  * gasto que aún no tienen ([available]); al cambiar, la categoría queda fija y se puede quitar.
  */
@@ -369,7 +484,12 @@ fun BudgetSheet(
     available: List<MovementCategory>,
     onDismiss: () -> Unit,
     onSave: (MovementCategory, Long) -> Unit,
-    onDelete: (MovementCategory) -> Unit
+    onDelete: (MovementCategory) -> Unit,
+    // Al crear desde una categoría del desglose, ya viene elegida
+    initialCategory: MovementCategory? = null,
+    // Los gastos del mes que se ve: la hoja enseña los de la categoría elegida
+    expenses: List<MovementOccurrence> = emptyList(),
+    today: LocalDate = LocalDate.now()
 ) {
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -381,7 +501,7 @@ fun BudgetSheet(
         containerColor = MaterialTheme.colorScheme.surface,
         shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
     ) {
-        BudgetContent(existing, available, onSave, onDelete)
+        BudgetContent(existing, available, onSave, onDelete, initialCategory, expenses, today)
     }
 }
 
@@ -391,10 +511,13 @@ fun BudgetContent(
     existing: Budget?,
     available: List<MovementCategory>,
     onSave: (MovementCategory, Long) -> Unit,
-    onDelete: (MovementCategory) -> Unit
+    onDelete: (MovementCategory) -> Unit,
+    initialCategory: MovementCategory? = null,
+    expenses: List<MovementOccurrence> = emptyList(),
+    today: LocalDate = LocalDate.now()
 ) {
     var amountText by remember { mutableStateOf(existing?.limitCents?.toAmountInput().orEmpty()) }
-    var category by remember { mutableStateOf(existing?.category) }
+    var category by remember { mutableStateOf(existing?.category ?: initialCategory) }
     val limitCents = parseEuroCents(amountText)
     val accent = category?.color ?: MaterialTheme.colorScheme.primary
     val canSave = limitCents != null && category != null
@@ -476,7 +599,7 @@ fun BudgetContent(
             if (existing == null) {
                 Column {
                     SectionTitle(Icons.Rounded.LocalOffer, "Categoría")
-                    // Por grupos del 50/30/20, como en la tarjeta: la lista se lee mejor
+                    // Por grupos del 50/30/20, como en el desglose: la lista se lee mejor
                     BudgetGroup.entries.forEach { group ->
                         val options = available.filter { it.budgetGroup == group }
                         if (options.isEmpty()) return@forEach
@@ -516,13 +639,45 @@ fun BudgetContent(
                     }
                     }
                 }
-            } else {
+            }
+            category?.let { CategoryMovements(it, expenses, today) }
+            if (existing != null) {
                 DeleteItemButton(
                     label = "Quitar presupuesto",
                     confirmTitle = "¿Quitar el presupuesto de ${existing.category.label}?",
                     warning = "Tus gastos no se tocan: solo dejarás de ver el límite y sus avisos.",
                     onDelete = { onDelete(existing.category) }
                 )
+            }
+        }
+    }
+}
+
+/**
+ * Los gastos del mes en [category], del más reciente al más antiguo, con su total: lo que cuenta
+ * para el presupuesto (también los previstos, atenuados).
+ */
+@Composable
+private fun CategoryMovements(category: MovementCategory, expenses: List<MovementOccurrence>, today: LocalDate) {
+    val ofCategory = expenses
+        .filter { it.movement.type == MovementType.EXPENSE && it.movement.category == category }
+        .sortedByDescending { it.date }
+    Column {
+        SectionTitle(
+            Icons.AutoMirrored.Rounded.ReceiptLong,
+            "Movimientos del mes",
+            trailing = formatEuros(ofCategory.sumOf { it.movement.amountCents }).takeIf { ofCategory.isNotEmpty() }
+        )
+        if (ofCategory.isEmpty()) {
+            Text(
+                "Este mes aún no hay gastos en ${category.label}.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 4.dp)
+            )
+        } else {
+            ofCategory.forEach { occurrence ->
+                MovementRow(occurrence, isUpcoming = occurrence.date.isAfter(today), onClick = null, horizontalPadding = 0.dp)
             }
         }
     }

@@ -11,15 +11,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 /**
  * Degradados arriba y abajo de una zona con scroll (Inicio, Ahorros): arriba el contenido se
  * desvanece al subir bajo la cabecera fija y abajo se ve por detrás de la barra de navegación
- * flotante. Va dentro del mismo Box que el contenido, después de él.
+ * flotante. Va dentro del mismo Box que el contenido, después de él. En páginas sin barra
+ * (desglose de presupuestos) el de abajo es corto, o taparía lo último de la lista.
  */
 @Composable
-fun BoxScope.EdgeFades() {
+fun BoxScope.EdgeFades(bottomHeight: Dp = 140.dp) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -37,7 +39,7 @@ fun BoxScope.EdgeFades() {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(140.dp)
+            .height(bottomHeight)
             .align(Alignment.BottomCenter)
             .background(
                 brush = Brush.verticalGradient(

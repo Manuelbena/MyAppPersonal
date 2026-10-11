@@ -16,6 +16,8 @@ sealed class AppScreen(val route: String, val title: String, val icon: ImageVect
     object Home : AppScreen("home", "Inicio", Icons.Outlined.Home)
     object Calendar : AppScreen("calendar", "Calendario", Icons.Outlined.DateRange)
     object Savings : AppScreen("savings", "Ahorros", Icons.Outlined.Savings)
+    /** El desglose de presupuestos, encima de Ahorros (comparte su ViewModel). */
+    object SavingsBudgets : AppScreen("savings/budgets", "Presupuestos", Icons.Outlined.Savings)
     object Assistant : AppScreen("assistant", "Asistente", Icons.Outlined.AutoAwesome)
     object Login : AppScreen("login", "Login", Icons.Outlined.Person)
     object NotesList : AppScreen("notes_list", "Mis Notas", Icons.Outlined.Home)

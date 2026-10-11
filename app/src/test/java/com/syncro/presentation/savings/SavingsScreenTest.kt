@@ -47,8 +47,7 @@ class SavingsScreenTest {
     private val shared = mutableListOf<String>()
     private val sharedMonths = mutableListOf<String>()
 
-    private val savedBudgets = mutableListOf<String>()
-    private val deletedBudgets = mutableListOf<MovementCategory>()
+    private var openedBudgets = 0
 
     private fun show(movements: MonthMovements = monthMovements(october, emptyList()), budgets: List<Budget> = emptyList()) {
         compose.setContent {
@@ -63,8 +62,7 @@ class SavingsScreenTest {
                 onShare = { shared += it.movement.id },
                 onShareMonth = { sharedMonths += it.month.toString() },
                 budgets = budgets,
-                onSaveBudget = { category, cents -> savedBudgets += "$category $cents" },
-                onDeleteBudget = { deletedBudgets += it }
+                onOpenBudgets = { openedBudgets++ }
             )
         }
     }
@@ -193,54 +191,6 @@ class SavingsScreenTest {
     }
 
     @Test
-    fun `sin presupuestos invita a crear uno y se guarda con categoria e importe`() {
-        show()
-
-        compose.onNode(hasScrollAction()).performScrollToNode(hasText("Crear presupuesto"))
-        compose.onNodeWithText("Crear presupuesto").performClick()
-        compose.onNodeWithText("Nuevo presupuesto").assertIsDisplayed()
-        compose.onNodeWithText("Guardar").assertIsNotEnabled()
-        compose.onNodeWithText("0,00 €").performTextInput("300")
-        compose.onNodeWithText("Supermercado").performClick()
-        compose.onNodeWithText("Guardar").assertIsEnabled().performClick()
-
-        assertEquals(listOf("GROCERIES 30000"), savedBudgets)
-    }
-
-    @Test
-    fun `un presupuesto muestra lo gastado y lo que queda, y se puede quitar`() {
-        show(
-            monthMovements(october, listOf(aMovement(id = "m", amountCents = 15_000, category = MovementCategory.GROCERIES, date = LocalDate.of(2026, 10, 1), note = "Mercadona"))),
-            budgets = listOf(Budget(MovementCategory.GROCERIES, 30_000))
-        )
-
-        // Va bien (50 %), así que su grupo sale cerrado: se abre como lo haría el usuario
-        compose.onNode(hasScrollAction()).performScrollToNode(hasContentDescription("Ver presupuestos"))
-        compose.onNodeWithContentDescription("Ver presupuestos").performClick()
-        compose.onNode(hasScrollAction()).performScrollToNode(hasText("150,00 € de 300,00 €"))
-        compose.onNodeWithText("Te quedan 150,00 €").assertIsDisplayed()
-        compose.onNodeWithText("50 %").assertIsDisplayed()
-
-        compose.onNodeWithText("Te quedan 150,00 €").performClick()
-        compose.onNodeWithText("Presupuesto de Supermercado").assertIsDisplayed()
-        compose.onNodeWithText("Quitar presupuesto").performScrollTo().performClick()
-        compose.onNodeWithText("Eliminar").performClick()
-
-        assertEquals(listOf(MovementCategory.GROCERIES), deletedBudgets)
-    }
-
-    @Test
-    fun `pasarse del presupuesto se dice en rojo`() {
-        show(
-            monthMovements(october, listOf(aMovement(id = "m", amountCents = 32_000, category = MovementCategory.GROCERIES, date = LocalDate.of(2026, 10, 1), note = "Mercadona"))),
-            budgets = listOf(Budget(MovementCategory.GROCERIES, 30_000))
-        )
-
-        compose.onNode(hasScrollAction()).performScrollToNode(hasText("Te has pasado 20,00 €"))
-        compose.onNodeWithText("106 %").assertIsDisplayed()
-    }
-
-    @Test
     fun `con movimientos se puede compartir el resumen del mes`() {
         show(monthMovements(october, listOf(netflix)))
 
@@ -267,10 +217,21 @@ class SavingsScreenTest {
         date = LocalDate.of(2026, 10, 1), note = "Netflix", repeatsMonthly = true
     )
 
-    // region Presupuestos agrupados (50/30/20)
+    // region Tarjeta de presupuestos (compacta; el detalle está en BudgetBreakdownContentTest)
 
     @Test
-    fun `los presupuestos se agrupan en necesidades, caprichos y ahorro segun la nomina`() {
+    fun `sin datos la tarjeta invita a poner limites y ver desglose abre el detalle`() {
+        show()
+
+        compose.onNode(hasScrollAction()).performScrollToNode(hasText("Ver desglose"))
+        compose.onNodeWithText("Pon un límite", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("Ver desglose").performClick()
+
+        assertEquals(1, openedBudgets)
+    }
+
+    @Test
+    fun `la tarjeta resume el 50-30-20 en una barra con su leyenda`() {
         show(
             monthMovements(
                 october,
@@ -282,35 +243,25 @@ class SavingsScreenTest {
             budgets = listOf(Budget(MovementCategory.HOUSING, 120_000))
         )
 
-        compose.onNode(hasScrollAction()).performScrollToNode(hasText("Reparto 50/30/20 de tu nómina (2.000,00 €)"))
-        compose.onNode(hasScrollAction()).performScrollToNode(hasText("🏠 Necesidades · 50 %"))
-        compose.onNode(hasScrollAction()).performScrollToNode(hasText("800,00 € de 1.000,00 €"))
-        compose.onNode(hasScrollAction()).performScrollToNode(hasText("🐷 Ahorro · 20 %"))
-        compose.onNode(hasScrollAction()).performScrollToNode(hasText("¡Objetivo cumplido! 💪"))
-        // Va bien: el presupuesto de Vivienda queda dentro del grupo cerrado
+        compose.onNode(hasScrollAction()).performScrollToNode(hasContentDescription("Reparto del mes"))
+        compose.onNodeWithText("Reparto 50/30/20 de tu nómina (2.000,00 €)").assertIsDisplayed()
+        compose.onNodeWithText("Necesidades").assertIsDisplayed()
+        compose.onNodeWithText("de 1.000,00 €").assertIsDisplayed()
+        compose.onNodeWithText("Ahorro").assertIsDisplayed()
+        compose.onNodeWithText("1.200,00 €").assertIsDisplayed()
+        // Las categorías y sus presupuestos solo están en el desglose
         compose.onAllNodesWithText("800,00 € de 1.200,00 €").assertCountEquals(0)
     }
 
     @Test
-    fun `un grupo con un presupuesto pasado sale abierto`() {
+    fun `la tarjeta avisa si un presupuesto se ha pasado`() {
         show(
             monthMovements(october, listOf(aMovement(id = "m", amountCents = 32_000, category = MovementCategory.GROCERIES, date = LocalDate.of(2026, 10, 1)))),
             budgets = listOf(Budget(MovementCategory.GROCERIES, 30_000))
         )
 
-        compose.onNode(hasScrollAction()).performScrollToNode(hasText("320,00 € de 300,00 €"))
-        compose.onNodeWithText("Te has pasado 20,00 €").assertIsDisplayed()
-    }
-
-    @Test
-    fun `al crear un presupuesto las categorias salen por grupos`() {
-        show()
-
-        compose.onNode(hasScrollAction()).performScrollToNode(hasText("Crear presupuesto"))
-        compose.onNodeWithText("Crear presupuesto").performClick()
-
-        compose.onNodeWithText("🏠 Necesidades · 50 %").assertIsDisplayed()
-        compose.onNodeWithText("🎉 Caprichos · 30 %").performScrollTo().assertIsDisplayed()
+        compose.onNode(hasScrollAction()).performScrollToNode(hasText("⚠️ 1 presupuesto pasado"))
+        compose.onNodeWithText("⚠️ 1 presupuesto pasado").assertIsDisplayed()
     }
 
     // endregion

@@ -26,6 +26,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.syncro.domain.model.label
@@ -61,6 +62,8 @@ fun SavingsScreen(
     // "Apuntar nómina" desde el asistente: abrir el formulario de ingreso con la categoría Nómina
     openSalaryForm: Boolean = false,
     onSalaryFormOpened: () -> Unit = {},
+    // "Ver desglose" de la tarjeta de presupuestos
+    onOpenBudgets: () -> Unit = {},
     viewModel: SavingsViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsState()
@@ -87,8 +90,7 @@ fun SavingsScreen(
         openSalaryForm = openSalaryForm,
         onSalaryFormOpened = onSalaryFormOpened,
         budgets = budgets,
-        onSaveBudget = viewModel::saveBudget,
-        onDeleteBudget = viewModel::deleteBudget,
+        onOpenBudgets = onOpenBudgets,
         onShare = { scope.launch { context.shareMovementTicket(it, LocalDateTime.now()) } },
         // Con varias cuentas, el resumen dice de cuál es
         onShareMonth = { scope.launch { context.shareMonthStatement(it, budgets, LocalDateTime.now(), accounts?.takeIf { a -> a.hasSeveral }?.active?.name) } },
@@ -98,9 +100,6 @@ fun SavingsScreen(
         onDeleteAccount = viewModel::deleteAccount
     )
 }
-
-/** El presupuesto que se abre en la hoja; [budget] null = crear uno nuevo. */
-private data class BudgetSheetTarget(val budget: Budget?)
 
 /** Qué movimiento se está viendo en detalle: el id y el día (un mensual sale en varios meses). */
 private data class SelectedOccurrence(val id: String, val date: LocalDate)
@@ -123,8 +122,7 @@ fun SavingsContent(
     onShare: (MovementOccurrence) -> Unit = {},
     onShareMonth: (MonthMovements) -> Unit = {},
     budgets: List<Budget> = emptyList(),
-    onSaveBudget: (MovementCategory, Long) -> Unit = { _, _ -> },
-    onDeleteBudget: (MovementCategory) -> Unit = {},
+    onOpenBudgets: () -> Unit = {},
     openSalaryForm: Boolean = false,
     onSalaryFormOpened: () -> Unit = {},
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
@@ -149,8 +147,6 @@ fun SavingsContent(
     // Se guarda el id y no el movimiento para que el detalle refleje los cambios al editarlo
     var selected by remember { mutableStateOf<SelectedOccurrence?>(null) }
     var editing by remember { mutableStateOf<Movement?>(null) }
-    // Presupuesto abierto: uno existente para cambiarlo, o null dentro para crear uno nuevo
-    var budgetSheet by remember { mutableStateOf<BudgetSheetTarget?>(null) }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -177,12 +173,7 @@ fun SavingsContent(
                     if (movements != null) {
                         item(key = "summary") { MonthSummaryCard(movements, onShare = { onShareMonth(movements) }) }
                         item(key = "budgets") {
-                            BudgetsCard(
-                                plan = movements.budgetPlan(budgets),
-                                canAddMore = categoriesWithoutBudget(budgets).isNotEmpty(),
-                                onAdd = { budgetSheet = BudgetSheetTarget(null) },
-                                onOpen = { budgetSheet = BudgetSheetTarget(it) }
-                            )
+                            BudgetsCard(plan = movements.budgetPlan(budgets), onSeeBreakdown = onOpenBudgets)
                         }
 
                         if (movements.occurrences.isEmpty()) {
@@ -252,22 +243,6 @@ fun SavingsContent(
             onSave = { amountCents, category, date, note, repeatsMonthly ->
                 editing = null
                 onSave(movement.type, amountCents, category, date, note, repeatsMonthly, movement.id)
-            }
-        )
-    }
-
-    budgetSheet?.let { target ->
-        BudgetSheet(
-            existing = target.budget,
-            available = categoriesWithoutBudget(budgets),
-            onDismiss = { budgetSheet = null },
-            onSave = { category, limitCents ->
-                budgetSheet = null
-                onSaveBudget(category, limitCents)
-            },
-            onDelete = { category ->
-                budgetSheet = null
-                onDeleteBudget(category)
             }
         )
     }
@@ -481,17 +456,22 @@ private fun DayHeader(date: LocalDate, today: LocalDate) {
 /**
  * Un movimiento: icono de su categoría, concepto (o la categoría si no tiene), y el importe con
  * signo y color. Los que aún no han llegado este mes (un recibo a final de mes) salen atenuados
- * como "Previsto".
+ * como "Previsto". También en la hoja de un presupuesto (sin [onClick] ni margen lateral propio).
  */
 @Composable
-private fun MovementRow(occurrence: MovementOccurrence, isUpcoming: Boolean, onClick: () -> Unit) {
+internal fun MovementRow(
+    occurrence: MovementOccurrence,
+    isUpcoming: Boolean,
+    onClick: (() -> Unit)?,
+    horizontalPadding: Dp = 24.dp
+) {
     val movement = occurrence.movement
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
             .alpha(if (isUpcoming) 0.6f else 1f)
-            .padding(horizontal = 24.dp, vertical = 10.dp),
+            .padding(horizontal = horizontalPadding, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         IconBadge(movement.category.icon, movement.category.color)

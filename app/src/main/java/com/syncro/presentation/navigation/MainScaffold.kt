@@ -47,6 +47,7 @@ import com.syncro.presentation.event.AddEventScreen
 import com.syncro.presentation.home.HomeScreen
 import com.syncro.presentation.login.LoginScreen
 import com.syncro.presentation.notes.NotesListScreen
+import com.syncro.presentation.savings.BudgetBreakdownScreen
 import com.syncro.presentation.savings.SavingsScreen
 import com.syncro.presentation.settings.SettingsScreen
 import com.syncro.presentation.onboarding.OnboardingScreen
@@ -59,7 +60,7 @@ import com.syncro.presentation.theme.SyncroTheme
 import com.syncro.presentation.theme.ThemeViewModel
 
 /** Pantallas que se abren "encima" de otra (entran por la derecha) y ocultan la barra inferior. */
-private val PAGE_ROUTES = setOf(AppScreen.NotesList.route, AppScreen.Settings.route, AppScreen.Legal.route)
+private val PAGE_ROUTES = setOf(AppScreen.NotesList.route, AppScreen.Settings.route, AppScreen.Legal.route, AppScreen.SavingsBudgets.route)
 
 /** Ritmo de las transiciones de página (libreta) y de la barra inferior, que van a la vez. */
 private fun <T> pushSpec() = tween<T>(durationMillis = 400, easing = FastOutSlowInEasing)
@@ -101,6 +102,7 @@ fun MainScaffold(
                        currentRoute != AppScreen.NotesList.route &&
                        currentRoute != AppScreen.Settings.route &&
                        currentRoute != AppScreen.Legal.route &&
+                       currentRoute != AppScreen.SavingsBudgets.route &&
                        currentRoute != AppScreen.Onboarding.route
     // Mientras la barra se oculta con animación, sigue marcando la sección de la que se viene
     var lastBottomRoute by remember { mutableStateOf(currentRoute) }
@@ -325,7 +327,22 @@ fun MainScaffold(
                         ReadableWidth(maxWidth = 720.dp) {
                             SavingsScreen(
                                 openSalaryForm = openSalaryForm,
-                                onSalaryFormOpened = { openSalaryForm = false }
+                                onSalaryFormOpened = { openSalaryForm = false },
+                                onOpenBudgets = { navController.navigate(AppScreen.SavingsBudgets.route) }
+                            )
+                        }
+                    }
+                    // El desglose de presupuestos: una página encima de Ahorros con su mismo ViewModel (mismo mes y cuenta)
+                    composable(
+                        AppScreen.SavingsBudgets.route,
+                        enterTransition = { slideInHorizontally(pushSpec()) { it } },
+                        popExitTransition = { slideOutHorizontally(pushSpec()) { it } }
+                    ) { entry ->
+                        val savingsEntry = remember(entry) { navController.getBackStackEntry(AppScreen.Savings.route) }
+                        ReadableWidth(maxWidth = 720.dp) {
+                            BudgetBreakdownScreen(
+                                onBack = { navController.popBackStack() },
+                                viewModel = hiltViewModel(savingsEntry)
                             )
                         }
                     }
