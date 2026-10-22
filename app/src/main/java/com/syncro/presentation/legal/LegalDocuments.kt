@@ -19,7 +19,7 @@ object LegalInfo {
     const val OWNER_ADDRESS = "14900 Lucena (Córdoba), España"
     const val CONTACT_EMAIL = "appsyncro2026@gmail.com"
     /** Fecha de la última revisión de los textos; cambiarla al modificarlos. */
-    const val LAST_UPDATED = "8 de octubre de 2026"
+    const val LAST_UPDATED = "13 de octubre de 2026"
 
     val isComplete: Boolean
         get() = listOf(OWNER_NAME, OWNER_ADDRESS, CONTACT_EMAIL).none { it.startsWith("[") }
@@ -76,7 +76,7 @@ private val privacyPolicy = LegalDocument(
             "En pocas palabras",
             listOf(
                 "• Tus datos se guardan en tu móvil y en tu propia cuenta de Google. ${LegalInfo.APP_NAME} no tiene servidores propios: el titular de la app no recibe ni puede ver tus tareas, eventos, notas, ingresos y gastos ni datos de tu cuenta.",
-                "• La app solo se comunica con Google, para iniciar sesión y para sincronizar Google Calendar y Google Tasks.",
+                "• La app solo se comunica con Google: para iniciar sesión, para sincronizar Google Calendar y Google Tasks y, a través de Google Play, para saber si hay una versión nueva de la app.",
                 "• No hay publicidad, no se venden ni se ceden datos, y no se usan herramientas de analítica ni de seguimiento.",
                 "• Los avisos diarios, los avisos de tus tareas y eventos y el asistente funcionan dentro del móvil, sin enviar tus datos a ningún sitio."
             )
@@ -119,6 +119,7 @@ private val privacyPolicy = LegalDocument(
             "Con quién se comparten",
             listOf(
                 "Solo con Google, que es quien presta el inicio de sesión y los servicios de Calendar y Tasks, y con quien ya tienes una relación como usuario. Google trata esos datos según su propia política de privacidad (policies.google.com/privacy).",
+                "Versiones nuevas: para avisarte en el chat del asistente de que hay una versión nueva, la app pregunta a Google Play, la tienda desde la que la instalaste, si la tiene. Esa consulta la gestiona Google Play en tu móvil; no incluye tus tareas, eventos, notas ni movimientos, y el titular de la app no recibe nada.",
                 "Google puede tratar datos fuera del Espacio Económico Europeo, con las garantías que recoge su política, como el Marco de Privacidad de Datos UE-EE. UU. y las cláusulas contractuales tipo de la Comisión Europea.",
                 "Tickets y resúmenes: si compartes el ticket de un ingreso o gasto o el resumen de un mes, se crea una imagen con sus datos en el almacenamiento temporal de la app y se envía solo a la app que elijas en el menú de compartir de Android (por ejemplo WhatsApp o el correo), que la tratará según su propia política. La app no la envía a ningún otro sitio.",
                 "Exportaciones y copias: si exportas tus ingresos y gastos o haces una copia de seguridad, el archivo se guarda solo donde tú elijas (tu móvil, Google Drive u otro servicio que tengas instalado), que lo tratará según su propia política. Restaurar una copia solo lee el archivo que elijas.",

@@ -1,5 +1,9 @@
 package com.syncro.data.repository
 
+import android.content.Intent
+import com.google.android.gms.auth.UserRecoverableAuthException
+import com.google.api.client.googleapis.extensions.android.gms.auth.UserRecoverableAuthIOException
+import com.syncro.domain.model.GoogleService
 import com.syncro.data.local.SyncroDatabase
 import com.syncro.data.local.dao.EventDao
 import com.syncro.data.local.dao.TaskDao
@@ -806,6 +810,45 @@ class GoogleSyncRepositoryImplTest {
         )
         assertEquals("No debe duplicarse al volver a leerlo", 1, eventDao.getEventsByDate(DAY.toEpochDay()).first().size)
         assertTrue(eventDao.getPendingEventIds().isEmpty())
+    }
+
+    // endregion
+
+    // region Permisos de Google
+
+    private fun noPermission() = UserRecoverableAuthIOException(UserRecoverableAuthException("Sin permiso", Intent()))
+
+    @Test
+    fun `sin permiso de Calendar se marca y una descarga que funciona lo quita`() = runTest {
+        google.networkError = noPermission()
+
+        assertTrue(repository.syncCalendar(DAY).isFailure)
+        assertEquals(setOf(GoogleService.CALENDAR), repository.observeMissingAccess().first())
+
+        google.networkError = null
+        assertTrue(repository.syncCalendar(DAY).isSuccess)
+        assertEquals(emptySet<GoogleService>(), repository.observeMissingAccess().first())
+    }
+
+    @Test
+    fun `un fallo de red no cuenta como falta de permiso`() = runTest {
+        google.networkError = IOException("Sin conexión")
+
+        repository.syncTasks(force = true)
+
+        assertEquals(emptySet<GoogleService>(), repository.observeMissingAccess().first())
+    }
+
+    @Test
+    fun `sin permiso lo creado en el movil se queda y sigue pendiente de subir`() = runTest {
+        taskDao.insertTask(aSyncedTaskEntity(id = "t1", remoteId = null, pendingChanges = 1).copy(title = "Nueva"))
+        google.networkError = noPermission()
+
+        assertTrue(repository.pushTask("t1").isFailure)
+
+        assertEquals(setOf(GoogleService.TASKS), repository.observeMissingAccess().first())
+        assertEquals(1, taskDao.getTaskById("t1")!!.pendingChanges)
+        assertEquals(1, repository.observePendingChangesCount().first())
     }
 
     // endregion

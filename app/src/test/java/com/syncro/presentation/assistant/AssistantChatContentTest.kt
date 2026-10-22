@@ -3,12 +3,15 @@ package com.syncro.presentation.assistant
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.hasScrollToIndexAction
+import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import com.syncro.domain.model.AppUpdate
 import com.syncro.domain.model.AssistantConversation
 import com.syncro.domain.model.DigestAnswer
 import com.syncro.domain.model.FocusCandidates
@@ -44,7 +47,7 @@ class AssistantChatContentTest {
             AssistantChatContent(
                 conversation = conversation,
                 firstSelectableDay = DAY.plusDays(1),
-                onReply = { reply, selected -> calls += if (selected.isEmpty()) reply.name else "${reply.name}$selected" },
+                onReply = { reply, selected, _ -> calls += if (selected.isEmpty()) reply.name else "${reply.name}$selected" },
                 onTaskAction = { taskId, action, _ -> calls += "$action($taskId)" },
                 onClearChat = { calls += "clear" }
             )
@@ -52,6 +55,25 @@ class AssistantChatContentTest {
     }
 
     private val leftovers = LeftoverTasks(DAY, MoveTarget.TOMORROW, listOf(aTask(id = "t1", title = "Llamar al banco")))
+
+    @Test
+    fun `mientras se arma la conversacion se ve el esqueleto y no No hay mensajes`() {
+        compose.setContent {
+            AssistantChatContent(conversation = null, firstSelectableDay = DAY, onReply = { _, _, _ -> }, onTaskAction = { _, _, _ -> }, onClearChat = {})
+        }
+
+        compose.onNodeWithContentDescription("Cargando").assertIsDisplayed()
+        compose.onNodeWithText("No hay mensajes").assertDoesNotExist()
+    }
+
+    @Test
+    fun `la cabecera lleva la foto del asistente`() {
+        show(assistantConversation(null, notificationsAllowed = false))
+
+        compose.onNodeWithContentDescription("Foto del asistente").assertIsDisplayed()
+        compose.onNodeWithContentDescription("En línea").assertIsDisplayed()
+        compose.onNodeWithText("Asistente").assertIsDisplayed()
+    }
 
     @Test
     fun `pregunta por los avisos y al contestar se quitan las opciones`() {
@@ -145,5 +167,49 @@ class AssistantChatContentTest {
 
         compose.onNodeWithText("No hay mensajes").assertIsDisplayed()
         compose.onNodeWithContentDescription("Vaciar el chat").assertDoesNotExist()
+    }
+
+    // Regresión: al tocar "Actualizar" se ocultaban los botones y, al volver de la tienda sin
+    // actualizar, ya no había forma de abrirla otra vez
+    @Test
+    fun `Actualizar abre la tienda y deja los botones por si vuelve sin actualizar`() {
+        show(assistantConversation(DigestAnswer.ACCEPTED, notificationsAllowed = true, update = AppUpdate(42)))
+
+        compose.onNodeWithText("Actualizar").performScrollTo().performClick()
+
+        assertEquals(listOf("UPDATE_NOW"), calls)
+        compose.onNodeWithText("Actualizar").assertExists()
+        compose.onNodeWithText("Más tarde").assertExists()
+    }
+
+    @Test
+    fun `cada dia lleva su chip como en WhatsApp`() {
+        val messages = assistantConversation(DigestAnswer.ACCEPTED, notificationsAllowed = true).messages
+        val days = listOf(DAY.minusDays(1)) + List(messages.size - 1) { DAY }
+        compose.setContent {
+            AssistantChatContent(
+                conversation = AssistantConversation(messages.zip(days) { message, day -> message.copy(day = day) }),
+                today = DAY,
+                firstSelectableDay = DAY,
+                onReply = { _, _, _ -> },
+                onTaskAction = { _, _, _ -> },
+                onClearChat = {}
+            )
+        }
+
+        compose.onAllNodesWithText("Hoy").assertCountEquals(1)
+        // Al abrir baja al final: el de ayer queda arriba
+        compose.onNode(hasScrollToIndexAction()).performScrollToIndex(0)
+        compose.onNodeWithText("Ayer").assertExists()
+    }
+
+    @Test
+    fun `etiquetas de dia del chat`() {
+        assertEquals("Hoy", chatDayLabel(DAY, DAY))
+        assertEquals("Ayer", chatDayLabel(DAY.minusDays(1), DAY))
+        // DAY es sábado 26 de septiembre de 2026
+        assertEquals("Martes", chatDayLabel(DAY.minusDays(4), DAY))
+        assertEquals("12 de septiembre", chatDayLabel(DAY.minusDays(14), DAY))
+        assertEquals("26 de septiembre de 2025", chatDayLabel(DAY.minusYears(1), DAY))
     }
 }

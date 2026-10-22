@@ -37,6 +37,8 @@ data class DailyDigest(
     val offerFocus: Boolean = true,
     /** Llevar al repaso de pendientes por la noche: activado en Ajustes. */
     val offerLeftovers: Boolean = true,
+    /** Avisar de eventos que se pisan o de un día a tope (hoy por la mañana, mañana por la noche): activado en Ajustes. */
+    val warnDayLoad: Boolean = true,
     /** Hoy es día de nómina (configurado en Ajustes): el aviso de la mañana lo celebra y lleva al chat. */
     val isPayday: Boolean = false
 )

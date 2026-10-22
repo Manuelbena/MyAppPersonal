@@ -15,6 +15,11 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
+import com.syncro.domain.model.ArgbColor
+import com.syncro.domain.model.MAIN_ACCOUNT_ID
+import com.syncro.domain.model.MAIN_ACCOUNT_NAME
+import com.syncro.domain.model.SavingsAccount
+import com.syncro.domain.model.SavingsAccounts
 import com.syncro.domain.model.SavingsPeriod
 import com.syncro.domain.model.Budget
 import com.syncro.domain.model.MonthMovements
@@ -36,6 +41,9 @@ import java.time.YearMonth
  */
 @RunWith(RobolectricTestRunner::class)
 class SavingsScreenTest {
+
+    // La app siempre tiene al menos una cuenta; sin ella Ahorros se queda en el esqueleto de carga
+    private val oneAccount = SavingsAccount(MAIN_ACCOUNT_ID, MAIN_ACCOUNT_NAME, ArgbColor(0xFF0EA5E9.toInt())).let { SavingsAccounts(listOf(it), it) }
 
     @get:Rule
     val compose = createComposeRule()
@@ -62,7 +70,8 @@ class SavingsScreenTest {
                 onShare = { shared += it.movement.id },
                 onShareMonth = { sharedMonths += it.month.toString() },
                 budgets = budgets,
-                onOpenBudgets = { openedBudgets++ }
+                onOpenBudgets = { openedBudgets++ },
+                accounts = oneAccount
             )
         }
     }
@@ -177,7 +186,8 @@ class SavingsScreenTest {
                 onSave = { type, cents, category, date, _, _, _ -> saved += "$type $cents $category $date" },
                 onDelete = {},
                 openSalaryForm = true,
-                onSalaryFormOpened = { opened++ }
+                onSalaryFormOpened = { opened++ },
+                accounts = oneAccount
             )
         }
 

@@ -17,6 +17,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 @Composable
@@ -28,41 +30,51 @@ fun FloatingBottomNav(
     /** Número sin leer por ruta (p. ej. mensajes del asistente); 0 o ausente no muestra nada. */
     badges: Map<String, Int> = emptyMap()
 ) {
-    Surface(
-        modifier = modifier
-            .padding(horizontal = 32.dp, vertical = 40.dp)
-            .fillMaxWidth(),
-        shape = RoundedCornerShape(30.dp),
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
-        shadowElevation = 8.dp,
-        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
-    ) {
-        Row(
+    // Se adapta al ancho de la pantalla: en móviles pequeños (≤ 360 dp) los márgenes y las píldoras
+    // encogen y cada pestaña se reparte el mismo ancho, así ninguna se queda fuera
+    BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
+        val compact = maxWidth < COMPACT_WIDTH
+        Surface(
             modifier = Modifier
-                .padding(horizontal = 16.dp, vertical = 12.dp)
+                .padding(horizontal = if (compact) 12.dp else 32.dp, vertical = if (compact) 24.dp else 40.dp)
                 .fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+            shape = RoundedCornerShape(30.dp),
+            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
+            shadowElevation = 8.dp,
+            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
         ) {
-            items.forEach { screen ->
-                val isSelected = currentRoute == screen.route
-                NavBarItem(
-                    screen = screen,
-                    isSelected = isSelected,
-                    badgeCount = badges[screen.route] ?: 0,
-                    onClick = { onItemClick(screen) }
-                )
+            Row(
+                modifier = Modifier
+                    .padding(horizontal = if (compact) 4.dp else 8.dp, vertical = 12.dp)
+                    .fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                items.forEach { screen ->
+                    NavBarItem(
+                        screen = screen,
+                        isSelected = currentRoute == screen.route,
+                        badgeCount = badges[screen.route] ?: 0,
+                        pillPadding = if (compact) 14.dp else 24.dp,
+                        onClick = { onItemClick(screen) },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
             }
         }
     }
 }
+
+/** Por debajo de este ancho de pantalla la barra se compacta. */
+private val COMPACT_WIDTH = 380.dp
 
 @Composable
 private fun NavBarItem(
     screen: AppScreen,
     isSelected: Boolean,
     badgeCount: Int,
-    onClick: () -> Unit
+    pillPadding: Dp,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     val interactionSource = remember { MutableInteractionSource() }
 
@@ -79,7 +91,7 @@ private fun NavBarItem(
     )
 
     Column(
-        modifier = Modifier
+        modifier = modifier
             .clickable(
                 interactionSource = interactionSource,
                 indication = null,
@@ -102,7 +114,7 @@ private fun NavBarItem(
                 modifier = Modifier
                     .clip(RoundedCornerShape(16.dp))
                     .background(backgroundColor)
-                    .padding(horizontal = 24.dp, vertical = 4.dp),
+                    .padding(horizontal = pillPadding, vertical = 4.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
@@ -119,7 +131,11 @@ private fun NavBarItem(
             text = screen.title,
             style = MaterialTheme.typography.labelSmall,
             color = contentColor,
-            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+            // "Calendario" no debe partirse ni empujar a las demás en pantallas estrechas
+            maxLines = 1,
+            softWrap = false,
+            overflow = TextOverflow.Ellipsis
         )
     }
 }

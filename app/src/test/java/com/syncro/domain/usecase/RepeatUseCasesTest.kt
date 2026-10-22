@@ -16,6 +16,8 @@ import com.syncro.testutil.FakeSettingsRepository
 import com.syncro.testutil.FakeTaskRepository
 import com.syncro.testutil.MutableClock
 import com.syncro.testutil.aTask
+import com.syncro.testutil.anEvent
+import com.syncro.domain.model.findHabits
 import com.syncro.testutil.at
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
@@ -291,4 +293,36 @@ class RepeatUseCasesTest {
 
         assertEquals(listOf("suelta"), leftovers.tasks.map { it.id })
     }
+
+    // region Hábitos ("Gimnasio" los martes): "Sí, cada martes" en el chat
+
+    private val repeatHabit = RepeatHabitUseCase(saveEvent, saveTask, clock)
+    // Los martes anteriores a DAY (sábado 26)
+    private val tuesdays = listOf(DAY.minusDays(4), DAY.minusDays(11), DAY.minusDays(18))
+
+    @Test
+    fun `un evento habitual pasa a repetirse desde su ultima vez, sin duplicarla`() = runTest {
+        tuesdays.forEach { events.insertEvent(anEvent(id = "gym-$it", title = "Gimnasio", date = it, startTime = at("19:00"), endTime = at("20:00"))) }
+        val habit = findHabits(emptyList(), events.events.value.values.toList(), DAY).single()
+
+        repeatHabit(habit).getOrThrow()
+
+        // La última vez es la primera de la serie (mismo id) y el martes que viene ya existe
+        assertTrue(events.events.value.getValue("gym-${tuesdays.first()}").seriesId != null)
+        assertEquals("Gimnasio", eventOn(DAY.plusDays(3)).title)
+        assertEquals(1, events.events.value.values.count { it.date == tuesdays.first() })
+    }
+
+    @Test
+    fun `una tarea habitual empieza su serie el proximo martes`() = runTest {
+        tuesdays.forEach { tasks.insertTask(aTask(title = "Sacar la basura", date = it)) }
+        val habit = findHabits(tasks.tasks.value.values.toList(), emptyList(), DAY).single()
+
+        repeatHabit(habit).getOrThrow()
+
+        assertTrue(taskOn(DAY.plusDays(3)).seriesId != null)
+        assertEquals(1, tasks.tasks.value.values.count { it.date == tuesdays.first() })
+    }
+
+    // endregion
 }

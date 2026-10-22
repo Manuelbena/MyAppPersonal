@@ -31,6 +31,7 @@ import androidx.compose.material.icons.automirrored.outlined.Logout
 import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Backup
+import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.FileDownload
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Notifications
@@ -55,6 +56,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import com.syncro.data.preferences.ThemeMode
 import com.syncro.domain.model.AssistantSettings
+import com.syncro.domain.model.HomeSettings
 import com.syncro.domain.model.DataLossSummary
 import com.syncro.domain.model.DigestSettings
 import com.syncro.presentation.components.canAskNotificationPermission
@@ -134,6 +136,7 @@ fun SettingsScreen(
             },
             onDigestChange = viewModel::updateDigest,
             onAssistantChange = viewModel::updateAssistant,
+            onHomeChange = viewModel::updateHome,
             onThemeChange = viewModel::setThemeMode,
             onLogoutClick = viewModel::requestLogout,
             onLogoutConfirm = viewModel::confirmLogout,
@@ -190,6 +193,7 @@ fun SettingsContent(
     onNotificationsToggle: (Boolean) -> Unit,
     onDigestChange: ((DigestSettings) -> DigestSettings) -> Unit,
     onAssistantChange: ((AssistantSettings) -> AssistantSettings) -> Unit,
+    onHomeChange: ((HomeSettings) -> HomeSettings) -> Unit = {},
     onThemeChange: (ThemeMode) -> Unit,
     onLogoutClick: () -> Unit,
     onLogoutConfirm: () -> Unit,
@@ -203,6 +207,7 @@ fun SettingsContent(
 ) {
     val digest = state.settings.digest
     val assistant = state.settings.assistant
+    val home = state.settings.home
     // Qué hora se está cambiando (mañana o noche)
     var editingMorning by remember { mutableStateOf<Boolean?>(null) }
     var editingPayday by remember { mutableStateOf(false) }
@@ -261,6 +266,8 @@ fun SettingsContent(
                             CategoryRow(SettingsPage.NOTIFICATIONS, if (notificationsAllowed) "Activadas" else "Desactivadas") { page = it }
                             SettingsDivider()
                             CategoryRow(SettingsPage.DIGEST, digestSummary(digest)) { page = it }
+                            SettingsDivider()
+                            CategoryRow(SettingsPage.HOME, homeSummary(state.settings.home, assistant)) { page = it }
                             SettingsDivider()
                             CategoryRow(SettingsPage.ASSISTANT, assistantSummary(assistant)) { page = it }
                             SettingsDivider()
@@ -326,6 +333,51 @@ fun SettingsContent(
                         TimeRow("Hora de cierre del día", digest.eveningTime) { editingMorning = false }
                     }
 
+                    // Qué se ve en Inicio: para dejarlo tan limpio como se quiera
+                    SettingsPage.HOME -> SettingsCard {
+                        SwitchRow(
+                            title = "Lo próximo",
+                            subtitle = "El evento en curso, el siguiente y cómo van las tareas de hoy",
+                            checked = home.showNextUp,
+                            onCheckedChange = { on -> onHomeChange { it.copy(showNextUp = on) } }
+                        )
+                        SettingsDivider()
+                        SwitchRow(
+                            title = "Frase del día",
+                            subtitle = "Una frase para empezar el día. Con la ✕ la ocultas solo hasta mañana",
+                            checked = assistant.dailyQuoteEnabled,
+                            onCheckedChange = { on -> onAssistantChange { it.copy(dailyQuoteEnabled = on) } }
+                        )
+                        SettingsDivider()
+                        SwitchRow(
+                            title = "Ahorros",
+                            subtitle = "El balance del mes y si algún presupuesto va justo",
+                            checked = assistant.homeSavingsEnabled,
+                            onCheckedChange = { on -> onAssistantChange { it.copy(homeSavingsEnabled = on) } }
+                        )
+                        SettingsDivider()
+                        SwitchRow(
+                            title = "Racha",
+                            subtitle = "Los días seguidos con todas tus tareas hechas",
+                            checked = home.showStreak,
+                            onCheckedChange = { on -> onHomeChange { it.copy(showStreak = on) } }
+                        )
+                        SettingsDivider()
+                        SwitchRow(
+                            title = "Huecos libres",
+                            subtitle = "El tiempo libre entre eventos, con un + para aprovecharlo",
+                            checked = home.showFreeGaps,
+                            onCheckedChange = { on -> onHomeChange { it.copy(showFreeGaps = on) } }
+                        )
+                        SettingsDivider()
+                        SwitchRow(
+                            title = "Notas",
+                            subtitle = "Tus últimas notas, al final de Inicio",
+                            checked = home.showNotes,
+                            onCheckedChange = { on -> onHomeChange { it.copy(showNotes = on) } }
+                        )
+                    }
+
                     SettingsPage.ASSISTANT -> SettingsCard {
                         SwitchRow(
                             title = "Prioridades del día",
@@ -349,17 +401,10 @@ fun SettingsContent(
                         )
                         SettingsDivider()
                         SwitchRow(
-                            title = "Frase del día",
-                            subtitle = "Una frase para empezar el día en Inicio. Con la ✕ la ocultas solo hasta mañana",
-                            checked = assistant.dailyQuoteEnabled,
-                            onCheckedChange = { on -> onAssistantChange { it.copy(dailyQuoteEnabled = on) } }
-                        )
-                        SettingsDivider()
-                        SwitchRow(
-                            title = "Ahorros en Inicio",
-                            subtitle = "El balance del mes y si algún presupuesto va justo, en la pantalla de Inicio",
-                            checked = assistant.homeSavingsEnabled,
-                            onCheckedChange = { on -> onAssistantChange { it.copy(homeSavingsEnabled = on) } }
+                            title = "Solapes y días a tope",
+                            subtitle = "Te avisa si se te pisan eventos o si un día vas muy cargado",
+                            checked = assistant.dayLoadEnabled,
+                            onCheckedChange = { on -> onAssistantChange { it.copy(dayLoadEnabled = on) } }
                         )
                         SettingsDivider()
                         SettingsRow(
@@ -492,6 +537,7 @@ enum class SettingsPage(val title: String, val icon: ImageVector) {
     ACCOUNT("Cuenta", Icons.Outlined.AccountCircle),
     NOTIFICATIONS("Notificaciones", Icons.Outlined.Notifications),
     DIGEST("Resumen del día", Icons.Outlined.WbSunny),
+    HOME("Inicio", Icons.Outlined.Home),
     ASSISTANT("Asistente", Icons.Outlined.AutoAwesome),
     DATA("Tus datos", Icons.Outlined.Backup),
     APPEARANCE("Apariencia", Icons.Outlined.Palette),
@@ -508,10 +554,18 @@ private fun assistantSummary(assistant: AssistantSettings): String = listOfNotNu
     "Prioridades".takeIf { assistant.focusEnabled },
     "Pendientes".takeIf { assistant.leftoversEnabled },
     "Presupuestos".takeIf { assistant.budgetAlertsEnabled },
-    "Frase".takeIf { assistant.dailyQuoteEnabled },
-    "Ahorros".takeIf { assistant.homeSavingsEnabled },
+    "Solapes".takeIf { assistant.dayLoadEnabled },
     assistant.paydayDay?.let { "Nómina día $it" }
 ).joinToString(" · ").ifEmpty { "Sin preguntas" }
+
+private fun homeSummary(home: HomeSettings, assistant: AssistantSettings): String = listOfNotNull(
+    "Lo próximo".takeIf { home.showNextUp },
+    "Frase".takeIf { assistant.dailyQuoteEnabled },
+    "Ahorros".takeIf { assistant.homeSavingsEnabled },
+    "Racha".takeIf { home.showStreak },
+    "Huecos".takeIf { home.showFreeGaps },
+    "Notas".takeIf { home.showNotes }
+).joinToString(" · ").ifEmpty { "Solo tu agenda" }
 
 private fun themeLabel(mode: ThemeMode): String = when (mode) {
     ThemeMode.SYSTEM -> "Sistema"

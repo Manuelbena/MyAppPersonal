@@ -14,6 +14,8 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onParent
 import androidx.compose.ui.unit.dp
 import com.syncro.domain.model.Subtask
+import com.syncro.domain.model.DayWindow
+import com.syncro.presentation.home.components.DayTimeline
 import com.syncro.presentation.home.components.EventCard
 import com.syncro.presentation.home.components.NowIndicator
 import com.syncro.presentation.home.components.QuickTaskContent
@@ -173,5 +175,50 @@ class TimelineComponentsTest {
         val pendingTop = compose.onNodeWithText("Pendiente").fetchSemanticsNode().boundsInRoot.top
         val doneTop = compose.onNodeWithText("Hecha").fetchSemanticsNode().boundsInRoot.top
         assertTrue(pendingTop < doneTop)
+    }
+
+    @Test
+    fun `el timeline va del inicio al fin del dia con la linea Ahora dentro del evento en curso`() {
+        compose.setContent {
+            DayTimeline(
+                events = listOf(anEvent(title = "Reunión", startTime = at("10:00"), endTime = at("12:00"))),
+                day = DAY,
+                now = DAY.atTime(11, 0),
+                window = DayWindow(at("09:00"), at("21:00")),
+                gaps = emptyMap(),
+                onAddInGap = {},
+                onSubtaskToggle = { _, _ -> },
+                onToggleEvent = {},
+                onEventClick = {}
+            )
+        }
+
+        val start = compose.onNodeWithText("Empieza tu día").fetchSemanticsNode().boundsInRoot
+        val end = compose.onNodeWithText("Termina tu día").fetchSemanticsNode().boundsInRoot
+        val card = compose.onNodeWithText("Reunión").fetchSemanticsNode().boundsInRoot
+        compose.onNodeWithText("21:00").assertIsDisplayed()
+        assertTrue(start.bottom <= card.top && card.bottom <= end.top)
+        // La línea "Ahora" va por encima de la tarjeta, no en una fila aparte
+        val nowLine = compose.onNodeWithContentDescription("Ahora, 11:00").fetchSemanticsNode().boundsInRoot
+        assertTrue(nowLine.center.y > start.bottom && nowLine.center.y < end.top)
+    }
+
+    @Test
+    fun `mirando otro dia no hay linea Ahora`() {
+        compose.setContent {
+            DayTimeline(
+                events = listOf(anEvent(startTime = at("10:00"), endTime = at("12:00"))),
+                day = DAY.plusDays(1),
+                now = DAY.atTime(11, 0),
+                window = DayWindow(at("09:00"), at("21:00")),
+                gaps = emptyMap(),
+                onAddInGap = {},
+                onSubtaskToggle = { _, _ -> },
+                onToggleEvent = {},
+                onEventClick = {}
+            )
+        }
+
+        compose.onNodeWithContentDescription("Ahora, 11:00").assertDoesNotExist()
     }
 }

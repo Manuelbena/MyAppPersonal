@@ -53,8 +53,6 @@ import com.syncro.presentation.event.transparentTextFieldColors
 import com.syncro.presentation.theme.Amber500
 import com.syncro.presentation.theme.Emerald500
 import com.syncro.presentation.theme.Rose500
-import com.syncro.presentation.theme.Sky500
-import com.syncro.presentation.theme.Violet500
 import java.time.LocalDate
 
 /*
@@ -78,7 +76,7 @@ internal val BudgetGroup.title: String
     }
 
 /** Nombre corto para la leyenda de la barra. */
-private val BudgetGroup.shortName: String
+internal val BudgetGroup.shortName: String
     get() = when (this) {
         BudgetGroup.NEEDS -> "Necesidades"
         BudgetGroup.WANTS -> "Caprichos"
@@ -88,13 +86,6 @@ internal val BudgetGroup.hint: String
     get() = when (this) {
         BudgetGroup.NEEDS -> "Casa, facturas, comida, transporte, salud y estudios"
         BudgetGroup.WANTS -> "Salir, ocio, suscripciones, compras y otros"
-    }
-
-/** Color de cada trozo de la barra: el del grupo, no el de cómo va (eso lo dice la leyenda). */
-private val BudgetGroup.stackColor: Color
-    get() = when (this) {
-        BudgetGroup.NEEDS -> Sky500
-        BudgetGroup.WANTS -> Violet500
     }
 
 /** "Reparto 50/30/20 de tu nómina (2.000,00 €)"; null si este mes no ha entrado nada. */
@@ -189,8 +180,9 @@ private data class StackSegment(val color: Color, val cents: Long)
  */
 @Composable
 internal fun BudgetStack(plan: BudgetPlan, modifier: Modifier = Modifier) {
-    val segments = plan.groups.map { StackSegment(it.group.stackColor, it.spentCents) } +
-        listOfNotNull(plan.savings?.let { StackSegment(Emerald500, it.savedCents.coerceAtLeast(0)) })
+    val palette = budgetChartPalette
+    val segments = plan.groups.map { StackSegment(palette.of(it.group), it.spentCents) } +
+        listOfNotNull(plan.savings?.let { StackSegment(palette.savings, it.savedCents.coerceAtLeast(0)) })
     val visible = segments.filter { it.cents > 0 }
     Row(
         modifier = modifier
@@ -215,10 +207,11 @@ internal fun BudgetStack(plan: BudgetPlan, modifier: Modifier = Modifier) {
 /** Debajo de la barra: cada trozo con su color, lo que lleva y lo que le toca. */
 @Composable
 internal fun BudgetStackLegend(plan: BudgetPlan) {
+    val palette = budgetChartPalette
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         plan.groups.forEach { group ->
             LegendItem(
-                color = group.group.stackColor,
+                color = palette.of(group.group),
                 label = group.group.shortName,
                 amount = formatEuros(group.spentCents),
                 // Solo se colorea lo que hay que mirar
@@ -229,7 +222,7 @@ internal fun BudgetStackLegend(plan: BudgetPlan) {
         }
         plan.savings?.let { goal ->
             LegendItem(
-                color = Emerald500,
+                color = palette.savings,
                 label = "Ahorro",
                 amount = (if (goal.savedCents < 0) "−" else "") + formatEuros(kotlin.math.abs(goal.savedCents)),
                 amountColor = if (goal.savedCents < 0) Rose500 else null,

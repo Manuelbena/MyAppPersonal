@@ -5,6 +5,7 @@ import com.syncro.data.notifications.DigestAlarmScheduler
 import com.syncro.data.notifications.ReminderAlarmScheduler
 import com.syncro.domain.usecase.ObserveRemindersUseCase
 import com.syncro.domain.repository.SettingsRepository
+import com.syncro.presentation.widget.SavingsWidgetUpdater
 import com.syncro.presentation.widget.TodayWidgetUpdater
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
@@ -21,6 +22,7 @@ class SyncroApp : Application() {
     @Inject lateinit var digestScheduler: DigestAlarmScheduler
     @Inject lateinit var settingsRepository: SettingsRepository
     @Inject lateinit var todayWidgetUpdater: TodayWidgetUpdater
+    @Inject lateinit var savingsWidgetUpdater: SavingsWidgetUpdater
     @Inject lateinit var reminderScheduler: ReminderAlarmScheduler
     @Inject lateinit var observeReminders: ObserveRemindersUseCase
 
@@ -39,6 +41,8 @@ class SyncroApp : Application() {
         }
         // El widget "Tu día" sigue los cambios de tareas y eventos mientras la app está viva
         appScope.launch { todayWidgetUpdater.run() }
+        // El widget "Ahorros" sigue los movimientos, cuentas y presupuestos
+        appScope.launch { savingsWidgetUpdater.run() }
         // Avisos de tareas y eventos: cada cambio (crear, editar, completar, borrar, sincronizar)
         // vuelve a programar la alarma del siguiente
         appScope.launch { observeReminders().collect { reminderScheduler.scheduleNext(it) } }

@@ -32,6 +32,8 @@ data class AssistantSettings(
     val leftoversEnabled: Boolean = true,
     /** Avisar en el chat al llegar al 80 % de un presupuesto y al pasarse. */
     val budgetAlertsEnabled: Boolean = true,
+    /** Avisar en el chat (y en los resúmenes) de eventos que se pisan y de días a tope. */
+    val dayLoadEnabled: Boolean = true,
     /** Mostrar la frase del día en Inicio. */
     val dailyQuoteEnabled: Boolean = true,
     /** Mostrar en Inicio el balance del mes y si algún presupuesto va justo. Apagado de fábrica: es dinero. */
@@ -43,10 +45,26 @@ data class AssistantSettings(
     val paydayDay: Int? = null
 )
 
+/**
+ * Qué tarjetas se ven en Inicio (la frase del día y los ahorros están en [AssistantSettings] porque
+ * llegaron antes; Ajustes > Inicio las muestra todas juntas).
+ */
+data class HomeSettings(
+    /** "Lo próximo": el evento en curso, el siguiente y cómo van las tareas de hoy. */
+    val showNextUp: Boolean = true,
+    /** Los huecos libres entre eventos, con "+" para llenarlos. */
+    val showFreeGaps: Boolean = true,
+    /** La racha de días con todas las tareas hechas. */
+    val showStreak: Boolean = true,
+    /** Las últimas notas de la libreta, al final. */
+    val showNotes: Boolean = true
+)
+
 /** Ajustes de la app que afectan a la lógica (el tema es solo de la interfaz y va aparte). */
 data class AppSettings(
     val digest: DigestSettings = DigestSettings(),
     val assistant: AssistantSettings = AssistantSettings(),
+    val home: HomeSettings = HomeSettings(),
     /** Si ya pasó (o se saltó) la guía de inicio; se puede repetir desde Ajustes. */
     val onboardingCompleted: Boolean = false
 )

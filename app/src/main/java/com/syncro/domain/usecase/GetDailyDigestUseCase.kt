@@ -41,6 +41,7 @@ class GetDailyDigestUseCase @Inject constructor(
             tomorrowEvents = tomorrowItems.filterIsInstance<SyncroItem.Event>(),
             offerFocus = assistant.focusEnabled && focusRepository.getFocus(today).first() == null,
             offerLeftovers = assistant.leftoversEnabled,
+            warnDayLoad = assistant.dayLoadEnabled,
             isPayday = assistant.paydayDay?.let { paydayIn(YearMonth.from(today), it) == today } == true
         )
     }

@@ -8,5 +8,9 @@
         <receiver
             android:name="com.syncro.debug.DemoDataReceiver"
             android:exported="true" />
+        <!-- Finge una versión nueva en Play para ver el mensaje del asistente (ver FakeUpdateReceiver) -->
+        <receiver
+            android:name="com.syncro.debug.FakeUpdateReceiver"
+            android:exported="true" />
     </application>
 </manifest>

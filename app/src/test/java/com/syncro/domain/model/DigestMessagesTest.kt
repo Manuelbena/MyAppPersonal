@@ -215,4 +215,50 @@ class DigestMessagesTest {
         assertEquals(DAY.atTime(21, 0), DigestMoment.EVENING.nextAfter(DAY.atTime(9, 0)))
         assertEquals(DAY.plusDays(1).atTime(21, 0), DigestMoment.EVENING.nextAfter(DAY.atTime(22, 30)))
     }
+
+    // region Solapes y días a tope
+
+    private val clashing = listOf(
+        anEvent(title = "Dentista", startTime = at("10:00"), endTime = at("11:00")),
+        anEvent(title = "Reunión", startTime = at("10:30"), endTime = at("11:30"))
+    )
+
+    @Test
+    fun `por la manana avisa lo primero de los eventos que se pisan y lleva al chat`() {
+        val message = digest(DigestMoment.MORNING, events = clashing).toMessage()
+
+        assertEquals("⚠️ Hoy se te pisan «Dentista» y «Reunión» a las 10:30", message.lines.first())
+        assertTrue(message.opensAssistant)
+    }
+
+    @Test
+    fun `por la noche avisa de que manana va a tope`() {
+        val tomorrow = DAY.plusDays(1)
+        val events = (8..13).map { anEvent(title = "Cita $it", date = tomorrow, startTime = at("%02d:00".format(it)), endTime = at("%02d:45".format(it))) }
+
+        val message = digest(DigestMoment.EVENING, tasks = listOf(aTask(isCompleted = true)), tomorrowEvents = events).toMessage()
+
+        assertTrue(message.lines.contains("🔋 Mañana vas a tope: 6 eventos y 4,5 h ocupadas"))
+        assertEquals("👉 Toca y lo miramos", message.lines.last())
+        assertTrue(message.opensAssistant)
+    }
+
+    @Test
+    fun `por la noche sin tareas tambien avisa de los solapes de manana`() {
+        val tomorrow = DAY.plusDays(1)
+        val message = digest(DigestMoment.EVENING, tomorrowEvents = clashing.map { it.copy(date = tomorrow, endDate = tomorrow) }).toMessage()
+
+        assertEquals(listOf("⚠️ Mañana se te pisan «Dentista» y «Reunión» a las 10:30", "👉 Toca y lo miramos"), message.lines)
+        assertTrue(message.opensAssistant)
+    }
+
+    @Test
+    fun `con el aviso apagado no se dice nada`() {
+        val message = digest(DigestMoment.MORNING, events = clashing).copy(warnDayLoad = false).toMessage()
+
+        assertFalse(message.lines.any { it.startsWith("⚠️") })
+        assertFalse(message.opensAssistant)
+    }
+
+    // endregion
 }

@@ -40,6 +40,7 @@ Lo que el código hace hoy:
 | Eventos de Calendar (título, horas, descripción, ubicación) | Sí | Google Calendar (tu cuenta) | Funcionalidad |
 | Tareas de Google Tasks (título, notas, fecha, hecha) | Sí | Google Tasks (tu cuenta) | Funcionalidad |
 | Notas, ingresos, gastos, presupuestos, cuentas de ahorro, repeticiones, avisos, ajustes, chat del asistente | **No** | Solo en el móvil | — |
+| Si hay versión nueva (librería In-App Updates de Google Play) | La consulta la hace Google Play en el móvil; sin datos del usuario | Google Play | Avisar en el chat de que hay actualización |
 
 Respuestas recomendadas:
 
@@ -58,7 +59,9 @@ Respuestas recomendadas:
 - **Eliminación de cuenta**: la app no crea cuentas propias (usa la de Google y no guarda nada en
   servidores propios), así que no aplica el requisito de borrar una cuenta de la app. Si Play lo
   pide, enlaza el apartado «Cómo borrar tus datos» de la política.
-- **Publicidad / analítica / SDK de terceros que recojan datos**: ninguno.
+- **Publicidad / analítica / SDK de terceros que recojan datos**: ninguno. La librería In-App Updates
+  de Google Play (`app-update-ktx`) solo pregunta a la tienda si hay versión nueva y no envía datos
+  del usuario; revisa al rellenar el formulario si Play pide declararla (es una librería de Google Play).
 
 ## 4. Permisos sensibles
 

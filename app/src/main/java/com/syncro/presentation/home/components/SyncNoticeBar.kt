@@ -6,6 +6,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CloudOff
 import androidx.compose.material.icons.rounded.CloudUpload
+import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.SyncProblem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -19,31 +20,40 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.syncro.domain.model.GoogleService
 import com.syncro.presentation.home.SyncNotice
 
 /**
  * Aviso discreto bajo la cabecera de Inicio cuando lo que se ve puede no coincidir con Google:
- * sin conexión, la última sincronización falló o hay cambios que no se han podido subir.
- * Sin conexión no hay "Reintentar": la app sincroniza sola al volver la red.
+ * sin conexión, sin permiso para entrar en Calendar/Tasks, la última sincronización falló o hay
+ * cambios que no se han podido subir. Sin conexión no hay botón: la app sincroniza sola al volver
+ * la red. Sin permiso, el botón vuelve a pedirlo (mientras, todo funciona en el móvil).
  */
 @Composable
 fun SyncNoticeBar(
     notice: SyncNotice,
     onRetry: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onGrantAccess: () -> Unit = {}
 ) {
     val colors = MaterialTheme.colorScheme
     val (icon, container, content) = when (notice) {
         is SyncNotice.Offline -> Triple(Icons.Rounded.CloudOff, colors.surfaceVariant, colors.onSurfaceVariant)
+        is SyncNotice.MissingAccess -> Triple(Icons.Rounded.Lock, colors.tertiaryContainer, colors.onTertiaryContainer)
         SyncNotice.SyncFailed -> Triple(Icons.Rounded.SyncProblem, colors.errorContainer, colors.onErrorContainer)
         is SyncNotice.PendingChanges -> Triple(Icons.Rounded.CloudUpload, colors.secondaryContainer, colors.onSecondaryContainer)
+    }
+    val action = when (notice) {
+        is SyncNotice.Offline -> null
+        is SyncNotice.MissingAccess -> "Dar permiso" to onGrantAccess
+        else -> "Reintentar" to onRetry
     }
     SyncNoticeRow(
         icon = icon,
         text = syncNoticeText(notice),
         container = container,
         content = content,
-        onRetry = onRetry.takeIf { notice !is SyncNotice.Offline },
+        action = action,
         modifier = modifier
     )
 }
@@ -54,7 +64,7 @@ private fun SyncNoticeRow(
     text: String,
     container: Color,
     content: Color,
-    onRetry: (() -> Unit)?,
+    action: Pair<String, () -> Unit>?,
     modifier: Modifier
 ) {
     Row(
@@ -64,7 +74,7 @@ private fun SyncNoticeRow(
             .clip(RoundedCornerShape(16.dp))
             .background(container)
             .heightIn(min = 44.dp)
-            .padding(start = 14.dp, end = if (onRetry == null) 14.dp else 4.dp),
+            .padding(start = 14.dp, end = if (action == null) 14.dp else 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(icon, contentDescription = null, tint = content, modifier = Modifier.size(18.dp))
@@ -78,9 +88,9 @@ private fun SyncNoticeRow(
             fontWeight = FontWeight.Medium,
             color = content
         )
-        if (onRetry != null) {
-            TextButton(onClick = onRetry) {
-                Text("Reintentar", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = content)
+        if (action != null) {
+            TextButton(onClick = action.second) {
+                Text(action.first, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = content)
             }
         }
     }
@@ -92,6 +102,14 @@ internal fun syncNoticeText(notice: SyncNotice): String = when (notice) {
         0 -> "Sin conexión · ves lo guardado en el móvil"
         1 -> "Sin conexión · 1 cambio se subirá a Google al volver la red"
         else -> "Sin conexión · ${notice.pendingChanges} cambios se subirán a Google al volver la red"
+    }
+    is SyncNotice.MissingAccess -> {
+        val what = when (notice.services) {
+            setOf(GoogleService.CALENDAR) -> "Google Calendar no se sincroniza"
+            setOf(GoogleService.TASKS) -> "Google Tasks no se sincroniza"
+            else -> "Google Calendar y Tasks no se sincronizan"
+        }
+        "$what: falta tu permiso. Todo se sigue guardando en el móvil"
     }
     SyncNotice.SyncFailed -> "No se pudo sincronizar con Google"
     is SyncNotice.PendingChanges ->

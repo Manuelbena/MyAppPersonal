@@ -21,8 +21,10 @@ calendar = "2.10.1"
 coil = "3.0.4"
 media3 = "1.5.1"
 glance = "1.2.0"
+appUpdate = "2.1.0"
 
 [libraries]
+play-app-update-ktx = { group = "com.google.android.play", name = "app-update-ktx", version.ref = "appUpdate" }
 androidx-glance-appwidget = { group = "androidx.glance", name = "glance-appwidget", version.ref = "glance" }
 androidx-glance-material3 = { group = "androidx.glance", name = "glance-material3", version.ref = "glance" }
 androidx-glance-appwidget-testing = { group = "androidx.glance", name = "glance-appwidget-testing", version.ref = "glance" }

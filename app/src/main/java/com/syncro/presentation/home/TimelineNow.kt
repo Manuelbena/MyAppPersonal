@@ -1,5 +1,6 @@
 package com.syncro.presentation.home
 
+import com.syncro.domain.model.DayWindow
 import com.syncro.domain.model.SyncroItem
 import java.time.Duration
 import java.time.LocalDate
@@ -37,22 +38,53 @@ fun SyncroItem.Event.minutesLeftAt(now: LocalDateTime): Long? {
     return (Duration.between(now, endDateTime()).seconds + 59) / 60
 }
 
+/** Un punto del timeline cuya hora se conoce: a [minute] del día (0–1440) le corresponde la altura [y] en pantalla. */
+data class TimeAnchor(val minute: Int, val y: Float)
+
 /**
- * Posición de la línea "Ahora" en el timeline de [day] (ya ordenado con `sortedForDay`): antes del
- * primer elemento que empieza después de [now], o al final si ya empezaron todos. Los elementos de
- * todo el día y los que vienen del día anterior cuentan como ya empezados. Null si [day] no es hoy
- * o no hay nada que mostrar.
+ * Altura de la línea "Ahora" sobre el timeline, interpolando entre las [anchors] en el orden en que
+ * se ven (inicio/fin de cada evento, huecos, inicio y fin del día). Así la línea cruza por encima de
+ * la tarjeta del evento en curso a la altura que toca. Las anclas que van hacia atrás en la hora
+ * (eventos solapados) se ignoran. Antes de la primera, se queda en ella; después de la última, igual.
  */
-fun nowIndicatorIndex(items: List<SyncroItem>, day: LocalDate, now: LocalDateTime): Int? {
-    if (day != now.toLocalDate() || items.none { it !is SyncroItem.Note }) return null
-    val nowTime = now.toLocalTime()
-    val index = items.indexOfFirst { item -> startTimeOnDay(item, day)?.isAfter(nowTime) == true }
-    return if (index == -1) items.size else index
+fun nowLineY(anchors: List<TimeAnchor>, nowMinute: Int): Float? {
+    val ordered = mutableListOf<TimeAnchor>()
+    anchors.forEach { anchor ->
+        val last = ordered.lastOrNull()
+        if (last == null || (anchor.minute >= last.minute && anchor.y >= last.y)) ordered += anchor
+    }
+    if (ordered.isEmpty()) return null
+    if (nowMinute <= ordered.first().minute) return ordered.first().y
+    ordered.zipWithNext().forEach { (a, b) ->
+        if (nowMinute <= b.minute) {
+            val span = b.minute - a.minute
+            return if (span == 0) b.y else a.y + (b.y - a.y) * (nowMinute - a.minute) / span
+        }
+    }
+    return ordered.last().y
 }
 
-/** Hora a la que empieza el elemento en [day]; null si no tiene hora propia ese día. */
-private fun startTimeOnDay(item: SyncroItem, day: LocalDate): LocalTime? = when (item) {
-    is SyncroItem.Event -> if (item.isAllDay || item.date != day) null else item.startTime
-    is SyncroItem.Task -> if (item.isAllDay) null else item.time
-    is SyncroItem.Note -> null
+/** Minuto del día en que empieza [event] en [day] (0 si viene del día anterior). */
+fun SyncroItem.Event.startMinuteOn(day: LocalDate): Int =
+    if (date.isBefore(day)) 0 else startTime.toSecondOfDay() / 60
+
+/** Minuto del día en que acaba [event] en [day] (1440 si sigue al día siguiente). */
+fun SyncroItem.Event.endMinuteOn(day: LocalDate): Int =
+    if (endDate.isAfter(day)) MINUTES_PER_DAY else endTime.toSecondOfDay() / 60
+
+const val MINUTES_PER_DAY = 24 * 60
+
+/**
+ * Dónde van las marcas de inicio y fin del día entre los [events] del timeline (ya ordenados): el
+ * inicio antes del primer evento con hora que empieza a partir de [window].start (arriba del todo si
+ * ninguno empieza antes), el fin antes del primero que empieza después de [window].end.
+ */
+fun dayBoundaryIndices(events: List<SyncroItem.Event>, day: LocalDate, window: DayWindow): Pair<Int, Int> {
+    fun startsToday(event: SyncroItem.Event) = !event.isAllDay && event.date == day
+    val hasEarly = events.any { startsToday(it) && it.startTime.isBefore(window.start) }
+    val startIndex = if (!hasEarly) 0 else events.indexOfFirst { startsToday(it) && !it.startTime.isBefore(window.start) }
+        .let { if (it == -1) events.size else it }
+    val endIndex = events.indexOfFirst { startsToday(it) && it.startTime.isAfter(window.end) }
+        .let { if (it == -1) events.size else it }
+    return startIndex to maxOf(startIndex, endIndex)
 }

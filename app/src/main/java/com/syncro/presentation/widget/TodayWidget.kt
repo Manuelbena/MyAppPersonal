@@ -94,7 +94,7 @@ class TodayWidgetReceiver : GlanceAppWidgetReceiver() {
  * los demás del escritorio. Antes de Android 12 no hay colores del sistema: se usan los de la app.
  */
 @Composable
-private fun widgetColors() =
+internal fun widgetColors() =
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) GlanceTheme.colors
     else ColorProviders(light = LightColorScheme, dark = DarkColorScheme)
 
@@ -156,7 +156,7 @@ fun TodayWidgetContent(agenda: TodayAgenda) {
 }
 
 /** Desde Android 12, el radio de esquina que usa el lanzador para todos los widgets. */
-private fun GlanceModifier.widgetCorners(): GlanceModifier =
+internal fun GlanceModifier.widgetCorners(): GlanceModifier =
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) cornerRadius(android.R.dimen.system_app_widget_background_radius)
     else cornerRadius(24.dp)
 

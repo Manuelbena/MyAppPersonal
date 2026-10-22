@@ -1,5 +1,6 @@
 package com.syncro.testutil
 
+import com.syncro.domain.model.GoogleService
 import com.syncro.domain.model.AppSettings
 import com.syncro.domain.model.Budget
 import com.syncro.domain.model.DailyFocus
@@ -237,6 +238,11 @@ class FakeGoogleSyncRepository(private val log: CallLog = CallLog()) : GoogleSyn
     val pendingChanges = MutableStateFlow(0)
 
     override fun observePendingChangesCount(): Flow<Int> = pendingChanges
+
+    /** Los servicios sin permiso; los tests lo fijan a mano. */
+    val missingAccess = MutableStateFlow(emptySet<GoogleService>())
+
+    override fun observeMissingAccess(): Flow<Set<GoogleService>> = missingAccess
 }
 
 class FakeConnectivityRepository : ConnectivityRepository {

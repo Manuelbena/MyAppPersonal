@@ -5,12 +5,21 @@ import android.content.Intent
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.google.api.client.googleapis.extensions.android.gms.auth.GoogleAuthIOException
 import com.google.api.client.googleapis.extensions.android.gms.auth.UserRecoverableAuthIOException
 import androidx.compose.ui.graphics.Color
 import com.syncro.domain.model.ExpenseDraft
 import com.syncro.domain.model.MovementCategory
 import com.syncro.domain.model.expenseDraft
 import com.syncro.domain.model.Priority
+import com.syncro.domain.model.HomeSettings
+import com.syncro.domain.model.GoogleService
+import com.syncro.domain.model.DayWindow
+import com.syncro.domain.model.DigestSettings
+import com.syncro.domain.model.dayWindow
+import com.syncro.domain.model.STREAK_LOOKBACK_DAYS
+import com.syncro.domain.model.taskStreak
+import com.syncro.domain.usecase.GetSettingsUseCase
 import com.syncro.domain.model.Recurrence
 import com.syncro.domain.model.RepeatScope
 import com.syncro.domain.model.Quote
@@ -81,7 +90,18 @@ data class HomeUiState(
     /** Los días de la tira de la semana con tareas o eventos (sin entrada = día vacío). */
     val dayMarks: Map<LocalDate, DayMark> = emptyMap(),
     /** El resumen de Ahorros del mes; null si no se ha activado en Ajustes. */
-    val savings: HomeSavings? = null
+    val savings: HomeSavings? = null,
+    /** Qué tarjetas se ven (Ajustes > Inicio). */
+    val home: HomeSettings = HomeSettings(),
+    /** Inicio y fin del día en el timeline (las horas de los resúmenes diarios). */
+    val dayWindow: DayWindow = DigestSettings().dayWindow,
+    /** Días seguidos con todas las tareas hechas (ver `taskStreak`). */
+    val streak: Int = 0,
+    /**
+     * Si ya llegó todo lo que se pinta (día, tarjetas, ajustes, notas…). Hasta entonces se ve el
+     * esqueleto de carga, para que la pantalla no salga a trozos y luego cambie.
+     */
+    val isContentReady: Boolean = false
 )
 
 /** Por qué lo que se ve en Inicio puede no coincidir con Google. */
@@ -89,7 +109,13 @@ sealed interface SyncNotice {
     /** Sin conexión: se ve lo guardado en el móvil y [pendingChanges] cambios esperan a subirse. */
     data class Offline(val pendingChanges: Int) : SyncNotice
 
-    /** Hay conexión pero la última sincronización falló (no por permisos: esos se piden aparte). */
+    /**
+     * No tenemos permiso para entrar en [services] (no se dio o se quitó). La app sigue funcionando en
+     * el móvil y los cambios esperan; el aviso ofrece pedir el permiso otra vez.
+     */
+    data class MissingAccess(val services: Set<GoogleService>) : SyncNotice
+
+    /** Hay conexión pero la última sincronización falló (no por permisos: eso es [MissingAccess]). */
     data object SyncFailed : SyncNotice
 
     /** Hay conexión pero [count] cambios siguen sin subir pasado un rato. */
@@ -97,11 +123,13 @@ sealed interface SyncNotice {
 }
 
 /**
- * Qué aviso toca: sin conexión manda (es la causa de lo demás); después un fallo de la última
+ * Qué aviso toca: sin conexión manda (es la causa de lo demás); después la falta de permiso (hasta
+ * darlo nada se sincroniza, y es lo único que el usuario puede arreglar), un fallo de la última
  * sincronización y por último los cambios que no se han podido subir.
  */
 internal fun syncNoticeFor(state: SyncState, lastSyncFailed: Boolean): SyncNotice? = when {
     !state.isOnline -> SyncNotice.Offline(state.pendingChanges)
+    state.missingAccess.isNotEmpty() -> SyncNotice.MissingAccess(state.missingAccess)
     lastSyncFailed -> SyncNotice.SyncFailed
     state.pendingChanges > 0 -> SyncNotice.PendingChanges(state.pendingChanges)
     else -> null
@@ -159,7 +187,8 @@ class HomeViewModel @Inject constructor(
     private val undoDeleteNoteUseCase: UndoDeleteNoteUseCase,
     observeHomeSavingsUseCase: ObserveHomeSavingsUseCase,
     private val generateRepeatsUseCase: GenerateRepeatsUseCase,
-    private val saveEventExpenseUseCase: SaveEventExpenseUseCase
+    private val saveEventExpenseUseCase: SaveEventExpenseUseCase,
+    getSettingsUseCase: GetSettingsUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HomeUiState(today = LocalDate.now(clock)))
@@ -169,6 +198,14 @@ class HomeViewModel @Inject constructor(
     val effect = _effect.receiveAsFlow()
 
     private var syncJob: Job? = null
+
+    /** Las fuentes que ya han dado su primer valor (ver [HomeUiState.isContentReady]). */
+    private val loadedSources = mutableSetOf<HomeSource>()
+
+    private fun markLoaded(source: HomeSource) {
+        if (_uiState.value.isContentReady || !loadedSources.add(source)) return
+        if (loadedSources.containsAll(HomeSource.entries)) _uiState.update { it.copy(isContentReady = true) }
+    }
 
     /** Si la última sincronización falló por algo que no son permisos (red, Google caído…). */
     private val lastSyncFailed = MutableStateFlow(false)
@@ -196,7 +233,7 @@ class HomeViewModel @Inject constructor(
             .launchIn(viewModelScope)
 
         observeDailyQuoteUseCase()
-            .onEach { quote -> _uiState.update { it.copy(quote = quote) } }
+            .onEach { quote -> _uiState.update { it.copy(quote = quote) }; markLoaded(HomeSource.QUOTE) }
             .launchIn(viewModelScope)
 
         // Observar cambios en la fecha seleccionada
@@ -213,6 +250,7 @@ class HomeViewModel @Inject constructor(
             }
             .onEach { items ->
                 _uiState.update { it.copy(timelineItems = items) }
+                markLoaded(HomeSource.TIMELINE)
             }
             .launchIn(viewModelScope)
 
@@ -228,7 +266,29 @@ class HomeViewModel @Inject constructor(
             .map { it.today }
             .distinctUntilChanged()
             .flatMapLatest { today -> observeHomeSavingsUseCase(today) }
-            .onEach { savings -> _uiState.update { it.copy(savings = savings) } }
+            .onEach { savings -> _uiState.update { it.copy(savings = savings) }; markLoaded(HomeSource.SAVINGS) }
+            .launchIn(viewModelScope)
+
+        getSettingsUseCase()
+            .map { it.home }
+            .distinctUntilChanged()
+            .onEach { home -> _uiState.update { it.copy(home = home) }; markLoaded(HomeSource.HOME_SETTINGS) }
+            .launchIn(viewModelScope)
+
+        getSettingsUseCase()
+            .map { it.digest.dayWindow }
+            .distinctUntilChanged()
+            .onEach { window -> _uiState.update { it.copy(dayWindow = window) }; markLoaded(HomeSource.DAY_WINDOW) }
+            .launchIn(viewModelScope)
+
+        // Racha de días con todo hecho: hasta hoy, rehecha al cambiar de día o al completar algo
+        _uiState
+            .map { it.today }
+            .distinctUntilChanged()
+            .flatMapLatest { today ->
+                getTasksInRangeUseCase(today.minusDays(STREAK_LOOKBACK_DAYS), today).map { taskStreak(it, today) }
+            }
+            .onEach { streak -> _uiState.update { it.copy(streak = streak) }; markLoaded(HomeSource.STREAK) }
             .launchIn(viewModelScope)
 
         // Puntos de la tira de la semana: las mismas semanas que muestra, rehechas al cambiar de día
@@ -243,19 +303,20 @@ class HomeViewModel @Inject constructor(
                     dayMarks(tasks, events, from, to)
                 }
             }
-            .onEach { marks -> _uiState.update { it.copy(dayMarks = marks) } }
+            .onEach { marks -> _uiState.update { it.copy(dayMarks = marks) }; markLoaded(HomeSource.DAY_MARKS) }
             .launchIn(viewModelScope)
 
         _uiState
             .map { it.selectedDate }
             .distinctUntilChanged()
             .flatMapLatest { date -> getDailyFocusUseCase(date) }
-            .onEach { focus -> _uiState.update { it.copy(focusTasks = focus) } }
+            .onEach { focus -> _uiState.update { it.copy(focusTasks = focus) }; markLoaded(HomeSource.FOCUS) }
             .launchIn(viewModelScope)
 
         getNotesUseCase()
             .onEach { notes ->
                 _uiState.update { it.copy(notes = notes) }
+                markLoaded(HomeSource.NOTES)
             }
             .launchIn(viewModelScope)
 
@@ -264,13 +325,19 @@ class HomeViewModel @Inject constructor(
                 _uiState.update {
                     it.copy(userName = user?.name.orEmpty().trim().substringBefore(' '), userPhotoUrl = user?.photoUrl)
                 }
+                markLoaded(HomeSource.USER)
             }
             .launchIn(viewModelScope)
+
+        // Red de seguridad: si algo no llegara nunca, la pantalla no se queda cargando para siempre
+        viewModelScope.launch {
+            delay(CONTENT_READY_TIMEOUT_MS)
+            _uiState.update { it.copy(isContentReady = true) }
+        }
     }
 
     fun syncFromGoogle(date: LocalDate = _uiState.value.selectedDate, force: Boolean = true) {
         syncJob?.cancel()
-        isAuthRecoveryInProgress = false
         syncJob = viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
             try {
@@ -286,9 +353,17 @@ class HomeViewModel @Inject constructor(
 
                 tasksResult.onFailure { handleSyncError(it) }
                 calendarResult.onFailure { handleSyncError(it) }
-                // Los permisos se piden con su propia pantalla: no cuentan como fallo para el aviso
+                // La falta de permiso tiene su propio aviso: no cuenta como fallo
                 lastSyncFailed.value = listOf(tasksResult, calendarResult).any { result ->
-                    result.exceptionOrNull()?.let { it !is UserRecoverableAuthIOException } == true
+                    result.exceptionOrNull()?.let { it !is GoogleAuthIOException } == true
+                }
+                if (askForAccessOnAuthError) {
+                    askForAccessOnAuthError = false
+                    // Se pidió "Dar permiso" pero Google no ofrece una pantalla para darlo (p. ej. la
+                    // cuenta ya no está en el móvil): solo queda volver a entrar
+                    if (recoveryIntent == null && listOf(tasksResult, calendarResult).any { it.exceptionOrNull() is GoogleAuthIOException }) {
+                        _effect.send(HomeEffect.ShowSnackbar("Vuelve a entrar con tu cuenta de Google desde Ajustes > Cuenta"))
+                    }
                 }
             } catch (e: CancellationException) {
                 throw e
@@ -301,18 +376,51 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    private var isAuthRecoveryInProgress = false
+    /**
+     * La pantalla de Google para dar el permiso, de la última vez que faltó. Se guarda para el botón
+     * "Dar permiso" del aviso; null si no falta o si Google no ofrece cómo darlo.
+     */
+    private var recoveryIntent: Intent? = null
+
+    /** Si ya se abrió sola la pantalla del permiso en esta sesión: no se insiste en cada sincronización. */
+    private var hasAskedForAccess = false
+
+    /** El usuario pulsó "Dar permiso" y no había pantalla guardada: se abre en cuanto Google la dé. */
+    private var askForAccessOnAuthError = false
 
     private fun handleSyncError(throwable: Throwable) {
         if (throwable is UserRecoverableAuthIOException) {
-            if (!isAuthRecoveryInProgress) {
-                isAuthRecoveryInProgress = true
-                viewModelScope.launch {
-                    _effect.send(HomeEffect.LaunchAuthRecovery(throwable.intent))
-                }
+            recoveryIntent = throwable.intent
+            // Regresión: se abría la pantalla del permiso en cada sincronización (también al cambiar de
+            // día), y si el usuario no lo daba volvía a salir una y otra vez. Ahora se pide sola una
+            // vez por sesión; después queda el aviso de Inicio con "Dar permiso"
+            if (!hasAskedForAccess || askForAccessOnAuthError) {
+                hasAskedForAccess = true
+                askForAccessOnAuthError = false
+                viewModelScope.launch { _effect.send(HomeEffect.LaunchAuthRecovery(throwable.intent)) }
             }
         } else {
             Log.e("HomeViewModel", "Error de sincronización", throwable)
+        }
+    }
+
+    /** El "Dar permiso" del aviso: abre la pantalla de Google (o sincroniza para conseguirla). */
+    fun requestGoogleAccess() {
+        val intent = recoveryIntent
+        if (intent != null) {
+            hasAskedForAccess = true
+            viewModelScope.launch { _effect.send(HomeEffect.LaunchAuthRecovery(intent)) }
+        } else {
+            askForAccessOnAuthError = true
+            syncFromGoogle()
+        }
+    }
+
+    /** Vuelta de la pantalla del permiso: si se dio, se sincroniza (y se quita el aviso). */
+    fun onGoogleAccessResult(granted: Boolean) {
+        if (granted) {
+            recoveryIntent = null
+            syncFromGoogle()
         }
     }
 
@@ -530,5 +638,11 @@ class HomeViewModel @Inject constructor(
          * "Deshacer" (mientras se ofrece, el borrado está pendiente a propósito).
          */
         const val PENDING_NOTICE_DELAY_MS = 10_000L
+
+        /** Lo más que se espera a que llegue todo antes de enseñar la pantalla igualmente. */
+        const val CONTENT_READY_TIMEOUT_MS = 3_000L
     }
 }
+
+/** Todo lo que tiene que haber llegado para enseñar Inicio (Room y DataStore, sin red). */
+private enum class HomeSource { USER, QUOTE, TIMELINE, FOCUS, SAVINGS, HOME_SETTINGS, DAY_WINDOW, STREAK, DAY_MARKS, NOTES }

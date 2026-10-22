@@ -1,6 +1,8 @@
 package com.syncro.presentation.calendar
 
 import androidx.compose.ui.platform.LocalContext
+import com.syncro.presentation.components.LoadingContent
+import com.syncro.presentation.components.SkeletonBlock
 import com.syncro.presentation.components.rememberCurrentMinute
 import com.syncro.presentation.components.shareEvent
 import com.syncro.presentation.components.AddFab
@@ -155,22 +157,29 @@ fun CalendarScreen(
                     // disponible, dejando sitio a la cabecera de días y a la barra flotante
                     val cellHeight = if (widthClass == WidthClass.Compact) null
                     else ((maxHeight - MONTH_HEADER_HEIGHT - BOTTOM_NAV_SPACE) / 6).coerceAtLeast(72.dp)
-                    HorizontalCalendar(
-                        state = state,
-                        modifier = Modifier.fillMaxSize(),
-                        dayContent = { day ->
-                            Day(
-                                day = day,
-                                items = uiState.events[day.date] ?: emptyList(),
-                                onClick = { viewModel.onDateSelected(day.date) },
-                                cellHeight = cellHeight,
-                                isSelected = isExpanded && day.date == panelDate
-                            )
-                        },
-                        monthHeader = { _ ->
-                            MonthHeader(daysOfWeek = daysOfWeek)
-                        }
-                    )
+                    // Hasta tener las tareas y eventos del mes, la cuadrícula va en esqueleto (sin chips que aparecen de golpe)
+                    LoadingContent(
+                        isReady = uiState.isLoaded,
+                        skeleton = { CalendarGridSkeleton(daysOfWeek, cellHeight) },
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        HorizontalCalendar(
+                            state = state,
+                            modifier = Modifier.fillMaxSize(),
+                            dayContent = { day ->
+                                Day(
+                                    day = day,
+                                    items = uiState.events[day.date] ?: emptyList(),
+                                    onClick = { viewModel.onDateSelected(day.date) },
+                                    cellHeight = cellHeight,
+                                    isSelected = isExpanded && day.date == panelDate
+                                )
+                            },
+                            monthHeader = { _ ->
+                                MonthHeader(daysOfWeek = daysOfWeek)
+                            }
+                        )
+                    }
                 }
 
                 // Tablet en horizontal: el detalle del día seleccionado (hoy, si no hay ninguno)
@@ -693,6 +702,30 @@ private fun ItemSnippet(title: String, color: Color, large: Boolean) {
                 color = MaterialTheme.colorScheme.onSurface,
                 lineHeight = if (large) 14.sp else 10.sp
             )
+        }
+    }
+}
+
+/**
+ * La cuadrícula del mes mientras cargan sus tareas y eventos: la cabecera de días de verdad y las
+ * casillas en gris con el reflejo, del mismo tamaño que las reales ([cellHeight] como en [Day]).
+ */
+@Composable
+private fun CalendarGridSkeleton(daysOfWeek: List<DayOfWeek>, cellHeight: Dp?) {
+    Column(modifier = Modifier.fillMaxSize()) {
+        MonthHeader(daysOfWeek = daysOfWeek)
+        repeat(6) {
+            Row(modifier = Modifier.fillMaxWidth()) {
+                repeat(7) {
+                    SkeletonBlock(
+                        modifier = Modifier
+                            .weight(1f)
+                            .then(if (cellHeight != null) Modifier.height(cellHeight) else Modifier.aspectRatio(0.6f))
+                            .padding(2.dp),
+                        shape = RoundedCornerShape(8.dp)
+                    )
+                }
+            }
         }
     }
 }

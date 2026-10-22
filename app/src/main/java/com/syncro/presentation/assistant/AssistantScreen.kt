@@ -1,6 +1,10 @@
 package com.syncro.presentation.assistant
 
 import android.Manifest
+import android.content.ActivityNotFoundException
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -11,6 +15,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CalendarMonth
@@ -28,7 +33,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -42,6 +50,10 @@ import com.syncro.domain.model.ChatTask
 import com.syncro.domain.model.DigestAnswer
 import com.syncro.domain.model.MoveTarget
 import com.syncro.domain.model.TaskAction
+import com.syncro.presentation.components.LoadingContent
+import com.syncro.presentation.components.MascotAvatar
+import com.syncro.presentation.components.SkeletonBlock
+import com.syncro.presentation.components.SkeletonCircle
 import com.syncro.presentation.components.SyncroIconButton
 import com.syncro.presentation.components.canAskNotificationPermission
 import com.syncro.presentation.components.markNotificationPermissionAsked
@@ -49,6 +61,8 @@ import com.syncro.presentation.components.notificationsAllowed
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 /**
  * Cada vez que la app vuelve a primer plano, pone al día el [AssistantViewModel]: el permiso de
@@ -84,8 +98,9 @@ fun AssistantMainScreen(
 
     AssistantChatContent(
         conversation = state?.conversation,
+        today = state?.today,
         firstSelectableDay = viewModel.firstSelectableDay(),
-        onReply = { reply, selectedTaskIds ->
+        onReply = { reply, selectedTaskIds, messageId ->
             when (reply) {
                 ChatReply.ENABLE_DIGEST ->
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && context.canAskNotificationPermission()) {
@@ -105,6 +120,11 @@ fun AssistantMainScreen(
                     onRegisterSalary()
                 }
                 ChatReply.PAYDAY_LATER -> viewModel.answerPayday(reply)
+                ChatReply.HABIT_REPEAT, ChatReply.HABIT_DISMISS -> viewModel.answerHabit(reply, messageId)
+                ChatReply.STUCK_DONE, ChatReply.STUCK_DELETE, ChatReply.STUCK_KEEP -> viewModel.answerStuck(reply, messageId)
+                // Las opciones se quedan hasta que se actualice: si vuelve sin actualizar, puede tocar otra vez
+                ChatReply.UPDATE_NOW -> context.openInPlayStore()
+                ChatReply.UPDATE_LATER -> viewModel.dismissUpdate()
             }
         },
         onTaskAction = viewModel::resolveLeftover,
@@ -116,9 +136,11 @@ fun AssistantMainScreen(
 @Composable
 fun AssistantChatContent(
     conversation: AssistantConversation?,
+    /** Para los chips de día ("Hoy", "Ayer"…); sin él, la fecha. */
+    today: LocalDate? = null,
     firstSelectableDay: LocalDate,
-    /** La opción tocada y, si el mensaje permite marcar tareas, las marcadas. */
-    onReply: (reply: ChatReply, selectedTaskIds: List<String>) -> Unit,
+    /** La opción tocada, las tareas marcadas (si el mensaje lo permite) y el mensaje contestado. */
+    onReply: (reply: ChatReply, selectedTaskIds: List<String>, messageId: String) -> Unit,
     onTaskAction: (taskId: String, action: TaskAction, otherDay: LocalDate?) -> Unit,
     onClearChat: () -> Unit
 ) {
@@ -131,9 +153,12 @@ fun AssistantChatContent(
     var answeredIds by remember { mutableStateOf(emptySet<String>()) }
     var selections by remember { mutableStateOf(emptyMap<String, Set<String>>()) }
 
-    // Al llegar un mensaje nuevo, baja hasta el final como en cualquier chat ("Hoy" + mensajes)
-    LaunchedEffect(messages.size) {
-        if (messages.isNotEmpty()) listState.animateScrollToItem(messages.size)
+    // Al abrir, directamente al final; al llegar un mensaje nuevo, baja hasta él como en cualquier chat
+    var scrolledToEnd by remember { mutableStateOf(false) }
+    LaunchedEffect(messages.lastOrNull()?.id, messages.size) {
+        if (messages.isEmpty()) return@LaunchedEffect
+        if (scrolledToEnd) listState.animateScrollToItem(messages.lastIndex) else listState.scrollToItem(messages.lastIndex)
+        scrolledToEnd = true
     }
 
     Column(
@@ -146,63 +171,84 @@ fun AssistantChatContent(
             onClearClick = { confirmClear = true }
         )
 
-        if (conversation != null && messages.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(bottom = 140.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    "No hay mensajes",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        } else {
-            LazyColumn(
-                state = listState,
-                modifier = Modifier.fillMaxSize(),
-                // Abajo deja sitio a la barra de navegación flotante
-                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 140.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                item(key = "day") { DayChip("Hoy") }
-
-                itemsIndexed(messages, key = { _, message -> message.id }) { index, message ->
-                    // Solo el primero de una racha del mismo lado lleva el "pico" de la burbuja
-                    val startsRun = index == 0 || messages[index - 1].fromAssistant != message.fromAssistant
-                    Column(
-                        modifier = Modifier
-                            .animateItem()
-                            .padding(top = if (startsRun) 12.dp else 0.dp)
-                    ) {
-                        // Tareas marcadas en este mensaje (prioridades); solo mientras se contesta
-                        val selected = selections[message.id].orEmpty()
-                        ChatBubble(
-                            message = message,
-                            withTail = startsRun,
-                            selected = selected,
-                            onToggleSelected = { taskId ->
-                                selections = selections + (message.id to (if (taskId in selected) selected - taskId else selected + taskId))
-                            },
-                            onTaskAction = { taskId, action ->
-                                if (action == TaskAction.OTHER_DAY) pickingDayFor = taskId
-                                else onTaskAction(taskId, action, null)
-                            }
+        // Hasta que se arma la conversación, burbujas de esqueleto (así no aparece "No hay mensajes" un instante)
+        LoadingContent(isReady = conversation != null, skeleton = { ChatSkeleton() }) {
+            if (messages.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(bottom = 140.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        MascotAvatar(size = 96.dp)
+                        Spacer(Modifier.height(16.dp))
+                        Text(
+                            "No hay mensajes",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                        val options = if (message.id in answeredIds) emptyList() else message.options
-                        if (options.isNotEmpty()) {
-                            ReplyOptions(
-                                options = options,
-                                // "Listo" sin nada marcado no significa nada: se desactiva
-                                isEnabled = { it != ChatReply.FOCUS_CONFIRM || selected.isNotEmpty() },
-                                onReply = { reply ->
-                                    answeredIds = answeredIds + message.id
-                                    // En el orden de la lista, no en el que se tocaron
-                                    onReply(reply, message.tasks.map { it.id }.filter { it in selected })
+                    }
+                }
+            } else {
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier.fillMaxSize(),
+                    // Abajo deja sitio a la barra de navegación flotante
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 140.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    itemsIndexed(messages, key = { _, message -> message.id }) { index, message ->
+                        // Como en WhatsApp: el día encima del primer mensaje de cada día
+                        val newDay = index == 0 || messages[index - 1].day != message.day
+                        // Solo el primero de una racha del mismo lado lleva el "pico" de la burbuja
+                        val startsRun = newDay || messages[index - 1].fromAssistant != message.fromAssistant
+                        Column(modifier = Modifier.animateItem()) {
+                            if (newDay) {
+                                message.day?.let {
+                                    DayChip(chatDayLabel(it, today), Modifier.padding(top = if (index == 0) 0.dp else 12.dp))
                                 }
-                            )
+                            }
+                            Row(
+                                modifier = Modifier.padding(top = if (startsRun) 12.dp else 0.dp)
+                            ) {
+                                // La cara del asistente junto al primer mensaje de cada racha suya; los
+                                // siguientes dejan el hueco para que las burbujas sigan alineadas
+                                if (message.fromAssistant) {
+                                    if (startsRun) MascotAvatar(size = CHAT_AVATAR_SIZE) else Spacer(Modifier.width(CHAT_AVATAR_SIZE))
+                                    Spacer(Modifier.width(8.dp))
+                                }
+                                Column(modifier = Modifier.weight(1f)) {
+                                    // Tareas marcadas en este mensaje (prioridades); solo mientras se contesta
+                                    val selected = selections[message.id].orEmpty()
+                                    ChatBubble(
+                                        message = message,
+                                        withTail = startsRun,
+                                        selected = selected,
+                                        onToggleSelected = { taskId ->
+                                            selections = selections + (message.id to (if (taskId in selected) selected - taskId else selected + taskId))
+                                        },
+                                        onTaskAction = { taskId, action ->
+                                            if (action == TaskAction.OTHER_DAY) pickingDayFor = taskId
+                                            else onTaskAction(taskId, action, null)
+                                        }
+                                    )
+                                    val options = if (message.id in answeredIds) emptyList() else message.options
+                                    if (options.isNotEmpty()) {
+                                        ReplyOptions(
+                                            options = options,
+                                            // "Listo" sin nada marcado no significa nada: se desactiva
+                                            isEnabled = { it != ChatReply.FOCUS_CONFIRM || selected.isNotEmpty() },
+                                            onReply = { reply ->
+                                                // "Actualizar" solo abre la tienda: si vuelve sin actualizar, los botones siguen
+                                                if (reply != ChatReply.UPDATE_NOW) answeredIds = answeredIds + message.id
+                                                // En el orden de la lista, no en el que se tocaron
+                                                onReply(reply, message.tasks.map { it.id }.filter { it in selected }, message.id)
+                                            }
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -239,7 +285,54 @@ fun AssistantChatContent(
     }
 }
 
-/** Misma cabecera que Inicio: título grande, subtítulo y botones redondos a la derecha. */
+/** Foto del asistente junto a sus mensajes. */
+private val CHAT_AVATAR_SIZE = 32.dp
+
+/** El verde de "en línea" (el de WhatsApp), en el punto de la foto. */
+private val OnlineGreen = Color(0xFF25D366)
+
+/**
+ * El chat mientras carga: unas burbujas grises del asistente (con su foto) y una del usuario, en
+ * los mismos sitios que las de verdad.
+ */
+@Composable
+private fun ChatSkeleton() {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        // "Hoy"
+        SkeletonBlock(
+            Modifier
+                .align(Alignment.CenterHorizontally)
+                .size(width = 56.dp, height = 24.dp),
+            RoundedCornerShape(50)
+        )
+        listOf(
+            true to listOf(240.dp to 64.dp, 200.dp to 44.dp),
+            false to listOf(150.dp to 40.dp),
+            true to listOf(260.dp to 84.dp)
+        ).forEach { (fromAssistant, bubbles) ->
+            Spacer(Modifier.height(12.dp))
+            bubbles.forEachIndexed { index, (width, height) ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = if (fromAssistant) Arrangement.Start else Arrangement.End
+                ) {
+                    if (fromAssistant) {
+                        if (index == 0) SkeletonCircle(CHAT_AVATAR_SIZE) else Spacer(Modifier.width(CHAT_AVATAR_SIZE))
+                        Spacer(Modifier.width(8.dp))
+                    }
+                    SkeletonBlock(Modifier.size(width = width, height = height), RoundedCornerShape(18.dp))
+                }
+            }
+        }
+    }
+}
+
+/** Como la cabecera de Inicio (título grande, subtítulo, botones redondos a la derecha) con la foto del asistente delante. */
 @Composable
 private fun ChatHeader(canClear: Boolean, onClearClick: () -> Unit) {
     Row(
@@ -248,9 +341,26 @@ private fun ChatHeader(canClear: Boolean, onClearClick: () -> Unit) {
             .statusBarsPadding()
             .padding(horizontal = 24.dp, vertical = 16.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.Top
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Column {
+        // Foto de perfil como en WhatsApp: la cafetera es el asistente, con el punto verde de "en línea"
+        Box {
+            MascotAvatar(size = 52.dp, contentDescription = "Foto del asistente")
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .size(16.dp)
+                    .clip(CircleShape)
+                    // Aro del color del fondo para que el punto se separe de la foto
+                    .background(MaterialTheme.colorScheme.background)
+                    .padding(2.5.dp)
+                    .clip(CircleShape)
+                    .background(OnlineGreen)
+                    .semantics { contentDescription = "En línea" }
+            )
+        }
+        Spacer(Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
             Text(
                 "Asistente",
                 style = MaterialTheme.typography.headlineMedium,
@@ -527,9 +637,24 @@ private fun OtherDayPicker(firstSelectableDay: LocalDate, onDismiss: () -> Unit,
     }
 }
 
+/** El chip de día del chat, como en WhatsApp: "Hoy", "Ayer", "Lunes" (esta semana) o "12 de octubre". */
+internal fun chatDayLabel(day: LocalDate, today: LocalDate?): String = when {
+    today == null -> day.format(DAY_MONTH)
+    day == today -> "Hoy"
+    day == today.minusDays(1) -> "Ayer"
+    day.isAfter(today.minusDays(7)) && day.isBefore(today) -> day.format(WEEKDAY).replaceFirstChar { it.uppercase() }
+    day.year == today.year -> day.format(DAY_MONTH)
+    else -> day.format(DAY_MONTH_YEAR)
+}
+
+private val SPANISH = Locale.forLanguageTag("es-ES")
+private val WEEKDAY = DateTimeFormatter.ofPattern("EEEE", SPANISH)
+private val DAY_MONTH = DateTimeFormatter.ofPattern("d 'de' MMMM", SPANISH)
+private val DAY_MONTH_YEAR = DateTimeFormatter.ofPattern("d 'de' MMMM 'de' yyyy", SPANISH)
+
 @Composable
-private fun DayChip(text: String) {
-    Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+private fun DayChip(text: String, modifier: Modifier = Modifier) {
+    Box(modifier = modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
         Text(
             text,
             modifier = Modifier
@@ -541,3 +666,22 @@ private fun DayChip(text: String) {
         )
     }
 }
+
+/**
+ * Abre Syncro en Google Play para actualizar: en la app de la tienda si está, si no en el navegador.
+ */
+private fun Context.openInPlayStore() {
+    val inStore = Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=$packageName"))
+        .setPackage(PLAY_STORE_PACKAGE)
+        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    try {
+        startActivity(inStore)
+    } catch (e: ActivityNotFoundException) {
+        startActivity(
+            Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=$packageName"))
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        )
+    }
+}
+
+private const val PLAY_STORE_PACKAGE = "com.android.vending"

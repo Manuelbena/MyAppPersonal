@@ -6,6 +6,7 @@ import com.syncro.data.preferences.ThemeMode
 import com.syncro.data.preferences.ThemePreferences
 import com.syncro.domain.model.AppSettings
 import com.syncro.domain.model.AssistantSettings
+import com.syncro.domain.model.HomeSettings
 import com.syncro.domain.model.DataLossSummary
 import com.syncro.domain.model.DigestSettings
 import com.syncro.domain.model.User
@@ -66,6 +67,8 @@ class SettingsViewModel @Inject constructor(
     fun updateDigest(change: (DigestSettings) -> DigestSettings) = update { it.copy(digest = change(it.digest)) }
 
     fun updateAssistant(change: (AssistantSettings) -> AssistantSettings) = update { it.copy(assistant = change(it.assistant)) }
+
+    fun updateHome(change: (HomeSettings) -> HomeSettings) = update { it.copy(home = change(it.home)) }
 
     private fun update(change: (AppSettings) -> AppSettings) {
         viewModelScope.launch {

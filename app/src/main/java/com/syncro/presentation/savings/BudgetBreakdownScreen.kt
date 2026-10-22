@@ -15,6 +15,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.syncro.domain.model.cumulativeSpending
+import com.syncro.domain.model.expenseShares
+import com.syncro.domain.model.spendingLimitCents
 import com.syncro.domain.model.BUDGET_WARNING_PERCENT
 import com.syncro.domain.model.Budget
 import com.syncro.domain.model.BudgetGroupSummary
@@ -112,10 +115,41 @@ fun BudgetBreakdownContent(
                                         style = MaterialTheme.typography.bodyMedium,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
-                                    Spacer(Modifier.height(12.dp))
-                                    BudgetStack(plan)
-                                    Spacer(Modifier.height(12.dp))
+                                    Spacer(Modifier.height(16.dp))
+                                    SpendingDonut(plan, modifier = Modifier.align(Alignment.CenterHorizontally))
+                                    Spacer(Modifier.height(16.dp))
                                     BudgetStackLegend(plan)
+                                }
+                            }
+                        }
+
+                        item(key = "pace") {
+                            BreakdownCard {
+                                Column(modifier = Modifier.padding(20.dp)) {
+                                    ChartTitle("Ritmo del mes", "Lo gastado día a día; discontinuo, lo previsto que aún no ha llegado")
+                                    Spacer(Modifier.height(12.dp))
+                                    SpendingPaceChart(
+                                        points = movements.cumulativeSpending(),
+                                        limitCents = plan.spendingLimitCents,
+                                        today = today
+                                    )
+                                }
+                            }
+                        }
+
+                        val shares = movements.expenseShares()
+                        if (shares.isNotEmpty()) {
+                            item(key = "shares") {
+                                BreakdownCard {
+                                    Column(modifier = Modifier.padding(vertical = 16.dp)) {
+                                        ChartTitle("¿En qué se va?", "Toca una categoría para ponerle límite", Modifier.padding(horizontal = 20.dp))
+                                        Spacer(Modifier.height(8.dp))
+                                        ExpenseShareBars(shares) { category ->
+                                            sheet = budgets.firstOrNull { it.category == category }
+                                                ?.let { BudgetTarget(it) }
+                                                ?: BudgetTarget(null, category)
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -254,5 +288,14 @@ private fun GroupCard(
             summary.statuses.forEach { status -> BudgetRow(status, onClick = { onOpenBudget(status.budget) }) }
             unbudgeted.forEach { (category, cents) -> UnbudgetedRow(category, cents, onClick = { onCreateBudget(category) }) }
         }
+    }
+}
+
+/** Título de una gráfica y, debajo, cómo leerla. */
+@Composable
+private fun ChartTitle(title: String, subtitle: String, modifier: Modifier = Modifier) {
+    Column(modifier = modifier) {
+        Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+        Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }

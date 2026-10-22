@@ -8,6 +8,8 @@ import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onFirst
+import com.syncro.domain.model.label
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -181,7 +183,8 @@ class BudgetBreakdownContentTest {
         )
 
         scrollTo("200,00 € de 300,00 €")
-        compose.onNodeWithText("Supermercado").performClick()
+        // La fila del presupuesto, en su grupo (el nombre también sale antes, en "¿En qué se va?")
+        compose.onAllNodesWithText("Supermercado").onLast().performClick()
 
         compose.onNodeWithText("MOVIMIENTOS DEL MES").performScrollTo().assertIsDisplayed()
         // El total de la categoría junto al título
@@ -201,5 +204,31 @@ class BudgetBreakdownContentTest {
         compose.onAllNodesWithText("Supermercado").onLast().performClick()
 
         compose.onNodeWithText("Este mes aún no hay gastos en Supermercado.").performScrollTo().assertIsDisplayed()
+    }
+
+    @Test
+    fun `las graficas resumen el mes y tocar una categoria abre su hoja`() {
+        show(
+            monthMovements(
+                october,
+                listOf(
+                    aMovement(id = "a", amountCents = 15_000, category = MovementCategory.GROCERIES, date = LocalDate.of(2026, 10, 1), note = "Mercadona"),
+                    aMovement(id = "c", amountCents = 4_500, category = MovementCategory.RESTAURANTS, date = LocalDate.of(2026, 10, 1), note = "Pizzería")
+                )
+            )
+        )
+
+        compose.onNodeWithContentDescription("Reparto del mes", substring = true).assertExists()
+        scrollTo("Ritmo del mes")
+        compose.onNodeWithText("Ritmo del mes").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Ritmo del mes", substring = true).assertExists()
+        scrollTo("¿En qué se va?")
+        compose.onNodeWithText("¿En qué se va?").assertIsDisplayed()
+        scrollTo("76 %")
+        compose.onNodeWithText("76 %").assertIsDisplayed()
+
+        // Restaurantes no tiene presupuesto: su hoja deja crearlo y enseña sus gastos del mes
+        compose.onAllNodesWithText(MovementCategory.RESTAURANTS.label).onFirst().performScrollTo().performClick()
+        compose.onNodeWithText("Pizzería").performScrollTo().assertIsDisplayed()
     }
 }

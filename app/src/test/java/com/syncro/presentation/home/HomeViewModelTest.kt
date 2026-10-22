@@ -5,6 +5,8 @@ import androidx.compose.ui.graphics.Color
 import com.google.android.gms.auth.UserRecoverableAuthException
 import com.google.api.client.googleapis.extensions.android.gms.auth.UserRecoverableAuthIOException
 import com.syncro.domain.model.AppSettings
+import com.syncro.domain.model.GoogleService
+import com.syncro.domain.model.SyncroItem
 import com.syncro.domain.model.MAIN_ACCOUNT_ID
 import com.syncro.domain.usecase.ObserveSavingsAccountsUseCase
 import com.syncro.testutil.FakeSavingsAccountRepository
@@ -21,6 +23,7 @@ import com.syncro.domain.usecase.HideDailyQuoteUseCase
 import com.syncro.domain.usecase.ObserveDailyQuoteUseCase
 import com.syncro.domain.usecase.ObserveSyncStateUseCase
 import com.syncro.domain.usecase.ObserveHomeSavingsUseCase
+import com.syncro.domain.usecase.ObserveSavingsSummaryUseCase
 import com.syncro.domain.usecase.GetMonthMovementsUseCase
 import com.syncro.domain.usecase.GetBudgetsUseCase
 import com.syncro.domain.model.Budget
@@ -37,6 +40,7 @@ import com.syncro.domain.usecase.GetNotesUseCase
 import com.syncro.domain.usecase.GetTimelineUseCase
 import com.syncro.domain.usecase.PushPendingChangesUseCase
 import com.syncro.domain.usecase.SaveEventExpenseUseCase
+import com.syncro.domain.usecase.GetSettingsUseCase
 import com.syncro.domain.usecase.SaveMovementUseCase
 import com.syncro.domain.model.ExpenseDraft
 import com.syncro.domain.model.SavingsAccount
@@ -158,9 +162,10 @@ class HomeViewModelTest {
         undoDeleteTaskUseCase = UndoDeleteTaskUseCase(tasks, google),
         undoDeleteEventUseCase = UndoDeleteEventUseCase(events, google),
         undoDeleteNoteUseCase = UndoDeleteNoteUseCase(notes),
-        observeHomeSavingsUseCase = ObserveHomeSavingsUseCase(settings, GetMonthMovementsUseCase(movements, settings), GetBudgetsUseCase(budgets), ObserveSavingsAccountsUseCase(accounts)),
+        observeHomeSavingsUseCase = ObserveHomeSavingsUseCase(settings, ObserveSavingsSummaryUseCase(GetMonthMovementsUseCase(movements, settings), GetBudgetsUseCase(budgets), ObserveSavingsAccountsUseCase(accounts))),
         generateRepeatsUseCase = GenerateRepeatsUseCase(series, tasks, events, google, clock),
-        saveEventExpenseUseCase = SaveEventExpenseUseCase(SaveMovementUseCase(movements), accounts)
+        saveEventExpenseUseCase = SaveEventExpenseUseCase(SaveMovementUseCase(movements), accounts),
+        getSettingsUseCase = GetSettingsUseCase(settings)
     )
 
     /** Recoge los efectos de un solo uso (snackbars, petición de permisos) que emite el ViewModel. */
@@ -171,6 +176,12 @@ class HomeViewModelTest {
     }
 
     // region Cabecera
+
+    @Test
+    fun `Inicio queda listo cuando ha llegado todo lo que se pinta`() = runTest {
+        // Sin esto la pantalla se quedaría en el esqueleto de carga (o lo quitaría el plazo de seguridad)
+        assertTrue(createViewModel().uiState.value.isContentReady)
+    }
 
     @Test
     fun `el saludo usa el nombre de pila del usuario con sesion`() = runTest {
@@ -267,6 +278,45 @@ class HomeViewModelTest {
         assertEquals(1, effects.count { it is HomeEffect.LaunchAuthRecovery })
     }
 
+    // Regresión: la pantalla del permiso se abría en cada sincronización (también al cambiar de día)
+    // y, si el usuario no lo daba, salía una y otra vez
+    @Test
+    fun `si no se da el permiso no se vuelve a pedir solo en cada sincronizacion`() = runTest {
+        google.syncFailure = UserRecoverableAuthIOException(UserRecoverableAuthException("Sin permiso", Intent()))
+        val viewModel = createViewModel()
+        val effects = collectEffects(viewModel)
+
+        viewModel.onGoogleAccessResult(granted = false)
+        viewModel.onDaySelected(viewModel.uiState.value.selectedDate.plusDays(1))
+        viewModel.syncFromGoogle()
+
+        assertEquals(1, effects.count { it is HomeEffect.LaunchAuthRecovery })
+    }
+
+    @Test
+    fun `Dar permiso vuelve a abrir la pantalla de Google`() = runTest {
+        google.syncFailure = UserRecoverableAuthIOException(UserRecoverableAuthException("Sin permiso", Intent()))
+        val viewModel = createViewModel()
+        val effects = collectEffects(viewModel)
+        viewModel.onGoogleAccessResult(granted = false)
+
+        viewModel.requestGoogleAccess()
+
+        assertEquals(2, effects.count { it is HomeEffect.LaunchAuthRecovery })
+    }
+
+    @Test
+    fun `al dar el permiso se vuelve a sincronizar`() = runTest {
+        google.syncFailure = UserRecoverableAuthIOException(UserRecoverableAuthException("Sin permiso", Intent()))
+        val viewModel = createViewModel()
+        google.syncFailure = null
+        val syncsBefore = log.calls.count { it == "syncTasks" }
+
+        viewModel.onGoogleAccessResult(granted = true)
+
+        assertEquals(syncsBefore + 1, log.calls.count { it == "syncTasks" })
+    }
+
     // endregion
 
     // region Aviso de sincronización
@@ -304,6 +354,36 @@ class HomeViewModelTest {
         google.syncFailure = UserRecoverableAuthIOException(UserRecoverableAuthException("Sin permiso", Intent()))
 
         assertEquals(null, createViewModel().uiState.value.syncNotice)
+    }
+
+    @Test
+    fun `sin permiso de Calendar se avisa en Inicio para darlo`() = runTest {
+        val viewModel = createViewModel()
+
+        google.missingAccess.value = setOf(GoogleService.CALENDAR)
+
+        assertEquals(SyncNotice.MissingAccess(setOf(GoogleService.CALENDAR)), viewModel.uiState.value.syncNotice)
+    }
+
+    @Test
+    fun `sin conexion manda el aviso de sin conexion aunque falte el permiso`() = runTest {
+        val viewModel = createViewModel()
+
+        google.missingAccess.value = setOf(GoogleService.CALENDAR)
+        connectivity.online.value = false
+
+        assertEquals(SyncNotice.Offline(0), viewModel.uiState.value.syncNotice)
+    }
+
+    @Test
+    fun `sin permiso se sigue pudiendo crear tareas en el movil`() = runTest {
+        google.syncFailure = UserRecoverableAuthIOException(UserRecoverableAuthException("Sin permiso", Intent()))
+        google.missingAccess.value = setOf(GoogleService.TASKS)
+        val viewModel = createViewModel()
+
+        viewModel.saveQuickTask(title = "Comprar pan", description = "", date = viewModel.uiState.value.selectedDate)
+
+        assertTrue(viewModel.uiState.value.timelineItems.any { (it as? SyncroItem.Task)?.title == "Comprar pan" })
     }
 
     @Test
@@ -594,6 +674,15 @@ class HomeViewModelTest {
 
         assertEquals(123_000, savings.balanceCents)
         assertEquals(listOf(MovementCategory.GROCERIES), savings.tightBudgets.map { it.budget.category })
+    }
+
+    @Test
+    fun `la racha cuenta los dias seguidos con todas las tareas hechas`() = runTest {
+        tasks.insertTask(aTask(date = DAY.minusDays(2), isCompleted = true))
+        tasks.insertTask(aTask(date = DAY.minusDays(1), isCompleted = true))
+        tasks.insertTask(aTask(date = DAY, isCompleted = false))
+
+        assertEquals(2, createViewModel().uiState.value.streak)
     }
 
     // endregion

@@ -1,6 +1,7 @@
 package com.syncro.presentation.navigation
 
 import android.annotation.SuppressLint
+import com.syncro.domain.model.MovementType
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.slideInVertically
@@ -76,6 +77,10 @@ fun MainScaffold(
     // El "+" del widget pide abrir la hoja de nueva tarea en Inicio
     addTask: Boolean = false,
     onAddTaskOpened: () -> Unit = {},
+    // El widget de Ahorros pide abrir Ahorros y, con [addMovement], el formulario de ese tipo
+    openSavings: Boolean = false,
+    addMovement: MovementType? = null,
+    onSavingsOpened: () -> Unit = {},
     themeViewModel: ThemeViewModel = hiltViewModel(),
     authViewModel: AuthViewModel = hiltViewModel(),
     // Uno solo para el chat y el número de la barra, así nunca se desincronizan
@@ -108,6 +113,8 @@ fun MainScaffold(
     var lastBottomRoute by remember { mutableStateOf(currentRoute) }
     // "Apuntar nómina" en el chat: Ahorros abre el formulario de ingreso con la categoría Nómina
     var openSalaryForm by remember { mutableStateOf(false) }
+    // Ingreso o gasto pedido desde el widget de Ahorros: Ahorros abre ese formulario
+    var openMovementForm by remember { mutableStateOf<MovementType?>(null) }
     if (bottomNavItems.any { it.route == currentRoute }) lastBottomRoute = currentRoute
 
     SyncroTheme(darkTheme = isDarkTheme) {
@@ -150,6 +157,13 @@ fun MainScaffold(
                 LaunchedEffect(addTask, session) {
                     if (addTask && session is SessionState.LoggedIn && navController.currentDestination?.route != AppScreen.Home.route) {
                         navigateToTab(AppScreen.Home)
+                    }
+                }
+                LaunchedEffect(openSavings, addMovement, session) {
+                    if ((openSavings || addMovement != null) && session is SessionState.LoggedIn) {
+                        addMovement?.let { openMovementForm = it }
+                        navigateToTab(AppScreen.Savings)
+                        onSavingsOpened()
                     }
                 }
                 LaunchedEffect(openAssistant, session) {
@@ -328,6 +342,8 @@ fun MainScaffold(
                             SavingsScreen(
                                 openSalaryForm = openSalaryForm,
                                 onSalaryFormOpened = { openSalaryForm = false },
+                                openMovementForm = openMovementForm,
+                                onMovementFormOpened = { openMovementForm = null },
                                 onOpenBudgets = { navController.navigate(AppScreen.SavingsBudgets.route) }
                             )
                         }

@@ -1,6 +1,8 @@
 package com.syncro.domain.model
 
 import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.LocalTime
 
 /** Lo que el usuario contestó a "¿Te recuerdo tu día?". */
 enum class DigestAnswer { ACCEPTED, DECLINED }
@@ -17,7 +19,18 @@ enum class ChatReply {
     FOCUS_SKIP,
     /** Día de nómina: abrir Ahorros con la nómina preparada. */
     PAYDAY_REGISTER,
-    PAYDAY_LATER
+    PAYDAY_LATER,
+    /** Hábito detectado: que se repita cada semana ese día. */
+    HABIT_REPEAT,
+    HABIT_DISMISS,
+    /** Hay versión nueva: abrir Syncro en la tienda para actualizar. */
+    UPDATE_NOW,
+    /** Hay versión nueva: no avisar más de esta versión. */
+    UPDATE_LATER,
+    /** Tarea atascada: ya está hecha, ya no hace falta (se borra) o se mantiene (no se vuelve a preguntar). */
+    STUCK_DONE,
+    STUCK_DELETE,
+    STUCK_KEEP
 }
 
 data class ChatOption(val reply: ChatReply, val label: String)
@@ -34,6 +47,8 @@ enum class TaskAction { MOVE_TO_TARGET, OTHER_DAY, DONE }
  * @param maxSelectable si es mayor que 0, las tareas se pueden marcar (hasta ese número) y
  *   [ChatReply.FOCUS_CONFIRM] confirma las marcadas
  * @param options opciones para contestar, bajo el mensaje; desaparecen al contestar
+ * @param day el día en que salió el mensaje (el chip "Hoy", "Ayer"… encima); null en los de
+ *   bienvenida, que van con los que les siguen
  */
 data class ChatMessage(
     val id: String,
@@ -42,7 +57,8 @@ data class ChatMessage(
     val tasks: List<ChatTask> = emptyList(),
     val taskTarget: MoveTarget? = null,
     val maxSelectable: Int = 0,
-    val options: List<ChatOption> = emptyList()
+    val options: List<ChatOption> = emptyList(),
+    val day: LocalDate? = null
 )
 
 data class AssistantConversation(val messages: List<ChatMessage>) {
@@ -59,26 +75,43 @@ data class AssistantConversation(val messages: List<ChatMessage>) {
  * @param notificationsAllowed si Android deja publicar los avisos ahora mismo
  * @param leftovers las tareas pendientes del repaso actual (null si aún no se saben)
  * @param outcomes lo que el usuario decidió en cada repaso (el actual y los recientes)
+ * @param stuck las tareas que llevan varios repasos sin hacerse, sin contestar aún
+ * @param stuckAnswers lo contestado sobre tareas atascadas (lo reciente)
  * @param focus las tareas de hoy entre las que elegir prioridades (null desde las 21:00)
  * @param focusHistory las prioridades ya elegidas (la de hoy y las recientes)
  * @param payday el último día de nómina si fue hace poco (null sin nómina en Ajustes)
  * @param budgetAlerts los presupuestos que llegaron al 80 % o se pasaron hace poco
  * @param weeklyBalance las horas por categoría de la semana pasada (se cuenta el lunes)
  * @param errands las salidas (Recados, Compras) pendientes de hoy, si son varias
+ * @param dayLoads solapes y días a tope de hoy y, desde la hora de la noche, de mañana
+ * @param habits lo que el usuario apunta casi cada semana el mismo día, sin contestar aún
+ * @param habitAnswers lo contestado a esas propuestas (las recientes)
+ * @param update versión nueva en la tienda: va al final, es lo más nuevo
+ * @param updateDismissed si a esa versión ya se contestó "Más tarde"
  * @param clearedIds mensajes que el usuario borró al vaciar el chat (no vuelven a salir)
+ * @param today hoy: ningún mensaje lleva un día posterior (el repaso de la noche se pregunta hoy
+ *   aunque se ordene con mañana); null para no poner días
  */
 fun assistantConversation(
     answer: DigestAnswer?,
     notificationsAllowed: Boolean,
     leftovers: LeftoverTasks? = null,
     outcomes: List<LeftoverOutcome> = emptyList(),
+    stuck: List<StuckTask> = emptyList(),
+    stuckAnswers: List<StuckAnswer> = emptyList(),
     focus: FocusCandidates? = null,
     focusHistory: List<DailyFocus> = emptyList(),
     payday: Payday? = null,
     budgetAlerts: List<BudgetAlert> = emptyList(),
     weeklyBalance: WeeklyBalance? = null,
     errands: ErrandsDay? = null,
-    clearedIds: Set<String> = emptySet()
+    dayLoads: List<DayLoad> = emptyList(),
+    habits: List<Habit> = emptyList(),
+    habitAnswers: List<HabitAnswer> = emptyList(),
+    update: AppUpdate? = null,
+    updateDismissed: Boolean = false,
+    clearedIds: Set<String> = emptySet(),
+    today: LocalDate? = null
 ): AssistantConversation {
     val messages = digestMessages(answer, notificationsAllowed)
 
@@ -87,13 +120,17 @@ fun assistantConversation(
     val blocks = mutableListOf<Pair<Moment, List<ChatMessage>>>()
     outcomes.forEach { outcome ->
         val pending = leftovers?.takeIf { it.reviewDate == outcome.reviewDate }?.tasks.orEmpty()
-        blocks += Moment(outcome.reviewDate.plusDays(1), LEFTOVERS_ORDER) to answeredLeftoverMessages(outcome, pending)
+        blocks += reviewMoment(outcome.reviewDate, outcome.target) to answeredLeftoverMessages(outcome, pending)
     }
     val unanswered = leftovers?.takeIf { current ->
         current.tasks.isNotEmpty() && outcomes.none { it.reviewDate == current.reviewDate }
     }
-    unanswered?.let { blocks += Moment(it.reviewDate.plusDays(1), LEFTOVERS_ORDER) to listOf(leftoverQuestion(it)) }
+    unanswered?.let { blocks += reviewMoment(it.reviewDate, it.target) to listOf(leftoverQuestion(it)) }
     val leftoverPending = unanswered != null
+    // Las atascadas, justo detrás del repaso que las ha vuelto a dejar sin hacer
+    stuckAnswers.forEach { blocks += Moment(it.lastReview.plusDays(1), STUCK_ORDER) to answeredStuckMessages(it) }
+    stuck.filter { task -> stuckAnswers.none { it.taskId == task.task.id } }
+        .forEach { blocks += Moment(it.lastReview.plusDays(1), STUCK_ORDER) to listOf(stuckQuestion(it)) }
     focusHistory.forEach { chosen -> blocks += Moment(chosen.date, FOCUS_ORDER) to answeredFocusMessages(chosen) }
     // Las prioridades se preguntan cuando ya no queda un repaso por contestar: lo que se pase a hoy
     // también puede ser prioridad
@@ -110,19 +147,77 @@ fun assistantConversation(
     weeklyBalance?.let { blocks += Moment(it.weekEnd.plusDays(1), WEEK_ORDER) to listOf(weeklyBalanceMessage(it)) }
     // Las salidas de hoy, detrás de lo demás de ese día
     errands?.let { blocks += Moment(it.date, ERRANDS_ORDER) to listOf(errandsMessage(it)) }
-    blocks.sortedWith(compareBy({ it.first.day }, { it.first.order })).forEach { messages += it.second }
+    // Cómo viene el día, en su día: el de mañana (que se cuenta esta noche) queda lo último del chat
+    dayLoads.forEach {
+        // El de mañana se cuenta esta noche
+        val asked = if (it.isTomorrow) it.date.minusDays(1) else it.date
+        blocks += Moment(it.date, DAY_LOAD_ORDER, asked) to listOf(dayLoadMessage(it))
+    }
+    // Los hábitos, el día que se hizo la última vez (que es cuando se nota)
+    habitAnswers.forEach { blocks += Moment(it.date, HABIT_ORDER) to answeredHabitMessages(it) }
+    habits.filter { habit -> habitAnswers.none { it.key == habit.key } }
+        .forEach { blocks += Moment(it.lastDone, HABIT_ORDER) to listOf(habitQuestion(it)) }
+    blocks.sortedWith(compareBy({ it.first.day }, { it.first.order })).forEach { (moment, block) ->
+        val day = today?.let { minOf(moment.asked, it) }
+        messages += block.map { it.copy(day = day) }
+    }
+    // La versión nueva, lo último: es de ahora mismo (y se va sola al actualizar)
+    update?.let { messages += updateMessages(it, updateDismissed).map { message -> message.copy(day = today) } }
 
     return AssistantConversation(messages.filter { it.id !in clearedIds })
 }
 
-/** Posición de un bloque en el chat: el día y, dentro del día, repaso (antes) o prioridades. */
-private data class Moment(val day: LocalDate, val order: Int)
+/**
+ * Posición de un bloque en el chat: el día y, dentro del día, repaso (antes) o prioridades.
+ * [asked] es el día en que se dijo, si no es [day] (el repaso de la noche va con el día siguiente).
+ */
+private data class Moment(val day: LocalDate, val order: Int, val asked: LocalDate = day)
+
+/** El repaso de la noche se pregunta ese mismo día; el de la mañana, al día siguiente. */
+private fun reviewMoment(reviewDate: LocalDate, target: MoveTarget) = Moment(
+    reviewDate.plusDays(1),
+    LEFTOVERS_ORDER,
+    asked = if (target == MoveTarget.TOMORROW) reviewDate else reviewDate.plusDays(1)
+)
 private const val WEEK_ORDER = -2
 private const val PAYDAY_ORDER = -1
 private const val LEFTOVERS_ORDER = 0
-private const val FOCUS_ORDER = 1
-private const val BUDGET_ORDER = 2
-private const val ERRANDS_ORDER = 3
+private const val STUCK_ORDER = 1
+private const val FOCUS_ORDER = 2
+private const val BUDGET_ORDER = 3
+private const val ERRANDS_ORDER = 4
+private const val HABIT_ORDER = 5
+private const val DAY_LOAD_ORDER = 6
+
+// region Orden de llegada
+
+/**
+ * El chat como en WhatsApp: cada mensaje en el momento en que salió por primera vez ([arrivedAt],
+ * lo guarda la app) y con ese día, así lo nuevo siempre queda abajo aunque hable de días pasados.
+ * Los que llegaron a la vez (o aún no tienen hora: son de [now]) mantienen el orden de la conversación.
+ */
+fun AssistantConversation.inArrivalOrder(arrivedAt: Map<String, LocalDateTime>, now: LocalDateTime): AssistantConversation {
+    val at = messages.map { arrivedAt[it.id] ?: now }
+    return AssistantConversation(
+        messages.indices.sortedBy { at[it] }.map { messages[it].copy(day = at[it].toLocalDate()) }
+    )
+}
+
+/**
+ * La hora de llegada de los mensajes que aún no la tienen: ahora. La primera vez (sin nada guardado,
+ * p. ej. al actualizar la app) los de días pasados se quedan en su día, para no juntarlo todo en hoy.
+ */
+fun AssistantConversation.newArrivals(arrivedAt: Map<String, LocalDateTime>, now: LocalDateTime): Map<String, LocalDateTime> {
+    val firstTime = arrivedAt.isEmpty()
+    // Los de bienvenida (sin día) van con el primer día que haya
+    val firstDay = messages.firstNotNullOfOrNull { it.day }
+    return messages.filter { it.id !in arrivedAt }.associate { message ->
+        val day = message.day ?: firstDay
+        message.id to if (firstTime && day != null && day.isBefore(now.toLocalDate())) day.atStartOfDay() else now
+    }
+}
+
+// endregion
 
 // region Avisos diarios
 
@@ -243,6 +338,49 @@ private fun leftoverId(reviewDate: LocalDate) = "leftovers-$reviewDate"
 
 // endregion
 
+// region Tareas atascadas
+
+private fun stuckQuestionText(title: String, reviews: Int) =
+    "🐌 «$title» ya lleva $reviews repasos sin hacerse. Cuando algo se aplaza tanto suele ser porque es " +
+        "demasiado grande o porque ya no hace falta. ¿Qué hacemos?"
+
+private fun stuckQuestion(stuck: StuckTask): ChatMessage = assistant(
+    stuckId(stuck.task.id),
+    stuckQuestionText(stuck.task.title, stuck.reviews),
+    options = listOf(
+        ChatOption(ChatReply.STUCK_DONE, stuckLabel(StuckChoice.DONE)),
+        ChatOption(ChatReply.STUCK_DELETE, stuckLabel(StuckChoice.DELETE)),
+        ChatOption(ChatReply.STUCK_KEEP, stuckLabel(StuckChoice.KEEP))
+    )
+)
+
+private fun stuckLabel(choice: StuckChoice) = when (choice) {
+    StuckChoice.DONE -> "Ya está hecha"
+    StuckChoice.DELETE -> "Ya no hace falta"
+    StuckChoice.KEEP -> "La mantengo"
+}
+
+private fun answeredStuckMessages(answer: StuckAnswer): List<ChatMessage> {
+    val id = stuckId(answer.taskId)
+    return listOf(
+        assistant(id, stuckQuestionText(answer.title, answer.reviews)),
+        user("$id-answer", stuckLabel(answer.choice)),
+        assistant(
+            "$id-done",
+            when (answer.choice) {
+                StuckChoice.DONE -> "¡Genial! ✅ La marco como hecha."
+                StuckChoice.DELETE -> "Hecho, la he borrado. Una cosa menos en la cabeza. 🧹"
+                StuckChoice.KEEP -> "Vale, la mantengo y no te vuelvo a preguntar por ella. Un truco: apunta solo el " +
+                    "primer paso, que cuesta mucho menos empezar. 💡"
+            }
+        )
+    )
+}
+
+fun stuckId(taskId: String) = "stuck-$taskId"
+
+// endregion
+
 // region Día de nómina
 
 /**
@@ -352,7 +490,7 @@ private fun weeklyBalanceMessage(balance: WeeklyBalance): ChatMessage {
 }
 
 /** "45 min", "3 h", "3,5 h" (redondeado a la media hora). */
-private fun hoursText(minutes: Long): String {
+internal fun hoursText(minutes: Long): String {
     if (minutes < 60) return "$minutes min"
     val halves = (minutes + 15) / 30
     return if (halves % 2 == 0L) "${halves / 2} h" else "${halves / 2},5 h"
@@ -380,6 +518,67 @@ private fun errandsMessage(errands: ErrandsDay): ChatMessage {
         "🧭 Hoy tienes ${errands.titles.size} salidas: $list. Si puedes, hazlas del tirón y te ahorras viajes. 🚶"
     )
 }
+
+// endregion
+
+// region Cómo viene el día
+
+/** Los solapes (para mover alguno) y, si va a tope, las horas ocupadas con un consejo. */
+private fun dayLoadMessage(load: DayLoad): ChatMessage {
+    val day = if (load.isTomorrow) "Mañana" else "Hoy"
+    val clashes = when (load.clashes.size) {
+        0 -> null
+        1 -> load.clashes.single().let {
+            "⚠️ $day se te pisan «${it.firstTitle}» y «${it.secondTitle}» (de ${clockText(it.from)} a ${clockText(it.to)})."
+        }
+        else -> "⚠️ $day se te pisan ${load.clashes.size} veces:\n" +
+            load.clashes.joinToString("\n") { "• «${it.firstTitle}» y «${it.secondTitle}», de ${clockText(it.from)} a ${clockText(it.to)}" }
+    }?.let { "$it\n¿Te da tiempo a todo o mueves alguno? 🗓️" }
+    val overload = if (load.isOverloaded) {
+        val opening = if (clashes == null) "🔋 $day vas a tope" else "🔋 Y vas a tope"
+        "$opening: ${load.eventCount} eventos y ${hoursText(load.busyMinutes)} ocupadas, " +
+            "de ${clockText(load.firstStart)} a ${clockText(load.lastEnd)}. Guárdate un rato para comer y respirar. 🌿"
+    } else {
+        null
+    }
+    return assistant("day-load-${load.date}", listOfNotNull(clashes, overload).joinToString("\n\n"))
+}
+
+/** "9:30", "18:00"; un evento que llega a la medianoche acaba a las "24:00". */
+private fun clockText(time: LocalTime): String =
+    if (time == LocalTime.MIDNIGHT) "24:00" else "${time.hour}:${time.minute.toString().padStart(2, '0')}"
+
+// endregion
+
+// region Hábitos
+
+private fun habitQuestionText(title: String, weekday: java.time.DayOfWeek) =
+    "🔁 Veo que «$title» lo sueles apuntar los ${weekday.spanishName()}. ¿Quieres que se repita solo cada ${weekday.spanishName()}?"
+
+private fun habitQuestion(habit: Habit): ChatMessage = assistant(
+    habitId(habit.key),
+    habitQuestionText(habit.title, habit.weekday),
+    options = listOf(
+        ChatOption(ChatReply.HABIT_REPEAT, "Sí, cada ${habit.weekday.spanishName()}"),
+        ChatOption(ChatReply.HABIT_DISMISS, "No, gracias")
+    )
+)
+
+private fun answeredHabitMessages(answer: HabitAnswer): List<ChatMessage> {
+    val id = habitId(answer.key)
+    val day = answer.weekday.spanishName()
+    return listOf(
+        assistant(id, habitQuestionText(answer.title, answer.weekday)),
+        user("$id-answer", if (answer.accepted) "Sí, cada $day" else "No, gracias"),
+        assistant(
+            "$id-done",
+            if (answer.accepted) "Hecho: «${answer.title}» se repetirá cada $day. Lo puedes cambiar desde su detalle. 🔁"
+            else "Vale, no te lo vuelvo a proponer. 👍"
+        )
+    )
+}
+
+fun habitId(key: String) = "habit-$key"
 
 // endregion
 
@@ -433,3 +632,29 @@ private const val ID_USER_ANSWER = "user_digest_answer"
 private const val ID_DIGEST_ACCEPTED = "digest_accepted"
 private const val ID_DIGEST_BLOCKED = "digest_blocked"
 private const val ID_DIGEST_DECLINED = "digest_declined"
+
+// region Versión nueva
+
+/** Por versión: si sale otra más nueva, es un mensaje nuevo (y vuelve a contar como sin leer). */
+fun updateMessageId(update: AppUpdate) = "update-${update.versionCode}"
+
+private fun updateMessages(update: AppUpdate, dismissed: Boolean): List<ChatMessage> {
+    val id = updateMessageId(update)
+    val question = assistant(
+        id,
+        "🎉 ¡Hay una versión nueva de Syncro! Trae mejoras y arreglos. Actualiza desde Google Play en un momento, sin perder nada de lo tuyo.",
+        options = if (dismissed) {
+            emptyList()
+        } else {
+            listOf(ChatOption(ChatReply.UPDATE_NOW, "Actualizar"), ChatOption(ChatReply.UPDATE_LATER, "Más tarde"))
+        }
+    )
+    if (!dismissed) return listOf(question)
+    return listOf(
+        question,
+        user("$id-answer", "Más tarde"),
+        assistant("$id-later", "¡Vale! Cuando quieras la tienes en Google Play. 😉")
+    )
+}
+
+// endregion

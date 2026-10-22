@@ -7,6 +7,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.time.DayOfWeek
 
 /**
  * Conversación del asistente.
@@ -344,6 +345,98 @@ class AssistantChatTest {
         val chat = assistantConversation(DigestAnswer.ACCEPTED, true)
 
         assertTrue(chat.messages.none { it.id.startsWith("payday") })
+    }
+
+    // endregion
+
+    // region Versión nueva
+
+    @Test
+    fun `una version nueva se anuncia al final con Actualizar y Mas tarde`() {
+        val chat = assistantConversation(DigestAnswer.ACCEPTED, notificationsAllowed = true, update = AppUpdate(42))
+
+        val last = chat.messages.last()
+        assertEquals("update-42", last.id)
+        assertEquals(listOf(ChatReply.UPDATE_NOW, ChatReply.UPDATE_LATER), last.options.map { it.reply })
+        assertEquals(1, chat.unreadCount(chat.messages.dropLast(1).map { it.id }.toSet()))
+    }
+
+    @Test
+    fun `tras Mas tarde se ve la respuesta y ya no hay opciones`() {
+        val chat = assistantConversation(DigestAnswer.ACCEPTED, notificationsAllowed = true, update = AppUpdate(42), updateDismissed = true)
+
+        val updateMessages = chat.messages.filter { it.id.startsWith("update-42") }
+        assertEquals(listOf("Más tarde"), updateMessages.filter { !it.fromAssistant }.map { it.text })
+        assertTrue(updateMessages.all { it.options.isEmpty() })
+    }
+
+    @Test
+    fun `sin version nueva no se dice nada`() {
+        val chat = assistantConversation(DigestAnswer.ACCEPTED, notificationsAllowed = true)
+
+        assertTrue(chat.messages.none { it.id.startsWith("update") })
+    }
+
+    // endregion
+
+    // region Orden de llegada y días
+
+    @Test
+    fun `el repaso de la noche lleva el dia en que se pregunta, no el siguiente`() {
+        val chat = assistantConversation(DigestAnswer.ACCEPTED, true, evening, today = DAY)
+
+        assertEquals(DAY, chat.byId("leftovers-$DAY")?.day)
+    }
+
+    @Test
+    fun `el repaso de la manana lleva el dia de la manana`() {
+        val morning = evening.copy(reviewDate = DAY.minusDays(1), target = MoveTarget.TODAY)
+
+        val chat = assistantConversation(DigestAnswer.ACCEPTED, true, morning, today = DAY)
+
+        assertEquals(DAY, chat.byId("leftovers-${DAY.minusDays(1)}")?.day)
+    }
+
+    // Regresión: los mensajes nuevos que hablan de días pasados salían arriba, en medio de la conversación
+    @Test
+    fun `un mensaje nuevo va al final con el dia de hoy aunque hable de un dia pasado`() {
+        val old = LeftoverOutcome(DAY.minusDays(2), LeftoverChoice.KEEP, MoveTarget.TOMORROW, total = 1)
+        fun chat(habits: List<Habit>) =
+            assistantConversation(DigestAnswer.ACCEPTED, true, outcomes = listOf(old), habits = habits, today = DAY)
+        val known = chat(emptyList()).newArrivals(emptyMap(), DAY.minusDays(2).atTime(21, 0))
+
+        // Llega un hábito que se hizo hace 5 días: por su fecha iría arriba del todo
+        val habit = Habit("Gimnasio", DayOfWeek.TUESDAY, weeks = 3, latest = aTask(title = "Gimnasio"), lastDone = DAY.minusDays(5))
+        val now = DAY.atTime(10, 0)
+        val withHabit = chat(listOf(habit))
+        val arranged = withHabit.inArrivalOrder(known + withHabit.newArrivals(known, now), now)
+
+        val last = arranged.messages.last()
+        assertEquals(habitId(habit.key), last.id)
+        assertEquals(DAY, last.day)
+        assertEquals(DAY.minusDays(2), arranged.byId("leftovers-${DAY.minusDays(2)}")?.day)
+    }
+
+    @Test
+    fun `la primera vez los mensajes de dias pasados se quedan en su dia`() {
+        val old = LeftoverOutcome(DAY.minusDays(3), LeftoverChoice.KEEP, MoveTarget.TOMORROW, total = 1)
+        val chat = assistantConversation(DigestAnswer.ACCEPTED, true, outcomes = listOf(old), today = DAY)
+        val now = DAY.atTime(10, 0)
+
+        val arranged = chat.inArrivalOrder(chat.newArrivals(emptyMap(), now), now)
+
+        assertEquals(DAY.minusDays(3), arranged.byId("leftovers-${DAY.minusDays(3)}")?.day)
+        // Los de bienvenida van con el primer día
+        assertEquals(DAY.minusDays(3), arranged.messages.first().day)
+        assertEquals(chat.messages.map { it.id }, arranged.messages.map { it.id })
+    }
+
+    @Test
+    fun `las llegadas ya guardadas no cambian`() {
+        val chat = assistantConversation(DigestAnswer.ACCEPTED, true, today = DAY)
+        val known = chat.newArrivals(emptyMap(), DAY.minusDays(1).atTime(9, 0))
+
+        assertTrue(chat.newArrivals(known, DAY.atTime(9, 0)).isEmpty())
     }
 
     // endregion

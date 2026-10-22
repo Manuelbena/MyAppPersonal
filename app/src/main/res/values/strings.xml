@@ -2,4 +2,6 @@
     <string name="app_name">syncro</string>
     <string name="widget_today_label">Tu día</string>
     <string name="widget_today_description">Lo que te queda hoy y un botón para apuntar una tarea</string>
+    <string name="widget_savings_label">Ahorros</string>
+    <string name="widget_savings_description">Cómo va el mes y botones para apuntar un ingreso o un gasto</string>
 </resources>

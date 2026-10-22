@@ -75,6 +75,18 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/today_widget_info" />
         </receiver>
+        <!-- Widget "Ahorros" de la pantalla de inicio -->
+        <receiver
+            android:name=".presentation.widget.SavingsWidgetReceiver"
+            android:exported="true"
+            android:label="@string/widget_savings_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/savings_widget_info" />
+        </receiver>
         <!-- Comparte la imagen del ticket de un ingreso o gasto (solo la carpeta de tickets de la caché) -->
         <provider
             android:name="androidx.core.content.FileProvider"

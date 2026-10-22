@@ -40,7 +40,9 @@ data class CalendarUiState(
     /** Categorías de evento ocultas con el filtro (sus eventos no salen; las tareas sí). */
     val hiddenCategories: Set<String> = emptySet(),
     /** Las categorías de los eventos del mes, con su color, para elegir en el filtro. */
-    val monthCategories: List<CategoryOption> = emptyList()
+    val monthCategories: List<CategoryOption> = emptyList(),
+    /** Si ya llegaron las tareas y eventos del mes; hasta entonces la cuadrícula se ve en esqueleto. */
+    val isLoaded: Boolean = false
 )
 
 /** Una categoría en el filtro del Calendario. */
@@ -97,7 +99,8 @@ class CalendarViewModel @Inject constructor(
                 // Las ocultas siguen en la lista (para volver a mostrarlas) aunque no tengan eventos este mes
                 monthCategories = (allEvents.map { CategoryOption(it.categoryText, it.categoryColor) }.distinctBy { it.name } +
                     hidden.filter { name -> allEvents.none { it.categoryText == name } }.map { CategoryOption(it, HIDDEN_WITHOUT_EVENTS_COLOR) })
-                    .sortedBy { it.name }
+                    .sortedBy { it.name },
+                isLoaded = true
             )
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), CalendarUiState())

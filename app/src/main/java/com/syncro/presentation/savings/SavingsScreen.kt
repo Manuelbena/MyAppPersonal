@@ -43,6 +43,10 @@ import com.syncro.domain.model.MovementOccurrence
 import com.syncro.domain.model.MovementType
 import com.syncro.presentation.components.AddFab
 import com.syncro.presentation.components.EdgeFades
+import com.syncro.presentation.components.LoadingContent
+import com.syncro.presentation.components.SkeletonBlock
+import com.syncro.presentation.components.SkeletonCircle
+import com.syncro.presentation.components.SkeletonLine
 import com.syncro.presentation.components.SyncroIconButton
 import com.syncro.presentation.event.IconBadge
 import com.syncro.presentation.home.components.AddOptionItem
@@ -62,6 +66,9 @@ fun SavingsScreen(
     // "Apuntar nómina" desde el asistente: abrir el formulario de ingreso con la categoría Nómina
     openSalaryForm: Boolean = false,
     onSalaryFormOpened: () -> Unit = {},
+    // "+ Ingreso" / "− Gasto" del widget: abrir ese formulario
+    openMovementForm: MovementType? = null,
+    onMovementFormOpened: () -> Unit = {},
     // "Ver desglose" de la tarjeta de presupuestos
     onOpenBudgets: () -> Unit = {},
     viewModel: SavingsViewModel = hiltViewModel()
@@ -89,6 +96,8 @@ fun SavingsScreen(
         onDelete = viewModel::delete,
         openSalaryForm = openSalaryForm,
         onSalaryFormOpened = onSalaryFormOpened,
+        openMovementForm = openMovementForm,
+        onMovementFormOpened = onMovementFormOpened,
         budgets = budgets,
         onOpenBudgets = onOpenBudgets,
         onShare = { scope.launch { context.shareMovementTicket(it, LocalDateTime.now()) } },
@@ -125,6 +134,8 @@ fun SavingsContent(
     onOpenBudgets: () -> Unit = {},
     openSalaryForm: Boolean = false,
     onSalaryFormOpened: () -> Unit = {},
+    openMovementForm: MovementType? = null,
+    onMovementFormOpened: () -> Unit = {},
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
     // Cuentas de ahorro: la que se ve (en la cabecera) y las demás; null mientras se cargan
     accounts: SavingsAccounts? = null,
@@ -144,6 +155,13 @@ fun SavingsContent(
             onSalaryFormOpened()
         }
     }
+    LaunchedEffect(openMovementForm) {
+        openMovementForm?.let {
+            presetCategory = null
+            formType = it
+            onMovementFormOpened()
+        }
+    }
     // Se guarda el id y no el movimiento para que el detalle refleje los cambios al editarlo
     var selected by remember { mutableStateOf<SelectedOccurrence?>(null) }
     var editing by remember { mutableStateOf<Movement?>(null) }
@@ -159,40 +177,48 @@ fun SavingsContent(
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            // Fija: el título y el mes; lo de debajo hace scroll
-            SavingsHeader(period, onPreviousMonth, onNextMonth, accounts?.active) { showAccounts = true }
+            // Hasta tener el mes, la cuenta y los movimientos se ve el esqueleto (sin saltos al llegar)
+            LoadingContent(
+                isReady = period != null && movements != null && accounts != null,
+                skeleton = { SavingsSkeleton() }
+            ) {
+                Column {
+                    // Fija: el título y el mes; lo de debajo hace scroll
+                    SavingsHeader(period, onPreviousMonth, onNextMonth, accounts?.active) { showAccounts = true }
 
-            // Igual que en Inicio: el contenido se desvanece bajo la cabecera y sobre la barra
-            Box(modifier = Modifier.fillMaxSize()) {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    // Arriba, aire para que la tarjeta no empiece bajo el degradado; abajo, sitio para la
-                    // barra de navegación flotante y el "+"
-                    contentPadding = PaddingValues(top = 8.dp, bottom = 180.dp)
-                ) {
-                    if (movements != null) {
-                        item(key = "summary") { MonthSummaryCard(movements, onShare = { onShareMonth(movements) }) }
-                        item(key = "budgets") {
-                            BudgetsCard(plan = movements.budgetPlan(budgets), onSeeBreakdown = onOpenBudgets)
-                        }
+                    // Igual que en Inicio: el contenido se desvanece bajo la cabecera y sobre la barra
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        LazyColumn(
+                            modifier = Modifier.fillMaxSize(),
+                            // Arriba, aire para que la tarjeta no empiece bajo el degradado; abajo, sitio para la
+                            // barra de navegación flotante y el "+"
+                            contentPadding = PaddingValues(top = 8.dp, bottom = 180.dp)
+                        ) {
+                            if (movements != null) {
+                                item(key = "summary") { MonthSummaryCard(movements, onShare = { onShareMonth(movements) }) }
+                                item(key = "budgets") {
+                                    BudgetsCard(plan = movements.budgetPlan(budgets), onSeeBreakdown = onOpenBudgets)
+                                }
 
-                        if (movements.occurrences.isEmpty()) {
-                            item(key = "empty") { EmptyMonth() }
-                        } else {
-                            movements.occurrences.groupBy { it.date }.forEach { (date, dayItems) ->
-                                item(key = "day-$date") { DayHeader(date, today) }
-                                items(dayItems, key = { "${it.movement.id}-${it.date}" }) { occurrence ->
-                                    MovementRow(
-                                        occurrence = occurrence,
-                                        isUpcoming = occurrence.date.isAfter(today),
-                                        onClick = { selected = SelectedOccurrence(occurrence.movement.id, occurrence.date) }
-                                    )
+                                if (movements.occurrences.isEmpty()) {
+                                    item(key = "empty") { EmptyMonth() }
+                                } else {
+                                    movements.occurrences.groupBy { it.date }.forEach { (date, dayItems) ->
+                                        item(key = "day-$date") { DayHeader(date, today) }
+                                        items(dayItems, key = { "${it.movement.id}-${it.date}" }) { occurrence ->
+                                            MovementRow(
+                                                occurrence = occurrence,
+                                                isUpcoming = occurrence.date.isAfter(today),
+                                                onClick = { selected = SelectedOccurrence(occurrence.movement.id, occurrence.date) }
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         }
+                        EdgeFades()
                     }
                 }
-                EdgeFades()
             }
         }
     }
@@ -544,5 +570,53 @@ private fun EmptyMonth() {
             textAlign = TextAlign.Center,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
+    }
+}
+
+/**
+ * Ahorros mientras carga: la cabecera con el mes, la tarjeta del resumen, la de presupuestos y unos
+ * movimientos, en gris con el reflejo.
+ */
+@Composable
+private fun SavingsSkeleton() {
+    Column(modifier = Modifier.fillMaxSize()) {
+        // Título, cuenta y el selector del mes
+        Column(Modifier.padding(horizontal = 24.dp, vertical = 16.dp)) {
+            SkeletonLine(width = 150.dp, height = 28.dp)
+            Spacer(Modifier.height(16.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                SkeletonCircle(36.dp)
+                Spacer(Modifier.weight(1f))
+                SkeletonLine(width = 130.dp, height = 16.dp)
+                Spacer(Modifier.weight(1f))
+                SkeletonCircle(36.dp)
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        SkeletonBlock(
+            Modifier.padding(horizontal = 16.dp).fillMaxWidth().height(170.dp),
+            RoundedCornerShape(24.dp)
+        )
+        Spacer(Modifier.height(12.dp))
+        SkeletonBlock(
+            Modifier.padding(horizontal = 16.dp).fillMaxWidth().height(110.dp),
+            RoundedCornerShape(24.dp)
+        )
+        SkeletonLine(width = 90.dp, modifier = Modifier.padding(start = 24.dp, top = 20.dp, bottom = 8.dp))
+        repeat(3) {
+            Row(
+                modifier = Modifier.padding(horizontal = 24.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                SkeletonCircle(40.dp)
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    SkeletonLine(width = 140.dp, height = 14.dp)
+                    Spacer(Modifier.height(6.dp))
+                    SkeletonLine(width = 90.dp, height = 10.dp)
+                }
+                SkeletonLine(width = 64.dp, height = 14.dp)
+            }
+        }
     }
 }

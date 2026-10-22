@@ -13,6 +13,7 @@ import com.syncro.data.local.toStoredTime
 import com.syncro.domain.model.AppSettings
 import com.syncro.domain.model.AssistantSettings
 import com.syncro.domain.model.DigestSettings
+import com.syncro.domain.model.HomeSettings
 import com.syncro.domain.repository.SettingsRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
@@ -36,9 +37,14 @@ class SettingsRepositoryImpl @Inject constructor(
     private val LEFTOVERS_ENABLED = booleanPreferencesKey("assistant_leftovers_enabled")
     private val PAYDAY_DAY = intPreferencesKey("assistant_payday_day")
     private val BUDGET_ALERTS_ENABLED = booleanPreferencesKey("assistant_budget_alerts_enabled")
+    private val DAY_LOAD_ENABLED = booleanPreferencesKey("assistant_day_load_enabled")
     private val DAILY_QUOTE_ENABLED = booleanPreferencesKey("assistant_daily_quote_enabled")
     private val HOME_SAVINGS_ENABLED = booleanPreferencesKey("home_savings_enabled")
     private val ONBOARDING_COMPLETED = booleanPreferencesKey("onboarding_completed")
+    private val HOME_NEXT_UP = booleanPreferencesKey("home_show_next_up")
+    private val HOME_FREE_GAPS = booleanPreferencesKey("home_show_free_gaps")
+    private val HOME_STREAK = booleanPreferencesKey("home_show_streak")
+    private val HOME_NOTES = booleanPreferencesKey("home_show_notes")
 
     override val settings: Flow<AppSettings> = context.settingsDataStore.data.map { prefs ->
         val defaults = AppSettings()
@@ -54,8 +60,15 @@ class SettingsRepositoryImpl @Inject constructor(
                 leftoversEnabled = prefs[LEFTOVERS_ENABLED] ?: defaults.assistant.leftoversEnabled,
                 paydayDay = prefs[PAYDAY_DAY]?.takeIf { it in 1..31 },
                 budgetAlertsEnabled = prefs[BUDGET_ALERTS_ENABLED] ?: defaults.assistant.budgetAlertsEnabled,
+                dayLoadEnabled = prefs[DAY_LOAD_ENABLED] ?: defaults.assistant.dayLoadEnabled,
                 dailyQuoteEnabled = prefs[DAILY_QUOTE_ENABLED] ?: defaults.assistant.dailyQuoteEnabled,
                 homeSavingsEnabled = prefs[HOME_SAVINGS_ENABLED] ?: defaults.assistant.homeSavingsEnabled
+            ),
+            home = HomeSettings(
+                showNextUp = prefs[HOME_NEXT_UP] ?: defaults.home.showNextUp,
+                showFreeGaps = prefs[HOME_FREE_GAPS] ?: defaults.home.showFreeGaps,
+                showStreak = prefs[HOME_STREAK] ?: defaults.home.showStreak,
+                showNotes = prefs[HOME_NOTES] ?: defaults.home.showNotes
             ),
             onboardingCompleted = prefs[ONBOARDING_COMPLETED] ?: defaults.onboardingCompleted
         )
@@ -70,9 +83,14 @@ class SettingsRepositoryImpl @Inject constructor(
             prefs[FOCUS_ENABLED] = settings.assistant.focusEnabled
             prefs[LEFTOVERS_ENABLED] = settings.assistant.leftoversEnabled
             prefs[BUDGET_ALERTS_ENABLED] = settings.assistant.budgetAlertsEnabled
+            prefs[DAY_LOAD_ENABLED] = settings.assistant.dayLoadEnabled
             prefs[DAILY_QUOTE_ENABLED] = settings.assistant.dailyQuoteEnabled
             prefs[HOME_SAVINGS_ENABLED] = settings.assistant.homeSavingsEnabled
             prefs[ONBOARDING_COMPLETED] = settings.onboardingCompleted
+            prefs[HOME_NEXT_UP] = settings.home.showNextUp
+            prefs[HOME_FREE_GAPS] = settings.home.showFreeGaps
+            prefs[HOME_STREAK] = settings.home.showStreak
+            prefs[HOME_NOTES] = settings.home.showNotes
             // Sin nómina no se guarda nada: así lo de fábrica (null) vuelve tal cual
             val payday = settings.assistant.paydayDay
             if (payday != null) prefs[PAYDAY_DAY] = payday else prefs.remove(PAYDAY_DAY)

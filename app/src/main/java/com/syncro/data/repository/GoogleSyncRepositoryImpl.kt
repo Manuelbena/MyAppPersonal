@@ -1,6 +1,7 @@
 package com.syncro.data.repository
 
 import android.util.Log
+import com.google.api.client.googleapis.extensions.android.gms.auth.GoogleAuthIOException
 import com.google.api.client.googleapis.json.GoogleJsonResponseException
 import com.google.api.client.util.Data
 import com.google.api.client.util.DateTime
@@ -14,12 +15,15 @@ import com.syncro.data.local.entity.SubtaskEntity
 import com.syncro.data.local.entity.TaskEntity
 import com.syncro.data.remote.GoogleRemoteDataSource
 import com.syncro.data.sync.SyncScheduler
+import com.syncro.domain.model.GoogleService
 import com.syncro.domain.model.isValidEventRange
 import com.syncro.domain.model.suggestEventCategory
 import com.syncro.domain.repository.GoogleSyncRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -56,7 +60,7 @@ class GoogleSyncRepositoryImpl @Inject constructor(
         if (!force && clock.millis() - lastTasksSyncAt < TASKS_SYNC_MIN_INTERVAL_MS) {
             return@withLock Result.success(Unit)
         }
-        runGoogleCall("syncTasks") { downloadAllTasks() }
+        runGoogleCall("syncTasks", GoogleService.TASKS, confirmsAccess = true) { downloadAllTasks() }
             .onSuccess { lastTasksSyncAt = clock.millis() }
     }
 
@@ -78,7 +82,7 @@ class GoogleSyncRepositoryImpl @Inject constructor(
     override suspend fun syncCalendar(
         startDate: LocalDate,
         endDate: LocalDate
-    ): Result<Unit> = runGoogleCall("syncCalendar") {
+    ): Result<Unit> = runGoogleCall("syncCalendar", GoogleService.CALENDAR, confirmsAccess = true) {
         require(!endDate.isBefore(startDate)) { "endDate ($endDate) is before startDate ($startDate)" }
         // Solo se comparan para borrado los eventos locales que empiezan dentro del rango
         val localRemoteIds = eventDao.getSyncedRemoteIdsInRange(startDate.toEpochDay(), endDate.toEpochDay())
@@ -190,30 +194,31 @@ class GoogleSyncRepositoryImpl @Inject constructor(
     private val pushMutex = Mutex()
 
     override suspend fun pushTask(taskId: String): Result<Unit> =
-        pushMutex.withLock { runGoogleCall("pushTask") { pushTaskInternal(taskId) } }
+        pushMutex.withLock { runGoogleCall("pushTask", GoogleService.TASKS) { pushTaskInternal(taskId) } }
             .onFailure { syncScheduler.schedulePendingPush() }
 
     override suspend fun pushEvent(eventId: String): Result<Unit> =
-        pushMutex.withLock { runGoogleCall("pushEvent") { pushEventInternal(eventId) } }
+        pushMutex.withLock { runGoogleCall("pushEvent", GoogleService.CALENDAR) { pushEventInternal(eventId) } }
             .onFailure { syncScheduler.schedulePendingPush() }
 
     override suspend fun pushPendingChanges(): Result<Unit> =
         pushMutex.withLock {
-            runGoogleCall("pushPendingChanges") {
+            runGoogleCall("pushPendingChanges", service = null) {
                 // Se intenta subir todo aunque falle algún elemento; al final se propaga el primer error
                 var firstError: Exception? = null
-                suspend fun attempt(push: suspend () -> Unit) {
+                suspend fun attempt(service: GoogleService, push: suspend () -> Unit) {
                     try {
                         push()
                     } catch (e: CancellationException) {
                         throw e
                     } catch (e: Exception) {
                         Log.w(TAG, "Pending item upload failed", e)
+                        if (e.isMissingAccess()) missingAccess.update { it + service }
                         if (firstError == null) firstError = e
                     }
                 }
-                taskDao.getPendingTaskIds().forEach { attempt { pushTaskInternal(it) } }
-                eventDao.getPendingEventIds().forEach { attempt { pushEventInternal(it) } }
+                taskDao.getPendingTaskIds().forEach { attempt(GoogleService.TASKS) { pushTaskInternal(it) } }
+                eventDao.getPendingEventIds().forEach { attempt(GoogleService.CALENDAR) { pushEventInternal(it) } }
                 firstError?.let { throw it }
             }
         }.onFailure { syncScheduler.schedulePendingPush() }
@@ -350,23 +355,51 @@ class GoogleSyncRepositoryImpl @Inject constructor(
 
     // region Infraestructura
 
+    /** Servicios a los que Google nos ha dicho que no tenemos permiso (ver [observeMissingAccess]). */
+    private val missingAccess = MutableStateFlow(emptySet<GoogleService>())
+
+    override fun observeMissingAccess(): Flow<Set<GoogleService>> = missingAccess
+
     /**
      * Ejecuta [block] en IO y lo envuelve en un [Result]. Los errores (incluido
      * `UserRecoverableAuthIOException`, que la UI usa para pedir permisos) se registran y se
      * devuelven como fallo; la cancelación de la corrutina se propaga.
+     *
+     * Un fallo de permiso marca [service] sin acceso. Solo una descarga que funciona
+     * ([confirmsAccess]) lo vuelve a dar por bueno: una subida puede "funcionar" sin llamar a Google
+     * (si no había nada que subir) y no prueba nada.
      */
-    private suspend fun runGoogleCall(operation: String, block: suspend () -> Unit): Result<Unit> =
+    private suspend fun runGoogleCall(
+        operation: String,
+        service: GoogleService?,
+        confirmsAccess: Boolean = false,
+        block: suspend () -> Unit
+    ): Result<Unit> =
         withContext(Dispatchers.IO) {
             try {
                 block()
+                if (service != null && confirmsAccess) missingAccess.update { it - service }
                 Result.success(Unit)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 Log.e(TAG, "$operation failed", e)
+                if (service != null && e.isMissingAccess()) missingAccess.update { it + service }
                 Result.failure(e)
             }
         }
+
+    /**
+     * Si el error es que no tenemos permiso: Google pide consentimiento (o no lo puede pedir, p. ej.
+     * la cuenta ya no está en el móvil), el token no vale (401) o le faltan los permisos (403
+     * `insufficientPermissions`). Otros 403, como los límites de uso, son pasajeros y no cuentan.
+     */
+    private fun Throwable.isMissingAccess(): Boolean = when (this) {
+        is GoogleAuthIOException -> true
+        is GoogleJsonResponseException -> statusCode == 401 ||
+            (statusCode == 403 && details?.errors.orEmpty().any { it.reason == INSUFFICIENT_PERMISSIONS })
+        else -> false
+    }
 
     // endregion
 
@@ -466,6 +499,8 @@ class GoogleSyncRepositoryImpl @Inject constructor(
 
     private companion object {
         const val TAG = "GoogleSync"
+        /** Motivo del 403 cuando el token no lleva los permisos que hacen falta. */
+        const val INSUFFICIENT_PERMISSIONS = "insufficientPermissions"
         const val DEFAULT_TASK_LIST = "@default"
         const val TASK_STATUS_COMPLETED = "completed"
         const val TASK_STATUS_NEEDS_ACTION = "needsAction"

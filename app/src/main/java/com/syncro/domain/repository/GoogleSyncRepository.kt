@@ -1,5 +1,6 @@
 package com.syncro.domain.repository
 
+import com.syncro.domain.model.GoogleService
 import kotlinx.coroutines.flow.Flow
 import java.time.LocalDate
 
@@ -31,4 +32,11 @@ interface GoogleSyncRepository {
 
     /** Cuántas tareas y eventos tienen cambios sin subir a Google o nunca se subieron. */
     fun observePendingChangesCount(): Flow<Int>
+
+    /**
+     * Los servicios de Google a los que no tenemos permiso (el usuario no lo dio o lo quitó). Se
+     * sabe al intentar hablar con Google: un fallo de permiso lo añade y una descarga que funciona
+     * lo quita. Sin permiso todo sigue funcionando en el móvil; los cambios esperan pendientes.
+     */
+    fun observeMissingAccess(): Flow<Set<GoogleService>>
 }

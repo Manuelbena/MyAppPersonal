@@ -22,6 +22,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.syncro.domain.model.Subtask
+import com.syncro.domain.model.FreeGap
 import com.syncro.domain.model.SyncroItem
 import com.syncro.presentation.components.SubtaskProgress
 import com.syncro.presentation.components.toDisplayTime
@@ -41,9 +42,25 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.Dp
+import java.time.LocalDate
 import java.time.LocalDateTime
+import java.time.LocalTime
+import kotlin.math.roundToInt
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.zIndex
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInParent
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.TextUnit
+import com.syncro.domain.model.DayWindow
+import com.syncro.presentation.home.TimeAnchor
+import com.syncro.presentation.home.dayBoundaryIndices
+import com.syncro.presentation.home.endMinuteOn
+import com.syncro.presentation.home.nowLineY
+import com.syncro.presentation.home.startMinuteOn
 import java.time.temporal.ChronoUnit
 
 /**
@@ -106,7 +123,7 @@ fun EventCard(
                     Text(
                         text = event.title,
                         fontWeight = FontWeight.Bold,
-                        fontSize = 17.sp,
+                        fontSize = EVENT_TITLE_SIZE,
                         lineHeight = 22.sp,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -117,7 +134,7 @@ fun EventCard(
                     if (minutesLeft != null) {
                         Text(
                             text = "En curso · quedan ${formatDuration(minutesLeft)}",
-                            fontSize = 12.sp,
+                            fontSize = EVENT_DETAIL_SIZE,
                             fontWeight = FontWeight.SemiBold,
                             color = accent,
                             maxLines = 1,
@@ -195,7 +212,9 @@ fun EventCard(
                                         subtask = subtask,
                                         color = accent,
                                         onClick = { onSubtaskToggle(subtask.title) },
-                                        maxLines = 1
+                                        maxLines = 1,
+                                        fontSize = EVENT_DETAIL_SIZE,
+                                        iconSize = 16.dp
                                     )
                                 }
                             }
@@ -275,7 +294,10 @@ fun SubtaskRow(
     color: Color,
     onClick: () -> Unit,
     // En la tarjeta cabe una línea; en el detalle se lee entera
-    maxLines: Int = Int.MAX_VALUE
+    maxLines: Int = Int.MAX_VALUE,
+    // En la tarjeta del timeline, del tamaño de "En curso" (con el círculo más pequeño a juego)
+    fontSize: TextUnit = 14.sp,
+    iconSize: Dp = 20.dp
 ) {
     val interactionSource = remember { MutableInteractionSource() }
 
@@ -295,12 +317,12 @@ fun SubtaskRow(
             imageVector = if (subtask.isCompleted) Icons.Rounded.CheckCircle else Icons.Rounded.RadioButtonUnchecked,
             contentDescription = null,
             tint = if (subtask.isCompleted) Emerald500 else color.copy(alpha = 0.5f),
-            modifier = Modifier.size(20.dp)
+            modifier = Modifier.size(iconSize)
         )
-        Spacer(modifier = Modifier.width(12.dp))
+        Spacer(modifier = Modifier.width(iconSize * 0.6f))
         Text(
             text = subtask.title,
-            fontSize = 14.sp,
+            fontSize = fontSize,
             maxLines = maxLines,
             overflow = TextOverflow.Ellipsis,
             color = if (subtask.isCompleted) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f) else MaterialTheme.colorScheme.onSurface,
@@ -374,6 +396,10 @@ fun TaskRow(
     }
 }
 
+private val EVENT_TITLE_SIZE = 17.sp
+/** Texto pequeño de la tarjeta: "En curso · quedan…" y las subtareas desplegadas. */
+private val EVENT_DETAIL_SIZE = 12.sp
+
 /** Área táctil mínima de Material (48 dp) para todo lo que se pulsa. */
 private val MIN_TOUCH_TARGET = 48.dp
 
@@ -427,7 +453,7 @@ private fun EventTimeRail(event: SyncroItem.Event, accent: Color, progress: Floa
             modifier = Modifier
                 .width(timeLabelWidth())
                 .fillMaxHeight()
-                .padding(vertical = 14.dp),
+                .padding(vertical = RAIL_END_INSET - RAIL_LABEL_SLOT / 2),
             horizontalAlignment = Alignment.End
         ) {
             if (event.isAllDay) {
@@ -435,7 +461,7 @@ private fun EventTimeRail(event: SyncroItem.Event, accent: Color, progress: Floa
                 TimeLabel("día", bold = true, small = true)
                 if (extraDays > 0) TimeLabel("${extraDays + 1} días", small = true)
             } else {
-                TimeLabel(event.startTime.toDisplayTime(), bold = true)
+                RailMarkLabel { TimeLabel(event.startTime.toDisplayTime(), bold = true) }
                 Spacer(Modifier.weight(1f))
                 // "+1 día" encima de la hora de fin, para que esta quede alineada con el anillo
                 if (extraDays > 0) {
@@ -447,7 +473,7 @@ private fun EventTimeRail(event: SyncroItem.Event, accent: Color, progress: Floa
                         maxLines = 1
                     )
                 }
-                TimeLabel(event.endTime.toDisplayTime())
+                RailMarkLabel { TimeLabel(event.endTime.toDisplayTime()) }
             }
         }
 
@@ -524,42 +550,116 @@ private fun timeLabelWidth(): Dp {
     return maxOf(MIN_TIME_LABEL_WIDTH, measured + 2.dp)
 }
 
+/**
+ * Estilo de las horas: números de ancho fijo y sin el interlineado de la fuente (alto de línea =
+ * tamaño, recortado por arriba y por abajo), para que el centro del texto sea el centro de los
+ * dígitos y quede alineado con los puntos del raíl y centrado en la píldora de "Ahora".
+ */
+@Composable
+private fun timeTextStyle(size: TextUnit): TextStyle = LocalTextStyle.current.merge(
+    TextStyle(
+        fontSize = size,
+        lineHeight = size,
+        fontFeatureSettings = TABULAR_NUMBERS,
+        lineHeightStyle = LineHeightStyle(LineHeightStyle.Alignment.Center, LineHeightStyle.Trim.Both)
+    )
+)
+
+/** Alto de la franja de cada hora del raíl; su centro cae a [RAIL_END_INSET] del borde, como el punto o el anillo. */
+private val RAIL_LABEL_SLOT = 20.dp
+
+/** Centra la hora en su franja aunque la letra del sistema sea más grande que la franja. */
+@Composable
+private fun RailMarkLabel(content: @Composable () -> Unit) {
+    Box(Modifier.height(RAIL_LABEL_SLOT), contentAlignment = Alignment.CenterEnd) {
+        Box(Modifier.wrapContentHeight(unbounded = true)) { content() }
+    }
+}
+
 @Composable
 private fun TimeLabel(text: String, bold: Boolean = false, small: Boolean = false) {
     Text(
         text = text,
-        style = LocalTextStyle.current.copy(fontFeatureSettings = TABULAR_NUMBERS),
+        style = timeTextStyle(if (small) 12.sp else if (bold) 14.sp else 12.sp),
         fontWeight = if (bold) FontWeight.Bold else FontWeight.Normal,
-        fontSize = if (small) 12.sp else if (bold) 14.sp else 12.sp,
         color = if (bold) MaterialTheme.colorScheme.onBackground else MaterialTheme.colorScheme.onSurfaceVariant,
         maxLines = 1
     )
 }
 
 /**
- * Línea de la hora actual en el timeline de hoy: la hora en la columna de horas y, desde el raíl,
- * una línea hasta el borde, como en Google Calendar.
+ * Hueco libre entre dos eventos: una línea discreta en el raíl con cuánto tiempo queda libre y un
+ * "+" para llenarlo (abre un evento nuevo en ese hueco).
  */
 @Composable
-fun NowIndicator(now: LocalDateTime) {
+fun FreeGapRow(gap: FreeGap, modifier: Modifier = Modifier, onAdd: () -> Unit) {
+    val background = MaterialTheme.colorScheme.background
+    val muted = MaterialTheme.colorScheme.onSurfaceVariant
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(onClickLabel = "Añadir un evento en este hueco", onClick = onAdd)
+            .heightIn(min = MIN_TOUCH_TARGET),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Spacer(Modifier.width(timeLabelWidth()))
+        // Trazo punteado en el raíl: tiempo sin nada
+        Canvas(modifier = Modifier.width(RAIL_WIDTH).height(MIN_TOUCH_TARGET)) {
+            val x = size.width / 2
+            // Tapa la línea continua del timeline para que el hueco se lea punteado
+            drawLine(background, Offset(x, 0f), Offset(x, size.height), 4.dp.toPx())
+            val dash = 3.dp.toPx()
+            var y = 0f
+            while (y < size.height) {
+                drawLine(muted.copy(alpha = 0.35f), Offset(x, y), Offset(x, minOf(y + dash, size.height)), 2.dp.toPx(), StrokeCap.Round)
+                y += dash * 2.2f
+            }
+        }
+        Spacer(Modifier.width(RAIL_GAP))
+        Text(
+            "Libre · ${formatDuration(gap.minutes)}",
+            style = MaterialTheme.typography.labelMedium,
+            color = muted,
+            modifier = Modifier.weight(1f)
+        )
+        Icon(
+            Icons.Rounded.Add,
+            contentDescription = null,
+            tint = muted,
+            modifier = Modifier.padding(end = 14.dp).size(18.dp)
+        )
+    }
+}
+
+/**
+ * Línea de la hora actual: la hora en una píldora sobre la columna de horas y, desde el raíl, una
+ * línea hasta el borde, como en Google Calendar. Se dibuja por encima de las tarjetas.
+ */
+@Composable
+fun NowIndicator(now: LocalDateTime, modifier: Modifier = Modifier) {
     val color = MaterialTheme.colorScheme.primary
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
-            .height(24.dp)
+            .height(NOW_INDICATOR_HEIGHT)
             .semantics(mergeDescendants = true) { contentDescription = "Ahora, ${now.toLocalTime().toDisplayTime()}" },
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(
-            text = now.toLocalTime().toDisplayTime(),
-            fontSize = 12.sp,
-            style = LocalTextStyle.current.copy(fontFeatureSettings = TABULAR_NUMBERS),
-            fontWeight = FontWeight.Bold,
-            color = color,
-            textAlign = TextAlign.End,
-            maxLines = 1,
-            modifier = Modifier.width(timeLabelWidth())
-        )
+        Box(Modifier.width(timeLabelWidth()), contentAlignment = Alignment.CenterEnd) {
+            Text(
+                text = now.toLocalTime().toDisplayTime(),
+                style = timeTextStyle(11.sp),
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onPrimary,
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(50))
+                    .background(color)
+                    .padding(horizontal = 6.dp, vertical = 3.dp)
+            )
+        }
         Canvas(
             modifier = Modifier
                 .weight(1f)
@@ -567,10 +667,178 @@ fun NowIndicator(now: LocalDateTime) {
         ) {
             val y = size.height / 2
             val x = RAIL_WIDTH.toPx() / 2
+            // Halo suave debajo para que la línea se lea también sobre el degradado de las tarjetas
+            drawLine(color.copy(alpha = 0.18f), Offset(x, y), Offset(size.width, y), 6.dp.toPx(), StrokeCap.Round)
             drawLine(color, Offset(x, y), Offset(size.width, y), 2.dp.toPx(), StrokeCap.Round)
+            drawCircle(color.copy(alpha = 0.25f), 9.dp.toPx(), Offset(x, y))
             drawCircle(color, 5.dp.toPx(), Offset(x, y))
         }
     }
 }
+
+private val NOW_INDICATOR_HEIGHT = 24.dp
+
+/** Marca de inicio o fin del día en el raíl: la hora, un sol o una luna y una etiqueta discreta. */
+@Composable
+private fun DayBoundaryRow(time: LocalTime, label: String, isStart: Boolean, modifier: Modifier = Modifier) {
+    val muted = MaterialTheme.colorScheme.onSurfaceVariant
+    val background = MaterialTheme.colorScheme.background
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(DAY_BOUNDARY_HEIGHT),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(Modifier.width(timeLabelWidth()), contentAlignment = Alignment.CenterEnd) {
+            TimeLabel(time.toDisplayTime())
+        }
+        Box(
+            modifier = Modifier
+                .size(RAIL_WIDTH)
+                .clip(RoundedCornerShape(50))
+                .background(background),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = if (isStart) Icons.Rounded.WbSunny else Icons.Rounded.Bedtime,
+                contentDescription = null,
+                tint = muted.copy(alpha = 0.8f),
+                modifier = Modifier.size(15.dp)
+            )
+        }
+        Spacer(Modifier.width(RAIL_GAP))
+        Text(label, style = MaterialTheme.typography.labelMedium, color = muted)
+    }
+}
+
+private val DAY_BOUNDARY_HEIGHT = 40.dp
+
+/**
+ * El timeline de eventos de un día, de principio a fin: una línea continua en el raíl desde la marca
+ * de inicio del día hasta la de fin ([window]; las horas de los resúmenes, o 00:00–23:59), los huecos
+ * libres ([gaps], por índice del evento que les sigue) y los eventos. Mirando hoy, la línea "Ahora"
+ * va por encima de todo a la altura que le toca según la hora (dentro de la tarjeta del evento en
+ * curso si lo hay) y el raíl queda relleno hasta ella.
+ */
+@Composable
+fun DayTimeline(
+    events: List<SyncroItem.Event>,
+    day: LocalDate,
+    now: LocalDateTime,
+    window: DayWindow,
+    gaps: Map<Int, FreeGap>,
+    onAddInGap: (FreeGap) -> Unit,
+    onSubtaskToggle: (SyncroItem.Event, String) -> Unit,
+    onToggleEvent: (SyncroItem.Event) -> Unit,
+    onEventClick: (SyncroItem.Event) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val density = LocalDensity.current
+    val labelWidth = timeLabelWidth()
+    val railColor = MaterialTheme.colorScheme.outlineVariant
+    val passedColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.45f)
+    val isToday = day == now.toLocalDate()
+    // Posición (arriba, alto) de cada fila medida en el layout, para colocar la línea "Ahora"
+    val bounds = remember(day) { mutableStateMapOf<String, Pair<Float, Float>>() }
+    fun Modifier.measured(key: String) = onGloballyPositioned { coordinates ->
+        bounds[key] = coordinates.positionInParent().y to coordinates.size.height.toFloat()
+    }
+
+    val (startIndex, endIndex) = dayBoundaryIndices(events, day, window)
+    val railInset = with(density) { (6.dp + RAIL_END_INSET).toPx() }
+
+    // Anclas hora → altura en el orden en que se ven las filas
+    val anchors = buildList {
+        fun center(key: String) = bounds[key]?.let { (top, height) -> top + height / 2 }
+        fun boundaryAt(index: Int) {
+            if (index == startIndex) center(KEY_DAY_START)?.let { add(TimeAnchor(window.start.toSecondOfDay() / 60, it)) }
+            if (index == endIndex) center(KEY_DAY_END)?.let { add(TimeAnchor(window.end.toSecondOfDay() / 60, it)) }
+        }
+        events.forEachIndexed { index, event ->
+            boundaryAt(index)
+            gaps[index]?.let { gap ->
+                bounds["gap$index"]?.let { (top, height) ->
+                    add(TimeAnchor(gap.start.toSecondOfDay() / 60, top))
+                    add(TimeAnchor(gap.end.toSecondOfDay() / 60, top + height))
+                }
+            }
+            if (!event.isAllDay) {
+                bounds["event${event.id}"]?.let { (top, height) ->
+                    add(TimeAnchor(event.startMinuteOn(day), top + railInset))
+                    add(TimeAnchor(event.endMinuteOn(day), maxOf(top + height - railInset, top + railInset)))
+                }
+            }
+        }
+        boundaryAt(events.size)
+    }
+    val nowMinute = now.toLocalTime().toSecondOfDay() / 60
+    val nowY = if (isToday) nowLineY(anchors, nowMinute) else null
+    val railTop = bounds[KEY_DAY_START]?.let { (top, height) -> top + height / 2 }
+    val railBottom = bounds[KEY_DAY_END]?.let { (top, height) -> top + height / 2 }
+
+    Box(modifier = modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .drawBehind {
+                    if (railTop == null || railBottom == null) return@drawBehind
+                    val x = labelWidth.toPx() + RAIL_WIDTH.toPx() / 2
+                    val top = minOf(railTop, railBottom)
+                    val bottom = maxOf(railTop, railBottom)
+                    val stroke = 2.dp.toPx()
+                    drawLine(railColor, Offset(x, top), Offset(x, bottom), stroke, StrokeCap.Round)
+                    // Lo que ya pasó del día, relleno
+                    val passedUntil = when {
+                        day.isBefore(now.toLocalDate()) -> bottom
+                        nowY != null -> nowY.coerceIn(top, bottom)
+                        else -> null
+                    }
+                    if (passedUntil != null && passedUntil > top) {
+                        drawLine(passedColor, Offset(x, top), Offset(x, passedUntil), stroke, StrokeCap.Round)
+                    }
+                }
+        ) {
+            events.forEachIndexed { index, event ->
+                if (index == startIndex) {
+                    DayBoundaryRow(window.start, "Empieza tu día", isStart = true, modifier = Modifier.measured(KEY_DAY_START))
+                }
+                if (index == endIndex) {
+                    DayBoundaryRow(window.end, "Termina tu día", isStart = false, modifier = Modifier.measured(KEY_DAY_END))
+                }
+                gaps[index]?.let { gap ->
+                    FreeGapRow(gap, modifier = Modifier.measured("gap$index")) { onAddInGap(gap) }
+                }
+                Box(Modifier.measured("event${event.id}")) {
+                    EventCard(
+                        event = event,
+                        onSubtaskToggle = { onSubtaskToggle(event, it) },
+                        onToggleEvent = { onToggleEvent(event) },
+                        onClick = { onEventClick(event) },
+                        now = now
+                    )
+                }
+            }
+            if (startIndex == events.size) {
+                DayBoundaryRow(window.start, "Empieza tu día", isStart = true, modifier = Modifier.measured(KEY_DAY_START))
+            }
+            if (endIndex == events.size) {
+                DayBoundaryRow(window.end, "Termina tu día", isStart = false, modifier = Modifier.measured(KEY_DAY_END))
+            }
+        }
+
+        if (nowY != null) {
+            val half = with(density) { NOW_INDICATOR_HEIGHT.toPx() / 2 }
+            NowIndicator(
+                now = now,
+                modifier = Modifier
+                    .zIndex(1f)
+                    .offset { IntOffset(0, (nowY - half).roundToInt()) }
+            )
+        }
+    }
+}
+
+private const val KEY_DAY_START = "dayStart"
+private const val KEY_DAY_END = "dayEnd"
 
 // endregion

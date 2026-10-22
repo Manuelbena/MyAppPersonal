@@ -431,6 +431,9 @@ fun AssistantStep(assistant: AssistantSettings, onAssistantChange: ((AssistantSe
         ToggleRow("🎯", "Avisos de presupuesto", "Te aviso al llegar al 80 % de un presupuesto", assistant.budgetAlertsEnabled, accent) { on ->
             onAssistantChange { it.copy(budgetAlertsEnabled = on) }
         }
+        ToggleRow("⚠️", "Solapes y días a tope", "Te aviso si se te pisan eventos o vas muy cargado", assistant.dayLoadEnabled, accent) { on ->
+            onAssistantChange { it.copy(dayLoadEnabled = on) }
+        }
         ToggleRow("💬", "Frase del día", "Una frase para arrancar el día en Inicio", assistant.dailyQuoteEnabled, accent) { on ->
             onAssistantChange { it.copy(dailyQuoteEnabled = on) }
         }
@@ -540,7 +543,7 @@ fun DoneStep(state: OnboardingUiState, notificationsAllowed: Boolean) {
         subtitle = "Así ha quedado. Lo puedes cambiar cuando quieras en Ajustes ⚙️"
     )
 
-    val helpers = listOf(assistant.focusEnabled, assistant.leftoversEnabled, assistant.budgetAlertsEnabled, assistant.dailyQuoteEnabled).count { it }
+    val helpers = listOf(assistant.focusEnabled, assistant.leftoversEnabled, assistant.budgetAlertsEnabled, assistant.dayLoadEnabled, assistant.dailyQuoteEnabled).count { it }
     val summary = buildList {
         add(if (notificationsAllowed) "🔔 Notificaciones activadas" else "🔕 Sin notificaciones")
         val times = listOfNotNull(

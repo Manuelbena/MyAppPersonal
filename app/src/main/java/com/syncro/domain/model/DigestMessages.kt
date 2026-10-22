@@ -67,13 +67,16 @@ private fun DailyDigest.morningAgendaMessage(): DigestMessage {
     }
 
     val items = (pending + events).sortedForDay(date)
-    val lines = items.take(MAX_LINES).map { it.line(date) } + moreLine(items.size) +
+    // Un solape o un día a tope va lo primero: es lo que conviene saber antes de empezar
+    val warning = dayLoadLine(date, events)
+    val lines = listOfNotNull(warning) + items.take(MAX_LINES).map { it.line(date) } + moreLine(items.size) +
         pick(listOf("¡Tú puedes! 💪", "Vamos a por ello 🚀", "Paso a paso, que lo tienes 🙂"))
     // Con varias tareas y sin prioridades elegidas, la notificación lleva al chat para elegirlas
     if (offerFocus && pending.size >= MIN_FOCUS_CANDIDATES) {
         return DigestMessage(title, text, lines + "👉 Toca para elegir tus $MAX_FOCUS_TASKS prioridades", opensAssistant = true)
     }
-    return DigestMessage(title, text, lines)
+    // Con un aviso, al tocar se abre el chat, donde está el detalle
+    return DigestMessage(title, text, lines, opensAssistant = warning != null)
 }
 
 // endregion
@@ -84,12 +87,15 @@ private fun DailyDigest.eveningMessage(): DigestMessage {
     val total = tasks.size
     val pending = tasks.filterNot { it.isCompleted }
     val done = total - pending.size
+    // Lo de mañana que conviene arreglar esta noche (eventos que se pisan, día a tope)
+    val warning = dayLoadLine(date.plusDays(1), tomorrowEvents)
 
     if (total == 0) {
         return DigestMessage(
             title = pick(listOf("Buenas noches$name 🌙", "¿Qué tal el día$name? 🌙")),
             text = "Hoy no tenías tareas apuntadas. ${tomorrowSentence()}",
-            lines = emptyList()
+            lines = warning?.let { listOf(it, "👉 Toca y lo miramos") }.orEmpty(),
+            opensAssistant = warning != null
         )
     }
 
@@ -104,8 +110,12 @@ private fun DailyDigest.eveningMessage(): DigestMessage {
             "aún estás a tiempo, o lo dejamos para mañana 💪"
     }
 
-    val lines = pending.take(MAX_LINES).map { it.line(date) } + moreLine(pending.size) + "🔜 ${tomorrowSentence()}"
-    if (pending.isEmpty() || !offerLeftovers) return DigestMessage(title, text, lines)
+    val lines = pending.take(MAX_LINES).map { it.line(date) } + moreLine(pending.size) + "🔜 ${tomorrowSentence()}" +
+        listOfNotNull(warning)
+    if (pending.isEmpty() || !offerLeftovers) {
+        if (warning == null) return DigestMessage(title, text, lines)
+        return DigestMessage(title, text, lines + "👉 Toca y lo miramos", opensAssistant = true)
+    }
     // Con pendientes, la notificación lleva al chat, donde se decide qué hacer con ellas
     return DigestMessage(title, text, lines + "👉 Toca para decidir qué hacer con ellas", opensAssistant = true)
 }
@@ -125,6 +135,26 @@ private fun DailyDigest.tomorrowSentence(): String {
         append("Mañana tienes $counts")
         first?.let { (time, itemTitle) -> append("; empiezas a las ${time.format(TIME)} con $itemTitle") }
         append(".")
+    }
+}
+
+/**
+ * "⚠️ Mañana se te pisan «Dentista» y «Reunión» a las 10:30", "🔋 Hoy vas a tope: 7 eventos y 11 h
+ * ocupadas"; null si [day] viene tranquilo o el aviso está apagado. El detalle está en el chat.
+ */
+private fun DailyDigest.dayLoadLine(day: LocalDate, dayEvents: List<SyncroItem.Event>): String? {
+    if (!warnDayLoad) return null
+    val load = dayLoadOf(dayEvents, day, today = date) ?: return null
+    val whenText = if (load.isTomorrow) "Mañana" else "Hoy"
+    val clash = when (load.clashes.size) {
+        0 -> null
+        1 -> load.clashes.single().let { "se te pisan «${it.firstTitle}» y «${it.secondTitle}» a las ${it.from.format(TIME)}" }
+        else -> "tienes ${load.clashes.size} solapes"
+    }
+    return when {
+        clash != null && load.isOverloaded -> "⚠️ $whenText $clash, y vas a tope (${hoursText(load.busyMinutes)} ocupadas)"
+        clash != null -> "⚠️ $whenText $clash"
+        else -> "🔋 $whenText vas a tope: ${load.eventCount} eventos y ${hoursText(load.busyMinutes)} ocupadas"
     }
 }
 

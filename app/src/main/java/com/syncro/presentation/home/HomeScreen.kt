@@ -1,6 +1,7 @@
 package com.syncro.presentation.home
 
 import androidx.compose.ui.platform.LocalContext
+import com.syncro.presentation.components.LoadingContent
 import com.syncro.presentation.components.rememberCurrentMinute
 import com.syncro.presentation.components.shareEvent
 import com.syncro.presentation.components.AddFab
@@ -47,6 +48,8 @@ import com.syncro.domain.model.MovementType
 import com.syncro.presentation.savings.MovementSheet
 import com.syncro.domain.model.SyncroItem
 import com.syncro.domain.model.nextUp
+import com.syncro.domain.model.freeGapsBefore
+import java.time.LocalDateTime
 import kotlinx.coroutines.launch
 import com.syncro.presentation.navigation.AppScreen
 import kotlinx.coroutines.flow.collectLatest
@@ -74,6 +77,8 @@ fun HomeScreen(
         onNavigateToSavings = onNavigateToSavings,
         onRefreshToday = viewModel::refreshToday,
         onSyncFromGoogle = { viewModel.syncFromGoogle() },
+        onRequestGoogleAccess = viewModel::requestGoogleAccess,
+        onGoogleAccessResult = viewModel::onGoogleAccessResult,
         onUndo = viewModel::undo,
         onUndoExpired = viewModel::undoExpired,
         onGoToToday = viewModel::goToToday,
@@ -104,6 +109,9 @@ fun HomeScreenContent(
     onNavigateToSavings: () -> Unit = {},
     onRefreshToday: () -> Unit,
     onSyncFromGoogle: () -> Unit,
+    // "Dar permiso" del aviso sin permiso de Google, y lo que contestó el usuario en la pantalla de Google
+    onRequestGoogleAccess: () -> Unit = {},
+    onGoogleAccessResult: (granted: Boolean) -> Unit = {},
     onUndo: (HomeUndo) -> Unit,
     onUndoExpired: (HomeUndo) -> Unit,
     onGoToToday: () -> Unit,
@@ -158,14 +166,14 @@ fun HomeScreenContent(
     var noteToEdit by remember { mutableStateOf<SyncroItem.Note?>(null) }
     // El gasto que se está apuntando tras completar un evento (compra, cena, médico…)
     var expenseDraft by remember { mutableStateOf<ExpenseDraft?>(null) }
+    // El hueco libre en el que se está creando un evento
+    var gapToFill by remember { mutableStateOf<ClosedRange<LocalDateTime>?>(null) }
 
     val authLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
-        if (result.resultCode == Activity.RESULT_OK) {
-            // Reintentar sincronización si el usuario autorizó
-            onSyncFromGoogle()
-        }
+        // Si lo dio se sincroniza; si no, se queda el aviso con "Dar permiso" (y la app sigue en local)
+        onGoogleAccessResult(result.resultCode == Activity.RESULT_OK)
     }
 
     LaunchedEffect(effectFlow) {
@@ -245,7 +253,7 @@ fun HomeScreenContent(
                 enter = expandVertically() + fadeIn(),
                 exit = shrinkVertically() + fadeOut()
             ) {
-                shownSyncNotice?.let { SyncNoticeBar(notice = it, onRetry = onSyncFromGoogle) }
+                shownSyncNotice?.let { SyncNoticeBar(notice = it, onRetry = onSyncFromGoogle, onGrantAccess = onRequestGoogleAccess) }
             }
         }
         val weekStrip: @Composable () -> Unit = {
@@ -263,7 +271,7 @@ fun HomeScreenContent(
         )
         val summaryCards: @Composable () -> Unit = {
             // Lo próximo de hoy (evento en curso, el siguiente y las tareas); solo mirando hoy
-            if (uiState.selectedDate == today) {
+            if (uiState.selectedDate == today && uiState.home.showNextUp) {
                 nextUp(uiState.timelineItems, now)?.let { next ->
                     NextUpCard(
                         nextUp = next,
@@ -320,34 +328,40 @@ fun HomeScreenContent(
                 TasksCard(
                     tasks = dayTasks,
                     onToggle = { onToggleTaskCompletion(it.id) },
-                    onClick = { selectedTaskIdForDetail = it.id }
+                    onClick = { selectedTaskIdForDetail = it.id },
+                    // La racha es de hoy: mirando otro día no dice nada
+                    streak = if (uiState.selectedDate == today && uiState.home.showStreak) uiState.streak else 0
                 )
             }
         }
         // Timeline de eventos
         val eventsTimeline: @Composable () -> Unit = {
             Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-                val nowIndex = nowIndicatorIndex(dayEvents, uiState.selectedDate, now)
-                dayEvents.forEachIndexed { index, event ->
-                    if (index == nowIndex) NowIndicator(now)
-                    EventCard(
-                        event = event,
-                        onSubtaskToggle = { subtaskTitle ->
-                            onToggleSubtaskCompletion(event.id, subtaskTitle)
-                        },
-                        onToggleEvent = {
-                            onToggleEventCompletion(event.id)
-                        },
-                        onClick = { selectedEventIdForDetail = event.id },
-                        now = now
-                    )
+                // Huecos libres entre eventos: de hoy en adelante (en un día pasado no hay nada que llenar)
+                val gaps = if (uiState.home.showFreeGaps && !uiState.selectedDate.isBefore(today)) {
+                    freeGapsBefore(dayEvents, uiState.selectedDate, now)
+                } else {
+                    emptyMap()
                 }
-                // Si ya empezaron todos los eventos del día, la línea "Ahora" va al final
-                if (nowIndex == dayEvents.size) NowIndicator(now)
+                DayTimeline(
+                    events = dayEvents,
+                    day = uiState.selectedDate,
+                    now = now,
+                    window = uiState.dayWindow,
+                    gaps = gaps,
+                    onAddInGap = { gap ->
+                        // Un evento de una hora (o lo que quepa) al principio del hueco
+                        val start = uiState.selectedDate.atTime(gap.start)
+                        gapToFill = start..minOf(start.plusHours(1), uiState.selectedDate.atTime(gap.end))
+                    },
+                    onSubtaskToggle = { event, subtaskTitle -> onToggleSubtaskCompletion(event.id, subtaskTitle) },
+                    onToggleEvent = { onToggleEventCompletion(it.id) },
+                    onEventClick = { selectedEventIdForDetail = it.id }
+                )
             }
         }
         val notesSection: @Composable () -> Unit = {
-            if (uiState.notes.isNotEmpty()) {
+            if (uiState.home.showNotes && uiState.notes.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(24.dp))
                 NotesSection(
                     notes = uiState.notes,
@@ -357,111 +371,123 @@ fun HomeScreenContent(
             }
         }
 
-        if (widthClass == WidthClass.Expanded) {
-            // Tablet en horizontal: a la izquierda el resumen del día (semana, frase, prioridades,
-            // tareas y notas) y a la derecha la agenda de eventos, cada una con su propio scroll
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding)
-            ) {
-                header()
-                PullToRefreshBox(
-                    isRefreshing = uiState.isLoading,
-                    onRefresh = onSyncFromGoogle,
-                    modifier = Modifier.fillMaxSize()
-                ) {
-                    Row(modifier = Modifier.fillMaxSize()) {
-                        Box(
-                            modifier = Modifier
-                                .weight(0.42f)
-                                .fillMaxHeight()
-                        ) {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .verticalScroll(summaryScrollState)
-                            ) {
-                                weekStrip()
-                                Spacer(modifier = Modifier.height(16.dp))
-                                summaryCards()
-                                tasksCard()
-                                notesSection()
-                                Spacer(modifier = Modifier.height(160.dp)) // Espacio para el degradado y menú
-                            }
-                            EdgeFades()
-                        }
-                        Box(
-                            modifier = Modifier
-                                .weight(0.58f)
-                                .fillMaxHeight()
-                        ) {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .then(daySwipe)
-                                    .verticalScroll(scrollState)
-                            ) {
-                                dayHeading()
-                                when {
-                                    isDayEmpty -> emptyDay()
-                                    dayEvents.isEmpty() && !uiState.isLoading -> Text(
-                                        "No hay eventos este día",
-                                        style = MaterialTheme.typography.bodyLarge,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.padding(horizontal = 16.dp)
-                                    )
-                                    else -> eventsTimeline()
-                                }
-                                Spacer(modifier = Modifier.height(160.dp))
-                            }
-                            EdgeFades()
-                        }
-                    }
-                }
+        // Hasta que llega todo se ve el esqueleto: la pantalla sale entera, sin piezas que aparecen y se mueven
+        LoadingContent(
+            isReady = uiState.isContentReady,
+            skeleton = {
+                HomeSkeleton(
+                    Modifier
+                        .padding(padding)
+                        .widthIn(max = if (widthClass == WidthClass.Medium) 720.dp else Dp.Unspecified)
+                )
             }
-        } else {
-            // Móvil, o tablet en vertical con la columna centrada para no estirar las tarjetas
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding),
-                contentAlignment = Alignment.TopCenter
-            ) {
+        ) {
+            if (widthClass == WidthClass.Expanded) {
+                // Tablet en horizontal: a la izquierda el resumen del día (semana, frase, prioridades,
+                // tareas y notas) y a la derecha la agenda de eventos, cada una con su propio scroll
                 Column(
                     modifier = Modifier
-                        .widthIn(max = if (widthClass == WidthClass.Medium) 720.dp else Dp.Unspecified)
                         .fillMaxSize()
+                        .padding(padding)
                 ) {
-                    // PARTE FIJA: Cabecera y Calendario
                     header()
-                    weekStrip()
-
-                    // CONTENEDOR CON DEGRADADOS (Arriba y Abajo)
                     PullToRefreshBox(
                         isRefreshing = uiState.isLoading,
                         onRefresh = onSyncFromGoogle,
                         modifier = Modifier.fillMaxSize()
                     ) {
-                        Box(modifier = Modifier.fillMaxSize()) {
-                            // El contenido principal siempre es scrollable para que el Assistant pueda subir
-                            Column(
+                        Row(modifier = Modifier.fillMaxSize()) {
+                            Box(
                                 modifier = Modifier
-                                    .fillMaxSize()
-                                    .then(daySwipe)
-                                    .verticalScroll(scrollState)
+                                    .weight(0.42f)
+                                    .fillMaxHeight()
                             ) {
-                                Spacer(modifier = Modifier.height(16.dp))
-                                summaryCards()
-                                dayHeading()
-                                if (isDayEmpty) emptyDay()
-                                tasksCard()
-                                if (dayTasks.isNotEmpty()) Spacer(modifier = Modifier.height(8.dp))
-                                eventsTimeline()
-                                notesSection()
-                                Spacer(modifier = Modifier.height(160.dp)) // Espacio extra para el degradado y menú
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .verticalScroll(summaryScrollState)
+                                ) {
+                                    weekStrip()
+                                    Spacer(modifier = Modifier.height(16.dp))
+                                    summaryCards()
+                                    tasksCard()
+                                    notesSection()
+                                    Spacer(modifier = Modifier.height(160.dp)) // Espacio para el degradado y menú
+                                }
+                                EdgeFades()
                             }
-                            EdgeFades()
+                            Box(
+                                modifier = Modifier
+                                    .weight(0.58f)
+                                    .fillMaxHeight()
+                            ) {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .then(daySwipe)
+                                        .verticalScroll(scrollState)
+                                ) {
+                                    dayHeading()
+                                    when {
+                                        isDayEmpty -> emptyDay()
+                                        dayEvents.isEmpty() && !uiState.isLoading -> Text(
+                                            "No hay eventos este día",
+                                            style = MaterialTheme.typography.bodyLarge,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.padding(horizontal = 16.dp)
+                                        )
+                                        else -> eventsTimeline()
+                                    }
+                                    Spacer(modifier = Modifier.height(160.dp))
+                                }
+                                EdgeFades()
+                            }
+                        }
+                    }
+                }
+            } else {
+                // Móvil, o tablet en vertical con la columna centrada para no estirar las tarjetas
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(padding),
+                    contentAlignment = Alignment.TopCenter
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .widthIn(max = if (widthClass == WidthClass.Medium) 720.dp else Dp.Unspecified)
+                            .fillMaxSize()
+                    ) {
+                        // PARTE FIJA: Cabecera y Calendario
+                        header()
+                        weekStrip()
+    
+                        // CONTENEDOR CON DEGRADADOS (Arriba y Abajo)
+                        PullToRefreshBox(
+                            isRefreshing = uiState.isLoading,
+                            onRefresh = onSyncFromGoogle,
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            Box(modifier = Modifier.fillMaxSize()) {
+                                // El contenido principal siempre es scrollable para que el Assistant pueda subir
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .then(daySwipe)
+                                        .verticalScroll(scrollState)
+                                ) {
+                                    Spacer(modifier = Modifier.height(16.dp))
+                                    summaryCards()
+                                    dayHeading()
+                                    if (isDayEmpty) emptyDay()
+                                    tasksCard()
+                                    if (dayTasks.isNotEmpty()) Spacer(modifier = Modifier.height(8.dp))
+                                    eventsTimeline()
+                                    notesSection()
+                                    Spacer(modifier = Modifier.height(160.dp)) // Espacio extra para el degradado y menú
+                                }
+                                EdgeFades()
+                            }
                         }
                     }
                 }
@@ -529,6 +555,14 @@ fun HomeScreenContent(
                 showDetailedEventSheet = false 
                 selectedEventForEdit = null
             }
+        )
+    }
+
+    gapToFill?.let { range ->
+        AddEventScreen(
+            initialDate = range.start.toLocalDate(),
+            initialRange = range,
+            onDismiss = { gapToFill = null }
         )
     }
 

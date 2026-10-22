@@ -9,6 +9,7 @@ import androidx.compose.ui.test.performScrollTo
 import com.syncro.data.preferences.ThemeMode
 import com.syncro.domain.model.AppSettings
 import com.syncro.domain.model.AssistantSettings
+import com.syncro.domain.model.HomeSettings
 import com.syncro.domain.model.DataLossSummary
 import com.syncro.domain.model.DigestSettings
 import com.syncro.domain.model.User
@@ -41,6 +42,7 @@ class SettingsContentTest {
                 onNotificationsToggle = { calls += "notifications:$it" },
                 onDigestChange = { change -> settings = settings.copy(digest = change(settings.digest)) },
                 onAssistantChange = { change -> settings = settings.copy(assistant = change(settings.assistant)) },
+                onHomeChange = { change -> settings = settings.copy(home = change(settings.home)) },
                 onThemeChange = { calls += "theme:$it" },
                 onLogoutClick = { calls += "logout?" },
                 onLogoutConfirm = { calls += "logout!" },
@@ -119,9 +121,20 @@ class SettingsContentTest {
         assertEquals(DigestSettings(morningEnabled = false), settings.digest)
         compose.onNodeWithText("Avisos de presupuesto").performClick()
 
-        compose.onNodeWithText("Frase del día").performScrollTo().performClick()
+        assertEquals(AssistantSettings(focusEnabled = false, budgetAlertsEnabled = false), settings.assistant)
+    }
 
-        assertEquals(AssistantSettings(focusEnabled = false, budgetAlertsEnabled = false, dailyQuoteEnabled = false), settings.assistant)
+    @Test
+    fun `en Inicio se elige que tarjetas se ven`() {
+        show()
+
+        compose.onNodeWithText("Inicio").performScrollTo().performClick()
+        compose.onNodeWithText("Frase del día").performScrollTo().performClick()
+        compose.onNodeWithText("Huecos libres").performScrollTo().performClick()
+        compose.onNodeWithText("Notas").performScrollTo().performClick()
+
+        assertEquals(false, settings.assistant.dailyQuoteEnabled)
+        assertEquals(HomeSettings(showFreeGaps = false, showNotes = false), settings.home)
     }
 
     @Test

@@ -19,6 +19,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import com.syncro.domain.model.SyncroItem
 import com.syncro.presentation.components.toDisplayTime
 import com.syncro.presentation.theme.Emerald500
@@ -33,7 +35,9 @@ fun TasksCard(
     tasks: List<SyncroItem.Task>,
     onToggle: (SyncroItem.Task) -> Unit,
     onClick: (SyncroItem.Task) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    // Días seguidos con todo hecho; se enseña desde 2 (uno solo aún no es racha)
+    streak: Int = 0
 ) {
     val accent = Emerald500
     val done = tasks.count { it.isCompleted }
@@ -64,6 +68,17 @@ fun TasksCard(
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
+                if (streak >= MIN_STREAK_SHOWN) {
+                    Text(
+                        "🔥 $streak días",
+                        modifier = Modifier
+                            .padding(end = 8.dp)
+                            .semantics { contentDescription = "Racha de $streak días con todo hecho" },
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
                 Text(
                     "$done/${tasks.size}",
                     modifier = Modifier
@@ -132,3 +147,6 @@ fun TasksCard(
         }
     }
 }
+
+/** Una racha de un día no dice nada: se enseña a partir de dos. */
+private const val MIN_STREAK_SHOWN = 2

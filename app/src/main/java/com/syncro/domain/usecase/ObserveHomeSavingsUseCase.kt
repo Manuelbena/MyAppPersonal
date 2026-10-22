@@ -1,12 +1,9 @@
 package com.syncro.domain.usecase
 
-import com.syncro.domain.model.BudgetLevel
 import com.syncro.domain.model.HomeSavings
-import com.syncro.domain.model.budgetStatuses
 import com.syncro.domain.repository.SettingsRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
@@ -15,38 +12,17 @@ import java.time.LocalDate
 import javax.inject.Inject
 
 /**
- * El resumen de Ahorros de Inicio para el mes en que cae [today] (de nómina a nómina si hay día de
- * nómina), de la cuenta que se está viendo en Ahorros: null si está apagado en Ajustes (lo de
- * fábrica), si no el balance del mes y los presupuestos que van justos o pasados.
+ * El resumen de Ahorros de Inicio ([ObserveSavingsSummaryUseCase]): null si está apagado en
+ * Ajustes (lo de fábrica).
  */
 class ObserveHomeSavingsUseCase @Inject constructor(
     private val settings: SettingsRepository,
-    private val getMonthMovements: GetMonthMovementsUseCase,
-    private val getBudgets: GetBudgetsUseCase,
-    private val observeAccounts: ObserveSavingsAccountsUseCase
+    private val observeSavingsSummary: ObserveSavingsSummaryUseCase
 ) {
     @OptIn(ExperimentalCoroutinesApi::class)
     operator fun invoke(today: LocalDate): Flow<HomeSavings?> =
         settings.settings
             .map { it.assistant.homeSavingsEnabled }
             .distinctUntilChanged()
-            .flatMapLatest { enabled ->
-                if (!enabled) {
-                    flowOf(null)
-                } else {
-                    observeAccounts().flatMapLatest { accounts ->
-                        val accountId = accounts.active.id
-                        combine(getMonthMovements(today, accountId), getBudgets(accountId)) { movements, budgets ->
-                            HomeSavings(
-                                period = movements.period,
-                                incomeCents = movements.incomeCents,
-                                expenseCents = movements.expenseCents,
-                                hasMovements = movements.occurrences.isNotEmpty(),
-                                tightBudgets = movements.budgetStatuses(budgets).filter { it.level != BudgetLevel.OK },
-                                accountName = accounts.active.name.takeIf { accounts.hasSeveral }
-                            )
-                        }
-                    }
-                }
-            }
+            .flatMapLatest { enabled -> if (enabled) observeSavingsSummary(today) else flowOf(null) }
 }

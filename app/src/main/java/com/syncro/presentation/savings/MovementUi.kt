@@ -78,7 +78,7 @@ fun formatSignedEuros(cents: Long, type: MovementType): String =
 private val SPANISH = Locale("es", "ES")
 
 /** "27 sep": el mes en tres letras a mano (lo abreviado de Java cambia según versión: "sept.", "sep"). */
-private fun LocalDate.shortDay(): String =
+internal fun LocalDate.shortDay(): String =
     "$dayOfMonth " + month.getDisplayName(TextStyle.FULL_STANDALONE, SPANISH).take(3)
 
 /**

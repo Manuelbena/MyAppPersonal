@@ -15,8 +15,8 @@ android {
         applicationId = "com.manuelgalindo.syncro"
         minSdk = 26
         targetSdk = 37
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "1.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -96,6 +96,8 @@ dependencies {
     implementation(libs.coil.video)
     implementation(libs.coil.network)
     implementation(libs.androidx.media3.exoplayer)
+    // Saber si hay una versión nueva en Google Play (el asistente lo cuenta y lleva a la tienda)
+    implementation(libs.play.app.update.ktx)
     implementation(libs.androidx.media3.ui)
     // Widget de la pantalla de inicio ("Tu día")
     implementation(libs.androidx.glance.appwidget)

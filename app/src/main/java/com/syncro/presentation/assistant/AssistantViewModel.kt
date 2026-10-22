@@ -3,6 +3,7 @@ package com.syncro.presentation.assistant
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.syncro.data.preferences.AssistantPreferences
+import com.syncro.domain.model.AppUpdate
 import com.syncro.domain.model.AssistantConversation
 import com.syncro.domain.model.BudgetAlert
 import com.syncro.domain.model.ChatReply
@@ -17,9 +18,27 @@ import com.syncro.domain.model.Payday
 import com.syncro.domain.model.PaydayAnswer
 import com.syncro.domain.model.TaskAction
 import com.syncro.domain.model.assistantConversation
+import com.syncro.domain.model.inArrivalOrder
+import com.syncro.domain.model.newArrivals
 import com.syncro.domain.model.budgetAlerts
 import com.syncro.domain.model.WeeklyBalance
 import com.syncro.domain.model.ErrandsDay
+import com.syncro.domain.model.DayLoad
+import com.syncro.domain.model.dayLoadOf
+import com.syncro.domain.model.StuckAnswer
+import com.syncro.domain.model.StuckChoice
+import com.syncro.domain.model.StuckTask
+import com.syncro.domain.model.stuckId
+import com.syncro.domain.model.stuckTasks
+import com.syncro.domain.usecase.DeleteTaskUseCase
+import com.syncro.domain.model.HABIT_LOOKBACK_WEEKS
+import com.syncro.domain.model.Habit
+import com.syncro.domain.model.HabitAnswer
+import com.syncro.domain.model.findHabits
+import com.syncro.domain.model.habitId
+import com.syncro.domain.usecase.CheckAppUpdateUseCase
+import com.syncro.domain.usecase.GetTasksInRangeUseCase
+import com.syncro.domain.usecase.RepeatHabitUseCase
 import com.syncro.domain.model.errandsOf
 import com.syncro.domain.model.lastWeekEnd
 import com.syncro.domain.model.weeklyBalance
@@ -42,6 +61,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
@@ -50,9 +70,10 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.Clock
 import java.time.LocalDate
+import java.time.LocalDateTime
 import javax.inject.Inject
 
-data class AssistantUiState(val conversation: AssistantConversation, val unreadCount: Int)
+data class AssistantUiState(val conversation: AssistantConversation, val unreadCount: Int, val today: LocalDate)
 
 /**
  * Chat del asistente y número de mensajes sin leer. MainScaffold crea una sola instancia y la
@@ -65,6 +86,7 @@ class AssistantViewModel @Inject constructor(
     private val getLeftoverTasks: GetLeftoverTasksUseCase,
     private val moveTasks: MoveTasksUseCase,
     private val toggleTaskCompletion: ToggleTaskCompletionUseCase,
+    private val deleteTask: DeleteTaskUseCase,
     private val getFocusCandidates: GetFocusCandidatesUseCase,
     private val getFocusHistory: GetFocusHistoryUseCase,
     private val chooseDailyFocus: ChooseDailyFocusUseCase,
@@ -73,6 +95,9 @@ class AssistantViewModel @Inject constructor(
     observeAccounts: ObserveSavingsAccountsUseCase,
     getSettings: GetSettingsUseCase,
     getEventsInRange: GetEventsInRangeUseCase,
+    getTasksInRange: GetTasksInRangeUseCase,
+    private val repeatHabit: RepeatHabitUseCase,
+    private val checkAppUpdate: CheckAppUpdateUseCase,
     private val clock: Clock
 ) : ViewModel() {
 
@@ -141,10 +166,71 @@ class AssistantViewModel @Inject constructor(
         getEventsInRange(today, today).map { errandsOf(it, today) }
     }
 
-    // Los resúmenes, juntos: nómina, presupuestos, la semana y las salidas de hoy
-    private data class Money(val payday: Payday?, val budgetAlerts: List<BudgetAlert>, val week: WeeklyBalance?, val errands: ErrandsDay?)
-    private val money = combine(payday.filterNotNull(), budgetAlerts, weekly, errands) { payday, alerts, week, errands ->
-        Money(payday.payday, alerts, week, errands)
+    // Solapes y días a tope: el de hoy y, desde la hora de la noche, el de mañana (aún se puede mover algo)
+    private val dayLoads = combine(refreshTick, getSettings().map { it.assistant.dayLoadEnabled to it.digest.eveningTime }.distinctUntilChanged()) { _, settings ->
+        settings
+    }.flatMapLatest { (enabled, evening) ->
+        if (!enabled) return@flatMapLatest flowOf(emptyList())
+        val now = LocalDateTime.now(clock)
+        val today = now.toLocalDate()
+        val days = if (now.toLocalTime().isBefore(evening)) listOf(today) else listOf(today, today.plusDays(1))
+        getEventsInRange(today, days.last()).map { events -> days.mapNotNull { dayLoadOf(events, it, today) } }
+    }
+
+    // Lo de hoy: las salidas y cómo viene el día
+    private val agenda = combine(errands, dayLoads, ::Pair)
+
+    // Lo que se apunta casi cada semana el mismo día ("Gimnasio" los martes) y lo ya contestado
+    private data class Habits(val found: List<Habit>, val answers: List<HabitAnswer>)
+    private val habits: StateFlow<Habits?> = refreshTick.flatMapLatest {
+        val today = LocalDate.now(clock)
+        val from = today.minusWeeks(HABIT_LOOKBACK_WEEKS)
+        // Un poco hacia delante: la base de la repetición es la última vez apuntada, aunque sea futura
+        val to = today.plusWeeks(2)
+        combine(getTasksInRange(from, to), getEventsInRange(from, to), preferences.habitAnswers) { tasks, events, answers ->
+            Habits(findHabits(tasks, events, today), answers.filter { !it.date.isBefore(historySince) })
+        }
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
+    // Los resúmenes, juntos: nómina, presupuestos, la semana, las salidas y cómo viene el día
+    private data class Money(
+        val payday: Payday?,
+        val budgetAlerts: List<BudgetAlert>,
+        val week: WeeklyBalance?,
+        val errands: ErrandsDay?,
+        val dayLoads: List<DayLoad>,
+        val habits: Habits
+    )
+    private val money = combine(payday.filterNotNull(), budgetAlerts, weekly, agenda, habits.filterNotNull()) { payday, alerts, week, (errands, loads), habits ->
+        Money(payday.payday, alerts, week, errands, loads, habits)
+    }
+
+    // Tareas atascadas (varios repasos sin hacerse) y lo ya contestado sobre ellas. Las tareas se buscan
+    // en un margen amplio: tras el repaso pueden estar en cualquier día que se eligiera
+    private data class Stuck(val tasks: List<StuckTask>, val answers: List<StuckAnswer>)
+    private val stuck: StateFlow<Stuck?> = refreshTick.flatMapLatest {
+        val today = LocalDate.now(clock)
+        combine(
+            getTasksInRange(today.minusDays(STUCK_LOOKBACK_DAYS), today.plusDays(STUCK_LOOKAHEAD_DAYS)),
+            preferences.postponedReviews,
+            preferences.stuckAnswers
+        ) { tasks, reviews, answers ->
+            Stuck(
+                stuckTasks(tasks, reviews, answers.map { it.taskId }.toSet()),
+                answers.filter { !it.lastReview.plusDays(1).isBefore(historySince) }
+            )
+        }
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
+    // Versión nueva en la tienda: se mira al abrir y al volver a la app (no hace esperar al chat)
+    private val update = MutableStateFlow<AppUpdate?>(null)
+    private var lastUpdateCheckAt: Long? = null
+
+    private fun checkForUpdate() {
+        val now = clock.millis()
+        if (lastUpdateCheckAt?.let { now - it < UPDATE_CHECK_INTERVAL_MS } == true) return
+        lastUpdateCheckAt = now
+        viewModelScope.launch { update.value = checkAppUpdate() }
     }
 
     private data class Tasks(val leftovers: LeftoverTasks, val focus: Focus, val focusHistory: List<DailyFocus>, val money: Money)
@@ -160,41 +246,72 @@ class AssistantViewModel @Inject constructor(
         )
     }
 
+    private data class Extras(val clearedIds: Set<String>, val update: AppUpdate?, val dismissedUpdate: Int?, val stuck: Stuck)
     private val chatInputs = combine(
         preferences.digestAnswer,
         notificationsAllowed.filterNotNull(),
         tasks,
         preferences.leftoverOutcomes,
-        preferences.clearedMessageIds
-    ) { answer, allowed, tasks, outcomes, clearedIds ->
+        combine(preferences.clearedMessageIds, update, preferences.dismissedUpdateVersion, stuck.filterNotNull(), ::Extras)
+    ) { answer, allowed, tasks, outcomes, (clearedIds, update, dismissedUpdate, stuck) ->
         assistantConversation(
             answer = answer,
             notificationsAllowed = allowed,
             leftovers = tasks.leftovers,
             outcomes = outcomes.filter { !it.reviewDate.isBefore(historySince) },
+            stuck = stuck.tasks,
+            stuckAnswers = stuck.answers,
             focus = tasks.focus.candidates,
             focusHistory = tasks.focusHistory,
             payday = tasks.money.payday,
             budgetAlerts = tasks.money.budgetAlerts,
             weeklyBalance = tasks.money.week,
             errands = tasks.money.errands,
-            clearedIds = clearedIds
+            dayLoads = tasks.money.dayLoads,
+            habits = tasks.money.habits.found,
+            habitAnswers = tasks.money.habits.answers,
+            update = update,
+            updateDismissed = update != null && update.versionCode == dismissedUpdate,
+            clearedIds = clearedIds,
+            today = LocalDate.now(clock)
         )
     }
 
     // null hasta saber el permiso y las pendientes: evita enseñar mensajes (y el número) por error
-    val uiState: StateFlow<AssistantUiState?> = combine(chatInputs, preferences.readMessageIds) { conversation, readIds ->
-        AssistantUiState(conversation, conversation.unreadCount(readIds))
+    // Cada mensaje en el momento en que salió por primera vez (como en WhatsApp: lo nuevo, abajo).
+    // Las llegadas aún sin guardar se recuerdan aquí para no darles otra hora mientras se guardan
+    private val unsavedArrivals = mutableMapOf<String, LocalDateTime>()
+
+    val uiState: StateFlow<AssistantUiState?> = combine(
+        chatInputs, preferences.readMessageIds, preferences.messageArrivals
+    ) { conversation, readIds, stored ->
+        val now = LocalDateTime.now(clock)
+        unsavedArrivals.keys.removeAll(stored.keys)
+        val known = stored + unsavedArrivals
+        val arrived = conversation.newArrivals(known, now)
+        if (arrived.isNotEmpty()) {
+            unsavedArrivals += arrived
+            viewModelScope.launch { preferences.saveMessageArrivals(arrived) }
+        }
+        val chat = conversation.inArrivalOrder(known + arrived, now)
+        AssistantUiState(chat, chat.unreadCount(readIds), now.toLocalDate())
     }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     /** Al volver a la app: permiso de avisos y repaso de pendientes (puede haber pasado de las 21:00). */
     fun onResume(notificationsAllowed: Boolean) {
         this.notificationsAllowed.value = notificationsAllowed
         refreshTick.value++
+        checkForUpdate()
     }
 
     fun onNotificationsAllowedChanged(allowed: Boolean) {
         notificationsAllowed.value = allowed
+    }
+
+    /** "Más tarde" a la versión nueva: no se vuelve a preguntar por esa (sí por una más nueva). */
+    fun dismissUpdate() {
+        val current = update.value ?: return
+        viewModelScope.launch { preferences.dismissUpdate(current.versionCode) }
     }
 
     fun answerDigest(answer: DigestAnswer) {
@@ -223,6 +340,8 @@ class AssistantViewModel @Inject constructor(
                     moved = if (choice == LeftoverChoice.MOVE_ALL) total else 0
                 )
             )
+            // Cualquier respuesta cuenta como un repaso más sin hacerse (las que se hagan luego ya no cuentan)
+            preferences.recordPostponed(current.tasks.map { it.id }, current.reviewDate)
             if (choice == LeftoverChoice.MOVE_ALL) {
                 moveTasks(current.tasks.map { it.id }, current.target.dateFrom(LocalDate.now(clock)))
             }
@@ -278,6 +397,48 @@ class AssistantViewModel @Inject constructor(
         viewModelScope.launch { preferences.savePaydayAnswer(current.date, answer) }
     }
 
+    /**
+     * Propuesta de un hábito ([messageId] es su mensaje): [ChatReply.HABIT_REPEAT] lo hace repetirse
+     * cada semana; [ChatReply.HABIT_DISMISS] no lo vuelve a proponer. La respuesta se guarda antes,
+     * para que la pregunta no parpadee mientras se crea la serie.
+     */
+    fun answerHabit(reply: ChatReply, messageId: String) {
+        val habit = habits.value?.found?.firstOrNull { habitId(it.key) == messageId } ?: return
+        val accepted = when (reply) {
+            ChatReply.HABIT_REPEAT -> true
+            ChatReply.HABIT_DISMISS -> false
+            else -> return
+        }
+        viewModelScope.launch {
+            preferences.saveHabitAnswer(HabitAnswer(habit.key, habit.title, habit.weekday, habit.lastDone, accepted))
+            if (accepted) repeatHabit(habit)
+        }
+    }
+
+    /**
+     * Tarea atascada ([messageId] es su mensaje): [ChatReply.STUCK_DONE] la completa,
+     * [ChatReply.STUCK_DELETE] la borra (también en Google) y [ChatReply.STUCK_KEEP] la deja. La
+     * respuesta se guarda antes, para que la pregunta no parpadee.
+     */
+    fun answerStuck(reply: ChatReply, messageId: String) {
+        val current = stuck.value?.tasks?.firstOrNull { stuckId(it.task.id) == messageId } ?: return
+        val choice = when (reply) {
+            ChatReply.STUCK_DONE -> StuckChoice.DONE
+            ChatReply.STUCK_DELETE -> StuckChoice.DELETE
+            ChatReply.STUCK_KEEP -> StuckChoice.KEEP
+            else -> return
+        }
+        val task = current.task
+        viewModelScope.launch {
+            preferences.saveStuckAnswer(StuckAnswer(task.id, task.title, current.reviews, current.lastReview, choice))
+            when (choice) {
+                StuckChoice.DONE -> toggleTaskCompletion(task.id)
+                StuckChoice.DELETE -> deleteTask(task.id)
+                StuckChoice.KEEP -> Unit
+            }
+        }
+    }
+
     /** El chat está en pantalla: todo lo que hay en él se da por leído. */
     fun markAllRead() {
         val ids = visibleMessageIds() ?: return
@@ -299,5 +460,10 @@ class AssistantViewModel @Inject constructor(
 
     private companion object {
         const val HISTORY_DAYS = 7L
+        const val STUCK_LOOKBACK_DAYS = 60L
+        const val STUCK_LOOKAHEAD_DAYS = 365L
+
+        /** Como mucho una consulta a Google Play cada media hora, aunque se entre y salga de la app. */
+        const val UPDATE_CHECK_INTERVAL_MS = 30 * 60 * 1000L
     }
 }

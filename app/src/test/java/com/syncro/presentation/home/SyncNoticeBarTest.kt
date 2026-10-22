@@ -4,6 +4,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import com.syncro.domain.model.GoogleService
 import com.syncro.domain.model.SyncState
 import com.syncro.presentation.home.components.SyncNoticeBar
 import org.junit.Assert.assertEquals
@@ -62,5 +63,29 @@ class SyncNoticeBarTest {
         compose.setContent { SyncNoticeBar(notice = SyncNotice.PendingChanges(4), onRetry = {}) }
 
         compose.onNodeWithText("4 cambios sin subir a Google").assertIsDisplayed()
+    }
+
+    @Test
+    fun `la falta de permiso va antes que el fallo y los pendientes`() {
+        val state = SyncState(isOnline = true, pendingChanges = 3, missingAccess = setOf(GoogleService.CALENDAR))
+
+        assertEquals(SyncNotice.MissingAccess(setOf(GoogleService.CALENDAR)), syncNoticeFor(state, lastSyncFailed = true))
+    }
+
+    @Test
+    fun `sin permiso explica que todo sigue en el movil y ofrece darlo`() {
+        var asked = 0
+        compose.setContent {
+            SyncNoticeBar(
+                notice = SyncNotice.MissingAccess(setOf(GoogleService.CALENDAR, GoogleService.TASKS)),
+                onRetry = {},
+                onGrantAccess = { asked++ }
+            )
+        }
+
+        compose.onNodeWithText("Google Calendar y Tasks no se sincronizan", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("Reintentar").assertDoesNotExist()
+        compose.onNodeWithText("Dar permiso").performClick()
+        assertEquals(1, asked)
     }
 }

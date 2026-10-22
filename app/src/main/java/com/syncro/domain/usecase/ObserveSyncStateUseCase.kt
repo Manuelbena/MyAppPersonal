@@ -8,13 +8,17 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import javax.inject.Inject
 
-/** La conexión y los cambios sin subir a Google, para avisar en la UI de lo que aún no está sincronizado. */
+/** La conexión, los cambios sin subir y los permisos de Google, para avisar en la UI de lo que no está sincronizado. */
 class ObserveSyncStateUseCase @Inject constructor(
     private val connectivity: ConnectivityRepository,
     private val googleSync: GoogleSyncRepository
 ) {
     operator fun invoke(): Flow<SyncState> =
-        combine(connectivity.isOnline, googleSync.observePendingChangesCount()) { online, pending ->
-            SyncState(isOnline = online, pendingChanges = pending)
+        combine(
+            connectivity.isOnline,
+            googleSync.observePendingChangesCount(),
+            googleSync.observeMissingAccess()
+        ) { online, pending, missing ->
+            SyncState(isOnline = online, pendingChanges = pending, missingAccess = missing)
         }.distinctUntilChanged()
 }

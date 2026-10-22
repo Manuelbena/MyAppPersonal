@@ -1,8 +1,9 @@
 package com.syncro.presentation.home
 
+import com.syncro.domain.model.DayWindow
+import com.syncro.domain.model.DigestSettings
+import com.syncro.domain.model.dayWindow
 import com.syncro.testutil.DAY
-import com.syncro.testutil.aNote
-import com.syncro.testutil.aTask
 import com.syncro.testutil.anEvent
 import com.syncro.testutil.at
 import org.junit.Assert.assertEquals
@@ -11,7 +12,7 @@ import org.junit.Test
 import java.time.LocalTime
 
 /**
- * Reglas del "ahora" en el timeline: progreso del raíl, minutos restantes y posición de la línea
+ * Reglas del "ahora" en el timeline: progreso del raíl, minutos restantes, marcas del día y altura de la línea
  * "Ahora". Riesgos: eventos que cruzan la medianoche, los de todo el día y los bordes exactos.
  */
 class TimelineNowTest {
@@ -46,35 +47,70 @@ class TimelineNowTest {
         assertNull(allDay.minutesLeftAt(DAY.atTime(12, 0)))
     }
 
+
     @Test
-    fun `la linea Ahora va antes del primer elemento que empieza despues`() {
-        val items = listOf(
-            anEvent(title = "Todo el día", startTime = LocalTime.MIDNIGHT, endTime = LocalTime.MIDNIGHT),
-            anEvent(title = "Reunión", startTime = at("10:00"), endTime = at("11:00")),
-            aTask(title = "Llamar", time = at("12:30")),
-            anEvent(title = "Cena", startTime = at("21:00"), endTime = at("22:00"))
+    fun `la linea Ahora se interpola entre las anclas`() {
+        val anchors = listOf(TimeAnchor(9 * 60, 0f), TimeAnchor(10 * 60, 100f), TimeAnchor(12 * 60, 300f))
+
+        assertEquals(50f, nowLineY(anchors, 9 * 60 + 30))
+        // Dentro de la tarjeta del evento en curso, a la altura de su progreso
+        assertEquals(200f, nowLineY(anchors, 11 * 60))
+        // Antes de la primera y después de la última se queda en el borde
+        assertEquals(0f, nowLineY(anchors, 6 * 60))
+        assertEquals(300f, nowLineY(anchors, 23 * 60))
+        assertNull(nowLineY(emptyList(), 600))
+    }
+
+    @Test
+    fun `las anclas que retroceden en la hora no mueven la linea`() {
+        // Reunión 10–12 y, debajo, una llamada solapada 11–11:30
+        val anchors = listOf(
+            TimeAnchor(10 * 60, 0f), TimeAnchor(12 * 60, 200f),
+            TimeAnchor(11 * 60, 300f), TimeAnchor(11 * 60 + 30, 400f),
+            TimeAnchor(13 * 60, 500f)
         )
 
-        assertEquals(1, nowIndicatorIndex(items, DAY, DAY.atTime(8, 0)))
-        assertEquals(2, nowIndicatorIndex(items, DAY, DAY.atTime(12, 0)))
-        // Si ya empezó todo, al final
-        assertEquals(4, nowIndicatorIndex(items, DAY, DAY.atTime(23, 0)))
+        assertEquals(100f, nowLineY(anchors, 11 * 60))
+        assertEquals(350f, nowLineY(anchors, 12 * 60 + 30))
     }
 
     @Test
-    fun `sin linea Ahora si el dia no es hoy o no hay nada`() {
-        val items = listOf(anEvent(startTime = at("10:00"), endTime = at("11:00")))
+    fun `los minutos de un evento en el dia se recortan a la medianoche`() {
+        val night = anEvent(date = DAY, endDate = DAY.plusDays(1), startTime = at("22:00"), endTime = at("02:00"))
 
-        assertNull(nowIndicatorIndex(items, DAY.plusDays(1), DAY.atTime(8, 0)))
-        assertNull(nowIndicatorIndex(emptyList(), DAY, DAY.atTime(8, 0)))
-        assertNull(nowIndicatorIndex(listOf(aNote()), DAY, DAY.atTime(8, 0)))
+        assertEquals(22 * 60, night.startMinuteOn(DAY))
+        assertEquals(MINUTES_PER_DAY, night.endMinuteOn(DAY))
+        assertEquals(0, night.startMinuteOn(DAY.plusDays(1)))
+        assertEquals(2 * 60, night.endMinuteOn(DAY.plusDays(1)))
     }
 
     @Test
-    fun `un evento que viene del dia anterior cuenta como ya empezado`() {
-        val fromYesterday = anEvent(date = DAY.minusDays(1), endDate = DAY, startTime = at("23:00"), endTime = at("09:00"))
-        val later = anEvent(startTime = at("10:00"), endTime = at("11:00"))
+    fun `las marcas del dia van arriba y abajo si todo cabe dentro`() {
+        val events = listOf(
+            anEvent(title = "Todo el día", startTime = LocalTime.MIDNIGHT, endTime = LocalTime.MIDNIGHT),
+            anEvent(startTime = at("10:00"), endTime = at("11:00")),
+            anEvent(startTime = at("18:00"), endTime = at("19:00"))
+        )
 
-        assertEquals(1, nowIndicatorIndex(listOf(fromYesterday, later), DAY, DAY.atTime(0, 30)))
+        assertEquals(0 to 3, dayBoundaryIndices(events, DAY, DayWindow(at("09:00"), at("21:00"))))
+    }
+
+    @Test
+    fun `los eventos fuera del dia quedan antes del inicio o despues del fin`() {
+        val events = listOf(
+            anEvent(startTime = at("07:00"), endTime = at("08:00")),
+            anEvent(startTime = at("10:00"), endTime = at("11:00")),
+            anEvent(startTime = at("22:00"), endTime = at("23:00"))
+        )
+
+        assertEquals(1 to 2, dayBoundaryIndices(events, DAY, DayWindow(at("09:00"), at("21:00"))))
+    }
+
+    @Test
+    fun `sin avisos el dia va de 00 00 a 23 59`() {
+        val window = DigestSettings(morningEnabled = false, eveningEnabled = false).dayWindow
+
+        assertEquals(DayWindow(LocalTime.MIDNIGHT, at("23:59")), window)
+        assertEquals(DayWindow(at("09:00"), at("21:00")), DigestSettings().dayWindow)
     }
 }

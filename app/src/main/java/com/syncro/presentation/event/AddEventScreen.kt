@@ -66,6 +66,8 @@ fun AddEventScreen(
     eventToEdit: SyncroItem.Event? = null,
     // Evento nuevo: el día en que empieza (el que se está mirando); null = hoy
     initialDate: LocalDate? = null,
+    // Evento nuevo desde un hueco libre de Inicio: su hora de inicio y de fin
+    initialRange: ClosedRange<LocalDateTime>? = null,
     onDismiss: () -> Unit,
     viewModel: com.syncro.presentation.home.HomeViewModel = hiltViewModel()
 ) {
@@ -82,6 +84,7 @@ fun AddEventScreen(
         AddEventContent(
             eventToEdit = eventToEdit,
             initialDate = initialDate,
+            initialRange = initialRange,
             onDismiss = onDismiss,
             onSave = { title, desc, loc, date, endDate, start, end, catText, catCol, priority, subs, repeat, scope, reminder ->
                 viewModel.saveDetailedEvent(
@@ -132,6 +135,7 @@ private enum class PickerTarget { StartDate, StartTime, EndDate, EndTime }
 fun AddEventContent(
     eventToEdit: SyncroItem.Event? = null,
     initialDate: LocalDate? = null,
+    initialRange: ClosedRange<LocalDateTime>? = null,
     onDismiss: () -> Unit,
     onSave: (String, String?, String?, LocalDate, LocalDate, LocalTime, LocalTime, String, Color, Priority?, List<String>, Recurrence?, RepeatScope, Int?) -> Unit
 ) {
@@ -173,11 +177,12 @@ fun AddEventContent(
 
     // Evento nuevo: de la próxima hora en punto a la siguiente (con fechas reales: a las 23:30
     // eso es mañana de 00:00 a 01:00, no un rango imposible dentro de hoy)
-    val defaultStart = remember { defaultEventStart(LocalDateTime.now(), initialDate) }
+    val defaultStart = remember { initialRange?.start ?: defaultEventStart(LocalDateTime.now(), initialDate) }
+    val defaultEnd = remember { initialRange?.endInclusive ?: defaultStart.plusHours(1) }
     var startDate by remember { mutableStateOf(eventToEdit?.date ?: defaultStart.toLocalDate()) }
     var startTime by remember { mutableStateOf(eventToEdit?.startTime ?: defaultStart.toLocalTime()) }
-    var endDate by remember { mutableStateOf(eventToEdit?.endDate ?: defaultStart.plusHours(1).toLocalDate()) }
-    var endTime by remember { mutableStateOf(eventToEdit?.endTime ?: defaultStart.plusHours(1).toLocalTime()) }
+    var endDate by remember { mutableStateOf(eventToEdit?.endDate ?: defaultEnd.toLocalDate()) }
+    var endTime by remember { mutableStateOf(eventToEdit?.endTime ?: defaultEnd.toLocalTime()) }
 
     /** Mover el inicio arrastra el fin, conservando la duración (como en Google Calendar). */
     fun moveStart(newStart: LocalDateTime) {

@@ -3,7 +3,7 @@ package com.syncro.data.sync
 import android.content.Context
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
-import com.google.api.client.googleapis.extensions.android.gms.auth.UserRecoverableAuthIOException
+import com.google.api.client.googleapis.extensions.android.gms.auth.GoogleAuthIOException
 import com.google.api.client.googleapis.json.GoogleJsonResponseException
 import com.syncro.domain.repository.GoogleSyncRepository
 import dagger.hilt.EntryPoint
@@ -41,7 +41,8 @@ class PushPendingChangesWorker(
      * autorización del usuario (se pedirá al abrir la app) o si Google rechaza los datos.
      */
     private fun isRetryable(error: Throwable): Boolean = when (error) {
-        is UserRecoverableAuthIOException -> false
+        // Sin permiso (se pida o no se pueda pedir) no se arregla reintentando: el aviso de Inicio lo pide
+        is GoogleAuthIOException -> false
         is GoogleJsonResponseException -> error.statusCode == 408 || error.statusCode == 429 || error.statusCode >= 500
         is IOException -> true
         else -> false
