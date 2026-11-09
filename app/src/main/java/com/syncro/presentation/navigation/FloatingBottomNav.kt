@@ -34,9 +34,16 @@ fun FloatingBottomNav(
     // encogen y cada pestaña se reparte el mismo ancho, así ninguna se queda fuera
     BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
         val compact = maxWidth < COMPACT_WIDTH
+        val verticalMargin = if (compact) 24.dp else 40.dp
+        val systemBar = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
         Surface(
             modifier = Modifier
-                .padding(horizontal = if (compact) 12.dp else 32.dp, vertical = if (compact) 24.dp else 40.dp)
+                .padding(
+                    start = if (compact) 12.dp else 32.dp,
+                    end = if (compact) 12.dp else 32.dp,
+                    top = verticalMargin,
+                    bottom = bottomBarMargin(verticalMargin, systemBar)
+                )
                 .fillMaxWidth(),
             shape = RoundedCornerShape(30.dp),
             color = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
@@ -66,6 +73,15 @@ fun FloatingBottomNav(
 
 /** Por debajo de este ancho de pantalla la barra se compacta. */
 private val COMPACT_WIDTH = 380.dp
+
+/** Aire mínimo entre la barra y la botonera del sistema. */
+private val SYSTEM_BAR_GAP = 12.dp
+
+/**
+ * Margen inferior de la barra: el suyo de siempre, salvo que la botonera del sistema (la de tres
+ * botones es más alta que ese margen) la tape; entonces queda justo por encima de ella.
+ */
+internal fun bottomBarMargin(margin: Dp, systemBar: Dp): Dp = maxOf(margin, systemBar + SYSTEM_BAR_GAP)
 
 @Composable
 private fun NavBarItem(

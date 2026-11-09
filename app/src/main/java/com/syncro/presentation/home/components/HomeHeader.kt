@@ -20,9 +20,18 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.syncro.presentation.components.SyncroIconButton
 import com.syncro.presentation.components.UserAvatar
+
+/** Letras del nombre que caben en el saludo sin llegar a los botones de la derecha. */
+private const val GREETING_NAME_MAX_LETTERS = 6
+
+/** Acorta el nombre del saludo: "Alejandro" → "Alejan...". */
+internal fun greetingName(name: String): String =
+    if (name.codePointCount(0, name.length) <= GREETING_NAME_MAX_LETTERS) name
+    else name.substring(0, name.offsetByCodePoints(0, GREETING_NAME_MAX_LETTERS)) + "..."
 
 @Composable
 fun HomeHeader(
@@ -41,12 +50,15 @@ fun HomeHeader(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.Top
     ) {
-        Column {
+        // Con weight, la foto y el botón de hoy miden primero: el texto nunca los encoge
+        Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
             Text(
-                text = if (userName.isBlank()) "Hola" else "Hola, $userName",
+                text = if (userName.isBlank()) "Hola" else "Hola, ${greetingName(userName)}",
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onBackground
+                color = MaterialTheme.colorScheme.onBackground,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
             Text(
                 text = currentDate,

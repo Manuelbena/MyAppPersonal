@@ -19,7 +19,7 @@ object LegalInfo {
     const val OWNER_ADDRESS = "14900 Lucena (Córdoba), España"
     const val CONTACT_EMAIL = "appsyncro2026@gmail.com"
     /** Fecha de la última revisión de los textos; cambiarla al modificarlos. */
-    const val LAST_UPDATED = "13 de octubre de 2026"
+    const val LAST_UPDATED = "9 de noviembre de 2026"
 
     val isComplete: Boolean
         get() = listOf(OWNER_NAME, OWNER_ADDRESS, CONTACT_EMAIL).none { it.startsWith("[") }
@@ -130,7 +130,7 @@ private val privacyPolicy = LegalDocument(
             "Uso de los datos de Google",
             listOf(
                 "El uso que ${LegalInfo.APP_NAME} hace de la información recibida de las API de Google, y su transferencia a cualquier otra aplicación, se ajusta a la Política de datos de usuario de los servicios de API de Google (Google API Services User Data Policy), incluidos los requisitos de Uso limitado (Limited Use).",
-                "• La app pide acceso a Google Calendar y Google Tasks solo para mostrarte y sincronizar tus eventos y tareas.",
+                "• La app pide acceso a los eventos de Google Calendar (no a la configuración de tus calendarios) y a Google Tasks, solo para mostrarte y sincronizar tus eventos y tareas. De Google Calendar solo usa tu calendario principal.",
                 "• Esos datos no se transfieren a terceros, salvo a Google para la propia sincronización o cuando lo exija la ley.",
                 "• No se usan para publicidad ni para entrenar modelos de inteligencia artificial, y ninguna persona los lee."
             )

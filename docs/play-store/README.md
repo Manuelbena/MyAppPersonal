@@ -1,7 +1,7 @@
 # Publicar Syncro en Google Play — lo legal y los formularios
 
 Guía para rellenar Play Console y la verificación de Google con lo que hace la app de verdad
-(revisada contra el código el 4 de octubre de 2026). Si cambia cómo se tratan los datos, hay que
+(revisada contra el código el 9 de noviembre de 2026). Si cambia cómo se tratan los datos, hay que
 actualizar `LegalDocuments.kt`, regenerar `docs/legal` y repasar esta guía.
 
 > Es una guía práctica, no asesoramiento jurídico. Conviene que un profesional revise los textos
@@ -77,7 +77,7 @@ Respuestas recomendadas:
 
 ## 5. Verificación de Google (OAuth) — imprescindible
 
-La app pide los ámbitos `https://www.googleapis.com/auth/calendar` y
+La app pide los ámbitos `https://www.googleapis.com/auth/calendar.events` y
 `https://www.googleapis.com/auth/tasks`, que Google considera **sensibles**. Sin verificar la app
 en Google Cloud Console, los usuarios ven «Google no ha verificado esta app» y hay un límite de
 100 usuarios. Para verificarla:
@@ -85,7 +85,7 @@ en Google Cloud Console, los usuarios ven «Google no ha verificado esta app» y
 1. Pantalla de consentimiento OAuth: nombre de la app, logo, correo de asistencia, dominio
    autorizado, **URL de la página de inicio** y **URL de la política de privacidad** (la del punto 2,
    en un dominio verificado).
-2. Justificar cada ámbito: Calendar para leer y escribir los eventos del usuario; Tasks para leer
+2. Justificar cada ámbito: `calendar.events` para leer y escribir los eventos del usuario; Tasks para leer
    y escribir sus tareas. Es la función principal de la app.
 3. Un vídeo (YouTube, puede ser oculto) que muestre el inicio de sesión, la pantalla de permisos de
    Google y cómo se usan los eventos y las tareas en la app.

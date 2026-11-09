@@ -106,7 +106,8 @@ class GoogleApiRemoteDataSource @Inject constructor(
     private companion object {
         const val APP_NAME = "Syncro"
         const val TASKS_SCOPE = "https://www.googleapis.com/auth/tasks"
-        const val CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar"
+        // Solo eventos: Google exige el permiso mínimo y la app no toca la configuración de los calendarios
+        const val CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar.events"
         const val PRIMARY_CALENDAR = "primary"
         const val MAX_TASKS_PER_PAGE = 100
     }
